@@ -10,6 +10,7 @@ from claude_diary.lib.git_info import collect_git_info
 from claude_diary.lib.categorizer import categorize
 from claude_diary.lib.secret_scanner import scan_entry_data
 from claude_diary.formatter import format_entry
+from claude_diary.lib.audit import log_entry as audit_log
 from claude_diary.writer import append_entry, update_session_count, ensure_diary_dir
 from claude_diary.indexer import update_index
 
@@ -129,7 +130,21 @@ def process_session(session_id, transcript_path, cwd):
     except Exception:
         pass
 
-    # 9. Log success
+    # 10. Audit log (non-critical)
+    try:
+        diary_file = os.path.join(diary_dir, "%s.md" % date_str)
+        audit_log(
+            diary_dir=diary_dir,
+            session_id=session_id,
+            transcript_path=transcript_path,
+            files_written=[diary_file],
+            secrets_masked=entry_data.get("secrets_masked", 0),
+            tz_offset=tz_offset,
+        )
+    except Exception:
+        pass
+
+    # 11. Log success
     sys.stderr.write(
         "[diary] Session #%d for %s | project: %s | categories: %s\n"
         % (count, date_str, project, ",".join(entry_data["categories"]) or "none")
