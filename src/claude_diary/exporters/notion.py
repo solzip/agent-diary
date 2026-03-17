@@ -23,6 +23,9 @@ class NotionExporter(BaseExporter):
         token = self.config["api_token"]
         db_id = self.config["database_id"]
 
+        # Team mode: add author column
+        member_name = self.config.get("member_name", "")
+
         # Build Notion page properties
         categories = entry_data.get("categories", [])
         prompts = entry_data.get("user_prompts", [])
@@ -40,6 +43,10 @@ class NotionExporter(BaseExporter):
             "Files Modified": {"rich_text": [{"text": {"content": "\n".join(files_mod + files_new)[:2000]}}]},
             "Work Summary": {"rich_text": [{"text": {"content": "\n".join(hints[:5])[:2000]}}]},
         }
+
+        # Team mode: add Author column
+        if member_name:
+            properties["Author"] = {"select": {"name": member_name}}
 
         # Git info
         commits = git_info.get("commits", [])

@@ -60,10 +60,23 @@ def main():
     p_config.add_argument("--add-exporter", help="Add exporter (interactive)")
 
     # init
-    sub.add_parser("init", help="Initialize claude-diary setup")
+    p_init = sub.add_parser("init", help="Initialize claude-diary setup")
+    p_init.add_argument("--team", dest="team_repo", help="Team repo URL for team mode")
 
     # migrate
     sub.add_parser("migrate", help="Migrate v1.0 env vars to config.json")
+
+    # team
+    p_team = sub.add_parser("team", help="Team management commands")
+    p_team.add_argument("action", nargs="?", default="stats",
+                        choices=["stats", "weekly", "monthly", "init", "add-member"],
+                        help="Team action")
+    p_team.add_argument("--project", "-p", help="Filter by project")
+    p_team.add_argument("--member", help="Filter by member")
+    p_team.add_argument("--month", "-m", help="Month (YYYY-MM)")
+    p_team.add_argument("--repo", help="Team repo URL (for init)")
+    p_team.add_argument("--name", help="Member name (for init/add-member)")
+    p_team.add_argument("--role", default="member", help="Role (for add-member)")
 
     # reindex
     sub.add_parser("reindex", help="Rebuild search index")
@@ -73,6 +86,11 @@ def main():
     p_audit.add_argument("--days", type=int, help="Show entries from last N days")
     p_audit.add_argument("--verify", action="store_true", help="Verify source code checksum")
     p_audit.add_argument("-n", type=int, default=10, help="Number of entries (default: 10)")
+
+    # delete
+    p_delete = sub.add_parser("delete", help="Delete a diary session entry")
+    p_delete.add_argument("--last", action="store_true", help="Delete the last session entry")
+    p_delete.add_argument("--session", help="Delete by session ID prefix")
 
     # dashboard
     p_dashboard = sub.add_parser("dashboard", help="Generate HTML dashboard")
@@ -96,7 +114,9 @@ def main():
         "init": cmd_init,
         "migrate": cmd_migrate,
         "reindex": cmd_reindex,
+        "team": cmd_team,
         "audit": cmd_audit,
+        "delete": cmd_delete,
         "dashboard": cmd_dashboard,
     }
 
@@ -523,6 +543,14 @@ def cmd_init(args):
     config = load_config()
     diary_dir = os.path.expanduser(config["diary_dir"])
 
+    # Team mode init
+    if hasattr(args, 'team_repo') and args.team_repo:
+        from claude_diary.team import init_team
+        print("Initializing claude-diary (team mode)...")
+        print()
+        init_team(args.team_repo)
+        return
+
     print("Initializing claude-diary...")
     print()
 
@@ -601,6 +629,67 @@ def cmd_reindex(args):
     print("Index: %s" % index_path)
 
 
+# ── Team ──
+
+def cmd_team(args):
+    from claude_diary.team import (
+        init_team, get_team_repo_path, team_stats,
+        print_team_stats, team_weekly_report
+    )
+
+    if args.action == "init":
+        repo_url = args.repo
+        if not repo_url:
+            repo_url = input("Team repo URL: ").strip()
+        name = args.name
+        if not name:
+            name = input("Your name: ").strip()
+        print("Initializing team mode...")
+        init_team(repo_url, name)
+        print("\nDone! Sessions will auto-push to team repo.")
+        return
+
+    config = load_config()
+    repo_path = get_team_repo_path(config)
+    if not repo_path or not os.path.isdir(repo_path):
+        print("Team not configured. Run: claude-diary team init --repo <url>")
+        return
+
+    if args.action == "stats":
+        data = team_stats(repo_path, month=args.month)
+        print_team_stats(data)
+
+    elif args.action in ("weekly", "monthly"):
+        lang = config.get("lang", "ko")
+        result = team_weekly_report(repo_path, lang=lang)
+        if result:
+            report, filepath = result
+            print(report)
+            print("---")
+            print("Saved: %s" % filepath)
+        else:
+            print("No team data found.")
+
+    elif args.action == "add-member":
+        name = args.name or input("Member name: ").strip()
+        role = args.role
+        team_config_path = os.path.join(repo_path, ".team-config.json")
+        tc = {}
+        if os.path.exists(team_config_path):
+            with open(team_config_path, "r") as f:
+                tc = json.load(f)
+        tc.setdefault("members", [])
+        tc.setdefault("roles", {})
+        if name not in tc["members"]:
+            tc["members"].append(name)
+        tc["roles"][name] = role
+        with open(team_config_path, "w") as f:
+            json.dump(tc, f, indent=2, ensure_ascii=False)
+        # Create member dir
+        Path(os.path.join(repo_path, "members", name)).mkdir(parents=True, exist_ok=True)
+        print("Added member '%s' with role '%s'" % (name, role))
+
+
 # ── Audit ──
 
 def cmd_audit(args):
@@ -643,6 +732,73 @@ def cmd_audit(args):
         if failed:
             line += " | FAILED:%s" % ",".join(failed)
         print(line)
+
+
+# ── Delete ──
+
+def cmd_delete(args):
+    config = load_config()
+    diary_dir = os.path.expanduser(config["diary_dir"])
+    tz_offset = config.get("timezone_offset", 9)
+    local_tz = timezone(timedelta(hours=tz_offset))
+
+    if args.last:
+        # Find today's file and remove last entry
+        today = datetime.now(local_tz).strftime("%Y-%m-%d")
+        filepath = os.path.join(diary_dir, "%s.md" % today)
+        if not os.path.exists(filepath):
+            print("No diary file for today (%s)" % today)
+            return
+
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Split by session markers and remove last
+        parts = content.split("### ⏰")
+        if len(parts) <= 1:
+            print("No session entries found in today's diary.")
+            return
+
+        # Remove last entry (everything after last "### ⏰")
+        new_content = "### ⏰".join(parts[:-1])
+        # Remove trailing "---\n\n" if present
+        new_content = new_content.rstrip()
+        if new_content.endswith("---"):
+            new_content = new_content[:-3].rstrip()
+        new_content += "\n\n"
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(new_content)
+
+        print("Last session entry deleted from %s" % filepath)
+        return
+
+    if args.session:
+        # Search all files for session ID and remove that entry
+        found = False
+        for f in sorted(Path(diary_dir).glob("*.md")):
+            try:
+                content = f.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            if args.session in content:
+                parts = content.split("### ⏰")
+                new_parts = [parts[0]]
+                for part in parts[1:]:
+                    if args.session not in part:
+                        new_parts.append(part)
+                    else:
+                        found = True
+                new_content = "### ⏰".join(new_parts).rstrip() + "\n"
+                f.write_text(new_content, encoding="utf-8")
+                print("Session %s deleted from %s" % (args.session, f.name))
+                break
+
+        if not found:
+            print("Session '%s' not found." % args.session)
+        return
+
+    print("Specify --last or --session <id>")
 
 
 # ── Dashboard ──
