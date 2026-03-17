@@ -68,6 +68,12 @@ def main():
     # reindex
     sub.add_parser("reindex", help="Rebuild search index")
 
+    # audit
+    p_audit = sub.add_parser("audit", help="View audit log and verify integrity")
+    p_audit.add_argument("--days", type=int, help="Show entries from last N days")
+    p_audit.add_argument("--verify", action="store_true", help="Verify source code checksum")
+    p_audit.add_argument("-n", type=int, default=10, help="Number of entries (default: 10)")
+
     # dashboard
     p_dashboard = sub.add_parser("dashboard", help="Generate HTML dashboard")
     p_dashboard.add_argument("--serve", action="store_true", help="Start local server")
@@ -90,6 +96,7 @@ def main():
         "init": cmd_init,
         "migrate": cmd_migrate,
         "reindex": cmd_reindex,
+        "audit": cmd_audit,
         "dashboard": cmd_dashboard,
     }
 
@@ -592,6 +599,50 @@ def cmd_reindex(args):
     index_path = os.path.join(diary_dir, ".diary_index.json")
     print("Indexed %d sessions." % count)
     print("Index: %s" % index_path)
+
+
+# ── Audit ──
+
+def cmd_audit(args):
+    from claude_diary.lib.audit import read_audit_log, verify_checksum
+    config = load_config()
+    diary_dir = os.path.expanduser(config["diary_dir"])
+
+    if args.verify:
+        is_valid, current, last = verify_checksum(diary_dir)
+        if is_valid:
+            print("Checksum OK: %s" % current)
+        else:
+            print("WARNING: Checksum mismatch!")
+            print("  Current:  %s" % current)
+            print("  Last log: %s" % last)
+            print("  Source files may have been modified since last Hook execution.")
+        return
+
+    entries = read_audit_log(diary_dir, days=args.days, limit=args.n)
+
+    if not entries:
+        print("No audit log entries found.")
+        return
+
+    print("Audit log (%d entries):" % len(entries))
+    print()
+    for e in entries:
+        ts = e.get("timestamp", "")[:19]
+        sid = e.get("session_id", "")[:8]
+        masked = e.get("secrets_masked", 0)
+        written = len(e.get("files_written", []))
+        exporters = e.get("exporters_called", [])
+        failed = e.get("exporters_failed", [])
+
+        line = "  %s | session:%s | wrote:%d" % (ts, sid, written)
+        if masked > 0:
+            line += " | secrets_masked:%d" % masked
+        if exporters:
+            line += " | exporters:%s" % ",".join(exporters)
+        if failed:
+            line += " | FAILED:%s" % ",".join(failed)
+        print(line)
 
 
 # ── Dashboard ──
