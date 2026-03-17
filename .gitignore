@@ -1,0 +1,21 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# bkit plugin state
+.bkit/
+
+# Claude Code project data
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Original archive (source already extracted)
+claude-code-working-diary.tar.gz
