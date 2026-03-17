@@ -20,7 +20,7 @@ def collect_git_info(cwd, session_start=None):
     try:
         branch = _get_branch(cwd)
         commits = _get_recent_commits(cwd, session_start)
-        diff_stat = _get_diff_stat(cwd)
+        diff_stat = get_diff_stat(cwd, session_start)
 
         return {
             "branch": branch,
@@ -80,25 +80,29 @@ def _get_recent_commits(cwd, since=None):
         return []
 
 
-def _get_diff_stat(cwd):
+def get_diff_stat(cwd, since=None):
     """Get diff stat (added/deleted lines, files changed).
-    Includes both staged and unstaged changes.
+
+    Args:
+        cwd: Working directory
+        since: ISO timestamp — if provided, diff from merge-base (optional)
+
+    Returns:
+        {"added": int, "deleted": int, "files": int}
     """
     added = 0
     deleted = 0
     files = 0
 
     try:
-        # Staged + unstaged
+        import re
+        cmd = ["git", "diff", "--stat", "HEAD"]
         result = subprocess.run(
-            ["git", "diff", "--stat", "HEAD"],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cmd, cwd=cwd, capture_output=True, text=True, timeout=5
         )
         lines = result.stdout.strip().split("\n")
         if lines:
             summary = lines[-1]
-            # Parse: " 5 files changed, 142 insertions(+), 38 deletions(-)"
-            import re
             files_match = re.search(r'(\d+) files? changed', summary)
             add_match = re.search(r'(\d+) insertions?', summary)
             del_match = re.search(r'(\d+) deletions?', summary)
