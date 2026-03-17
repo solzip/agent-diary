@@ -32,6 +32,12 @@ def process_session(session_id, transcript_path, cwd):
     diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
     enrichment = config.get("enrichment", {})
 
+    # 0. Session opt-out check
+    from claude_diary.lib.team_security import should_skip_session
+    if should_skip_session(cwd, config):
+        sys.stderr.write("[diary] Session skipped (opt-out)\n")
+        return False
+
     local_tz = timezone(timedelta(hours=tz_offset))
     now = datetime.now(local_tz)
     date_str = now.strftime("%Y-%m-%d")
@@ -98,6 +104,25 @@ def process_session(session_id, transcript_path, cwd):
     # 5. Secret scan (always runs)
     try:
         scan_entry_data(entry_data)
+    except Exception:
+        pass
+
+    # 5.5 Team security filters (path masking + content filter)
+    try:
+        from claude_diary.lib.team_security import mask_paths, filter_entry_data
+        security = config.get("security", {})
+        mask_patterns = security.get("mask_paths", [])
+        if mask_patterns:
+            entry_data["files_created"] = mask_paths(entry_data["files_created"], mask_patterns)
+            entry_data["files_modified"] = mask_paths(entry_data["files_modified"], mask_patterns)
+
+        content_filters = security.get("content_filters", [])
+        filter_mode = security.get("filter_mode", "redact")
+        if content_filters:
+            should_record = filter_entry_data(entry_data, content_filters, filter_mode)
+            if not should_record:
+                sys.stderr.write("[diary] Session skipped (content filter)\n")
+                return False
     except Exception:
         pass
 

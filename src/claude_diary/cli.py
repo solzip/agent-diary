@@ -74,6 +74,11 @@ def main():
     p_audit.add_argument("--verify", action="store_true", help="Verify source code checksum")
     p_audit.add_argument("-n", type=int, default=10, help="Number of entries (default: 10)")
 
+    # delete
+    p_delete = sub.add_parser("delete", help="Delete a diary session entry")
+    p_delete.add_argument("--last", action="store_true", help="Delete the last session entry")
+    p_delete.add_argument("--session", help="Delete by session ID prefix")
+
     # dashboard
     p_dashboard = sub.add_parser("dashboard", help="Generate HTML dashboard")
     p_dashboard.add_argument("--serve", action="store_true", help="Start local server")
@@ -97,6 +102,7 @@ def main():
         "migrate": cmd_migrate,
         "reindex": cmd_reindex,
         "audit": cmd_audit,
+        "delete": cmd_delete,
         "dashboard": cmd_dashboard,
     }
 
@@ -643,6 +649,73 @@ def cmd_audit(args):
         if failed:
             line += " | FAILED:%s" % ",".join(failed)
         print(line)
+
+
+# ── Delete ──
+
+def cmd_delete(args):
+    config = load_config()
+    diary_dir = os.path.expanduser(config["diary_dir"])
+    tz_offset = config.get("timezone_offset", 9)
+    local_tz = timezone(timedelta(hours=tz_offset))
+
+    if args.last:
+        # Find today's file and remove last entry
+        today = datetime.now(local_tz).strftime("%Y-%m-%d")
+        filepath = os.path.join(diary_dir, "%s.md" % today)
+        if not os.path.exists(filepath):
+            print("No diary file for today (%s)" % today)
+            return
+
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Split by session markers and remove last
+        parts = content.split("### ⏰")
+        if len(parts) <= 1:
+            print("No session entries found in today's diary.")
+            return
+
+        # Remove last entry (everything after last "### ⏰")
+        new_content = "### ⏰".join(parts[:-1])
+        # Remove trailing "---\n\n" if present
+        new_content = new_content.rstrip()
+        if new_content.endswith("---"):
+            new_content = new_content[:-3].rstrip()
+        new_content += "\n\n"
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(new_content)
+
+        print("Last session entry deleted from %s" % filepath)
+        return
+
+    if args.session:
+        # Search all files for session ID and remove that entry
+        found = False
+        for f in sorted(Path(diary_dir).glob("*.md")):
+            try:
+                content = f.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            if args.session in content:
+                parts = content.split("### ⏰")
+                new_parts = [parts[0]]
+                for part in parts[1:]:
+                    if args.session not in part:
+                        new_parts.append(part)
+                    else:
+                        found = True
+                new_content = "### ⏰".join(new_parts).rstrip() + "\n"
+                f.write_text(new_content, encoding="utf-8")
+                print("Session %s deleted from %s" % (args.session, f.name))
+                break
+
+        if not found:
+            print("Session '%s' not found." % args.session)
+        return
+
+    print("Specify --last or --session <id>")
 
 
 # ── Dashboard ──
