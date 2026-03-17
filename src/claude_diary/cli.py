@@ -68,6 +68,12 @@ def main():
     # reindex
     sub.add_parser("reindex", help="Rebuild search index")
 
+    # dashboard
+    p_dashboard = sub.add_parser("dashboard", help="Generate HTML dashboard")
+    p_dashboard.add_argument("--serve", action="store_true", help="Start local server")
+    p_dashboard.add_argument("--port", type=int, default=8787, help="Server port (default: 8787)")
+    p_dashboard.add_argument("--months", type=int, default=3, help="Months of data (default: 3)")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -84,6 +90,7 @@ def main():
         "init": cmd_init,
         "migrate": cmd_migrate,
         "reindex": cmd_reindex,
+        "dashboard": cmd_dashboard,
     }
 
     fn = commands.get(args.command)
@@ -635,6 +642,23 @@ def cmd_reindex(args):
 
     print("Indexed %d sessions from %d files." % (count, len(list(Path(diary_dir).glob("*.md")))))
     print("Index: %s" % index_path)
+
+
+# ── Dashboard ──
+
+def cmd_dashboard(args):
+    from claude_diary.dashboard import generate_dashboard, serve_dashboard
+    config = load_config()
+    diary_dir = os.path.expanduser(config["diary_dir"])
+
+    path = generate_dashboard(diary_dir, months=args.months)
+    print("Dashboard generated: %s" % path)
+
+    if args.serve:
+        serve_dashboard(diary_dir, port=args.port)
+    else:
+        import webbrowser
+        webbrowser.open("file://%s" % os.path.abspath(path))
 
 
 if __name__ == "__main__":
