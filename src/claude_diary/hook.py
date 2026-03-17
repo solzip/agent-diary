@@ -31,8 +31,8 @@ def main():
     cwd = input_data.get("cwd", "")
 
     try:
-        wrote = process_session(session_id, transcript_path, cwd)
-        sys.exit(0 if wrote else 0)
+        process_session(session_id, transcript_path, cwd)
+        sys.exit(0)
     except Exception as e:
         sys.stderr.write("[diary] Fatal error: %s\n" % str(e))
         sys.exit(0)  # Never block Claude Code exit

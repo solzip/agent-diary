@@ -119,8 +119,6 @@ def format_daily_header(date_str, lang="ko"):
     """Create daily diary file header."""
     L = lambda key: get_label(key, lang)
 
-    tz_offset = 9  # Will be overridden by config
-    local_tz = timezone(timedelta(hours=tz_offset))
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         weekday_idx = dt.weekday()

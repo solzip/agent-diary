@@ -146,47 +146,40 @@ export CLAUDE_DIARY_TZ_OFFSET="9"
 [Environment]::SetEnvironmentVariable("CLAUDE_DIARY_DIR", "$env:USERPROFILE\working-diary", "User")
 ```
 
-## 주간 요약 생성
+## CLI 명령어
 
 ```bash
-# 이번 주 요약
-python ~/.claude/hooks/weekly-summary.py
-
-# 특정 주 요약
-python ~/.claude/hooks/weekly-summary.py 2026-03-10
+claude-diary search "키워드"              # 키워드 검색
+claude-diary filter --project my-app      # 프로젝트 필터
+claude-diary trace src/main.py            # 파일 변경 이력
+claude-diary stats                        # 터미널 대시보드
+claude-diary weekly                       # 주간 요약 생성
+claude-diary dashboard                    # HTML 대시보드
+claude-diary audit                        # 보안 감사 로그
+claude-diary audit --verify               # 소스 코드 무결성 검증
+claude-diary config                       # 설정 확인
+claude-diary team stats                   # 팀 통계
+claude-diary team weekly                  # 팀 주간 리포트
 ```
 
-## Hook 설정 확인
+## 주요 기능
 
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python ~/.claude/hooks/working-diary.py"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-## 제거
-
-```bash
-./install.sh --uninstall
-```
-
-작업일지 데이터(`~/working-diary/`)는 보존됩니다.
+| 기능 | 설명 |
+|------|------|
+| 자동 카테고리 | feature/bugfix/refactor/docs/test/config/style 자동 분류 |
+| Git 연동 | 브랜치, 커밋, 변경량 (+/- lines) 자동 기록 |
+| 시크릿 스캔 | 패스워드, API 키, 토큰 자동 마스킹 (11+ 패턴) |
+| 검색 인덱스 | 수개월 일지에서도 빠른 검색 |
+| 5개 Exporter | Notion, Slack, Discord, Obsidian, GitHub 연동 |
+| HTML 대시보드 | GitHub 잔디 히트맵, Chart.js 차트 |
+| 보안 감사 | audit 로그, SHA-256 checksum 변조 감지 |
+| 팀 모드 | 접근 제어, Git 중앙 repo, 팀 리포트 |
 
 ## 요구사항
 
-- Python 3.6+ (`python3` or `python`)
+- Python 3.7+ (`python3` or `python`)
 - Claude Code (hooks 지원 버전)
+- 외부 의존성 없음 (코어), API 토큰 불필요
 
 ## 팁
 
@@ -195,28 +188,20 @@ python ~/.claude/hooks/weekly-summary.py 2026-03-10
 ```markdown
 ## 작업일지
 - 세션 종료 시 작업 내용이 자동 기록됩니다
-- 작업 완료/구현/수정 시 한국어로 명확한 요약을 출력해주세요
-```
-
-**Git으로 일지를 관리하면** 작업 이력을 추적할 수 있습니다:
-
-```bash
-cd ~/working-diary
-git init && git add -A && git commit -m "diary: $(date +%Y-%m-%d)"
+- 작업 완료/구현/수정 시 명확한 요약을 출력해주세요
 ```
 
 ## 로드맵
 
-이 프로젝트는 3단계로 진화합니다:
-
-| Phase | 목표 | 상태 |
-|-------|------|------|
-| **A** | 개인 생산성 도구 (카테고리, Git연동, CLI, 플러그인, 대시보드) | 📋 Plan |
-| **B** | 오픈소스 커뮤니티 (보안 강화, pip 배포, 테스트, CI/CD) | 📋 Plan |
-| **C** | 팀/회사 도구 (접근 제어, Git 중앙 repo, 팀 리포트) | 📋 Plan |
+| Phase | 목표 | 버전 | 상태 |
+|-------|------|------|------|
+| **A** | 개인 생산성 도구 (카테고리, Git, CLI, 플러그인, 대시보드) | v2.0.0 | ✅ 완료 |
+| **B** | 오픈소스 커뮤니티 (보안, 테스트 40개, CI/CD) | v3.0.0 | ✅ 완료 |
+| **C** | 팀/회사 도구 (접근 제어, Git 중앙 repo, 팀 리포트) | v4.0.0 | ✅ 완료 |
+| **D** | 배포 (플러그인, PyPI, 마켓플레이스) | v4.1.0 | 🔄 진행 중 |
 
 자세한 내용은 [`docs/plans/`](docs/plans/) 디렉토리를 참고하세요.
 
 ## 라이선스
 
-MIT License
+MIT License — [LICENSE](LICENSE)

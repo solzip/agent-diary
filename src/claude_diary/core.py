@@ -89,8 +89,8 @@ def process_session(session_id, transcript_path, cwd):
 
                 # Supplement files from git if transcript was incomplete
                 _supplement_from_git(entry_data, git_info)
-        except Exception:
-            pass
+        except Exception as e:
+            sys.stderr.write("[diary] Git enrichment failed: %s\n" % str(e))
 
     # 4. Enrichment: Auto-categorization
     if enrichment.get("auto_category", True):
