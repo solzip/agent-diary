@@ -111,21 +111,17 @@ def _compute_source_checksum():
     """Compute SHA-256 hash of core source files for tamper detection."""
     hasher = hashlib.sha256()
 
-    # Hash key source files
+    # Hash all .py source files for comprehensive tamper detection
     src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    key_files = [
-        "core.py", "hook.py", "config.py",
-        os.path.join("lib", "parser.py"),
-        os.path.join("lib", "secret_scanner.py"),
-    ]
 
-    for rel_path in key_files:
-        full_path = os.path.join(src_dir, rel_path)
-        if os.path.exists(full_path):
-            try:
-                with open(full_path, "rb") as f:
-                    hasher.update(f.read())
-            except Exception:
-                pass
+    for root, dirs, files in os.walk(src_dir):
+        for fname in sorted(files):
+            if fname.endswith(".py"):
+                full_path = os.path.join(root, fname)
+                try:
+                    with open(full_path, "rb") as f:
+                        hasher.update(f.read())
+                except Exception:
+                    pass
 
     return "sha256:" + hasher.hexdigest()[:16]
