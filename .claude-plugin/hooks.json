@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m claude_diary.hook"
+          }
+        ]
+      }
+    ]
+  }
+}

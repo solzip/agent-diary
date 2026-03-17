@@ -22,7 +22,7 @@ def main():
         prog="claude-diary",
         description="Auto-generated work diary from Claude Code sessions",
     )
-    parser.add_argument("--version", action="version", version="claude-diary 2.0.0")
+    parser.add_argument("--version", action="version", version="claude-diary 4.1.0")
 
     sub = parser.add_subparsers(dest="command")
 
