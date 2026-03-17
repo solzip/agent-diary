@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "claude-diary"
+version = "2.0.0"
+description = "Auto-generate work diaries from Claude Code sessions"
+readme = "README.en.md"
+license = {text = "MIT"}
+requires-python = ">=3.7"
+authors = [{name = "solzip"}]
+keywords = ["claude-code", "productivity", "work-diary", "automation", "hooks"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Documentation",
+]
+dependencies = []
+
+[project.optional-dependencies]
+notion = ["requests>=2.28"]
+all = ["requests>=2.28"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0"]
+
+[project.scripts]
+claude-diary = "claude_diary.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/solzip/claude-code-hooks-diary"
+Repository = "https://github.com/solzip/claude-code-hooks-diary"
+
+[tool.setuptools.packages.find]
+where = ["src"]
