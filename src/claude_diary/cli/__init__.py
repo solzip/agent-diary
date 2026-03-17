@@ -129,18 +129,29 @@ def main():
 
 def cmd_search(args):
     config = load_config()
+    lang = config.get("lang", "ko")
+    L = lambda key: get_label(key, lang)
     diary_dir = os.path.expanduser(config["diary_dir"])
     keyword = args.keyword.lower()
 
     index = load_index(diary_dir)
     entries = index.get("entries", [])
 
+    # Auto-reindex if no index but diary files exist
+    if not entries:
+        diary_files = list(Path(diary_dir).glob("*.md"))
+        if diary_files:
+            print(L("cli_no_index"))
+            from claude_diary.indexer import reindex_all
+            reindex_all(diary_dir)
+            index = load_index(diary_dir)
+            entries = index.get("entries", [])
+
     if not entries:
         entries = _fallback_search_from_files(diary_dir, keyword)
         if not entries:
-            print("No results found for '%s'" % args.keyword)
+            print(L("cli_no_results") % args.keyword)
             return
-        # Fallback mode: entries are dicts with date, project, line
         for e in entries:
             print("%s | %s | %s" % (e["date"], e["project"], e["line"]))
         return
@@ -167,7 +178,7 @@ def cmd_search(args):
         print("No results found for '%s'" % args.keyword)
         return
 
-    print("Found %d entries:" % len(results))
+    print(L("cli_found_entries") % len(results))
     print()
     for e in results:
         cats = ",".join(e.get("categories", [])) or "uncategorized"
@@ -222,10 +233,10 @@ def cmd_filter(args):
         results.append(e)
 
     if not results:
-        print("No entries match the filter.")
+        print(get_label("cli_no_match", load_config().get("lang", "ko")))
         return
 
-    print("Found %d entries:" % len(results))
+    print(L("cli_found_entries") % len(results))
     print()
     for e in results:
         cats = ",".join(e.get("categories", [])) or "-"
@@ -743,11 +754,16 @@ def cmd_delete(args):
     local_tz = timezone(timedelta(hours=tz_offset))
 
     if args.last:
-        # Find today's file and remove last entry
         today = datetime.now(local_tz).strftime("%Y-%m-%d")
         filepath = os.path.join(diary_dir, "%s.md" % today)
         if not os.path.exists(filepath):
             print("No diary file for today (%s)" % today)
+            return
+
+        # Confirmation prompt
+        confirm = input("Delete last session entry from %s? [y/N]: " % today).strip().lower()
+        if confirm not in ("y", "yes"):
+            print("Cancelled.")
             return
 
         with open(filepath, "r", encoding="utf-8") as f:
