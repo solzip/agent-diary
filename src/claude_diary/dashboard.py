@@ -102,8 +102,9 @@ def serve_dashboard(diary_dir=None, port=8787):
     if not os.path.exists(os.path.join(dashboard_dir, "index.html")):
         generate_dashboard(diary_dir)
 
-    os.chdir(dashboard_dir)
-    server = HTTPServer(("localhost", port), SimpleHTTPRequestHandler)
+    import functools
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=dashboard_dir)
+    server = HTTPServer(("localhost", port), handler)
     print("Dashboard: http://localhost:%d" % port)
     print("Press Ctrl+C to stop.")
 

@@ -33,12 +33,14 @@ def main():
     p_search.add_argument("--category", "-c", help="Filter by category")
     p_search.add_argument("--from", dest="date_from", help="Start date (YYYY-MM-DD)")
     p_search.add_argument("--to", dest="date_to", help="End date (YYYY-MM-DD)")
+    p_search.add_argument("--json", dest="json_output", action="store_true", help="Output as JSON")
 
     # filter
     p_filter = sub.add_parser("filter", help="Filter diary entries")
     p_filter.add_argument("--project", "-p", help="Filter by project")
     p_filter.add_argument("--category", "-c", help="Filter by category")
     p_filter.add_argument("--month", "-m", help="Filter by month (YYYY-MM)")
+    p_filter.add_argument("--json", dest="json_output", action="store_true", help="Output as JSON")
 
     # trace
     p_trace = sub.add_parser("trace", help="Trace file change history")
@@ -176,6 +178,10 @@ def cmd_search(args):
 
     if not results:
         print("No results found for '%s'" % args.keyword)
+        return
+
+    if getattr(args, 'json_output', False):
+        print(json.dumps(results, ensure_ascii=False, indent=2))
         return
 
     print(L("cli_found_entries") % len(results))
@@ -364,15 +370,24 @@ def cmd_stats(args):
     _print_box_bottom()
 
 
+def _get_terminal_width():
+    """Get terminal width, defaulting to 52."""
+    try:
+        import shutil
+        return min(max(shutil.get_terminal_size().columns - 2, 40), 100)
+    except Exception:
+        return 52
+
+
 def _print_box_top(title):
-    width = 52
+    width = _get_terminal_width()
     print("╔" + "═" * width + "╗")
     print("║  📊 %-*s║" % (width - 4, title))
     print("╠" + "═" * width + "╣")
 
 
 def _print_box_bottom():
-    print("╚" + "═" * 52 + "╝")
+    print("╚" + "═" * _get_terminal_width() + "╝")
 
 
 # ── Weekly ──
@@ -483,12 +498,25 @@ def cmd_config(args):
         key, _, value = args.set_value.partition("=")
         key = key.strip()
         value = value.strip()
-        if key in ("lang", "diary_dir"):
+        if key == "lang":
+            if value not in ("ko", "en"):
+                print("Invalid lang: %s (use 'ko' or 'en')" % value)
+                return
+            config[key] = value
+        elif key == "diary_dir":
             config[key] = value
         elif key == "timezone_offset":
-            config[key] = int(value)
+            try:
+                tz = int(value)
+                if not (-12 <= tz <= 14):
+                    print("Invalid timezone_offset: %s (range: -12 to 14)" % value)
+                    return
+                config[key] = tz
+            except ValueError:
+                print("Invalid timezone_offset: %s (must be integer)" % value)
+                return
         else:
-            print("Unknown config key: %s" % key)
+            print("Unknown config key: %s (available: lang, diary_dir, timezone_offset)" % key)
             return
         save_config(config)
         print("Set %s = %s" % (key, value))

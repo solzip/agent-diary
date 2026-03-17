@@ -103,7 +103,8 @@ def process_session(session_id, transcript_path, cwd):
 
     # 5. Secret scan (always runs)
     try:
-        scan_entry_data(entry_data)
+        additional = config.get("security", {}).get("additional_secret_patterns", [])
+        scan_entry_data(entry_data, additional or None)
     except Exception:
         pass
 
