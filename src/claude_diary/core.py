@@ -146,30 +146,12 @@ def _supplement_from_git(entry_data, git_info):
 
 
 def _run_exporters(config, entry_data):
-    """Load and run enabled exporters."""
-    exporters_config = config.get("exporters", {})
-    if not exporters_config:
-        return
+    """Load and run enabled exporters via plugin loader."""
+    from claude_diary.exporters.loader import load_exporters, run_exporters
+    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
 
-    for name, exp_config in exporters_config.items():
-        if not exp_config.get("enabled", False):
-            continue
-        try:
-            _run_single_exporter(name, exp_config, entry_data)
-        except Exception as e:
-            sys.stderr.write("[diary] Exporter '%s' failed: %s\n" % (name, str(e)))
-
-
-def _run_single_exporter(name, exp_config, entry_data):
-    """Dynamically load and run a single exporter."""
-    import importlib
-    try:
-        module = importlib.import_module("claude_diary.exporters.%s" % name)
-        exporter_class = getattr(module, "%sExporter" % name.capitalize(), None)
-        if exporter_class is None:
-            return
-        exporter = exporter_class(exp_config)
-        if exporter.validate_config():
-            exporter.export(entry_data)
-    except ImportError:
-        sys.stderr.write("[diary] Exporter '%s' not found\n" % name)
+    exporters = load_exporters(config)
+    if exporters:
+        result = run_exporters(exporters, entry_data, diary_dir)
+        if result["failed"]:
+            sys.stderr.write("[diary] Failed exporters: %s\n" % ", ".join(result["failed"]))
