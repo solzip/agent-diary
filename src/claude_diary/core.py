@@ -100,11 +100,15 @@ def process_session(session_id, transcript_path, cwd):
     except Exception:
         pass
 
-    # 6. Format and write
-    entry_text = format_entry(entry_data, lang)
-    ensure_diary_dir(diary_dir)
-    append_entry(diary_dir, date_str, entry_text, lang)
-    count = update_session_count(diary_dir, date_str)
+    # 6. Format and write (CRITICAL — exit 1 on failure)
+    try:
+        entry_text = format_entry(entry_data, lang)
+        ensure_diary_dir(diary_dir)
+        append_entry(diary_dir, date_str, entry_text, lang)
+        count = update_session_count(diary_dir, date_str)
+    except Exception as e:
+        sys.stderr.write("[diary] FATAL: Failed to write diary: %s\n" % str(e))
+        sys.exit(1)
 
     # 7. Update search index (non-critical)
     try:
@@ -112,7 +116,14 @@ def process_session(session_id, transcript_path, cwd):
     except Exception:
         pass
 
-    # 8. Run exporters (non-critical)
+    # 8. Retry previously failed exports (non-critical)
+    try:
+        from claude_diary.exporters.loader import retry_queued
+        retry_queued(config, diary_dir)
+    except Exception:
+        pass
+
+    # 9. Run exporters (non-critical)
     try:
         _run_exporters(config, entry_data)
     except Exception:
@@ -137,12 +148,25 @@ def _extract_project_name(cwd):
 
 def _supplement_from_git(entry_data, git_info):
     """Supplement file lists from git when transcript may be incomplete."""
-    # If git has commits but transcript has no files, git diff is more reliable
-    if git_info.get("diff_stat", {}).get("files", 0) > 0:
-        if not entry_data["files_created"] and not entry_data["files_modified"]:
-            # transcript was empty — trust git
-            pass  # git diff --stat doesn't give individual filenames easily
-            # This will be enhanced when we parse `git diff --name-status`
+    diff_stat = git_info.get("diff_stat", {})
+    if diff_stat.get("files", 0) > 0 and not entry_data["files_modified"] and not entry_data["files_created"]:
+        # Transcript was empty/incomplete — get filenames from git
+        cwd = entry_data.get("cwd", "")
+        if cwd:
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["git", "diff", "--name-only", "HEAD"],
+                    cwd=cwd, capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    from claude_diary.lib.parser import _shorten_path
+                    for line in result.stdout.strip().split("\n"):
+                        line = line.strip()
+                        if line:
+                            entry_data["files_modified"].append(_shorten_path(line))
+            except Exception:
+                pass
 
 
 def _run_exporters(config, entry_data):

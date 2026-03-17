@@ -58,9 +58,67 @@ def load_index(diary_dir):
 
 
 def reindex_all(diary_dir):
-    """Rebuild entire index from all .md files. (Placeholder for CLI command)"""
-    # This will be implemented in Sprint 2 (CLI)
-    pass
+    """Rebuild entire index from all .md files."""
+    import re
+    from pathlib import Path
+    from claude_diary.lib.stats import parse_daily_file
+
+    index = {"entries": [], "last_indexed": ""}
+    count = 0
+
+    for f in sorted(Path(diary_dir).glob("*.md")):
+        date_str = f.stem
+        stats = parse_daily_file(str(f))
+        if stats["sessions"] == 0:
+            continue
+
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        sessions = content.split("### ⏰")
+        for session in sessions[1:]:
+            time_match = re.match(r'\s*(\d{2}:\d{2}:\d{2})', session)
+            time_str = time_match.group(1) if time_match else ""
+
+            proj_match = re.search(r'📁 `([^`]+)`', session)
+            project = proj_match.group(1) if proj_match else ""
+
+            cats = re.findall(r'(?:카테고리|Categories).*?`([^`]+)`', session)
+            files = re.findall(r'  - `([^`]+)`', session)
+
+            keywords = set()
+            prompt_section = re.search(
+                r'(?:작업 요청|Task Requests).*?\n((?:\s+\d+\. .+\n?)+)', session
+            )
+            if prompt_section:
+                for word in prompt_section.group(1).lower().split():
+                    w = word.strip(".,!?:;\"'()[]{}").strip()
+                    if len(w) > 2:
+                        keywords.add(w)
+
+            index["entries"].append({
+                "date": date_str,
+                "time": time_str,
+                "project": project,
+                "categories": cats,
+                "files": files[:20],
+                "keywords": sorted(keywords)[:30],
+                "git_commits": [],
+                "lines_added": 0,
+                "lines_deleted": 0,
+                "session_id": "",
+            })
+            count += 1
+
+    from datetime import datetime
+    index["last_indexed"] = datetime.now().isoformat()
+
+    index_path = os.path.join(diary_dir, ".diary_index.json")
+    _save_index(index_path, index)
+
+    return count
 
 
 def _load_index(index_path):

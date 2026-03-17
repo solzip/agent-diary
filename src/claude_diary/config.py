@@ -43,16 +43,7 @@ def load_config():
     """
     config = dict(DEFAULT_CONFIG)
 
-    config_path = get_config_path()
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                file_config = json.load(f)
-            _deep_merge(config, file_config)
-        except (json.JSONDecodeError, IOError):
-            pass
-
-    # Environment variable overrides
+    # 1. Environment variables (lowest priority override)
     env_lang = os.environ.get("CLAUDE_DIARY_LANG")
     if env_lang:
         config["lang"] = env_lang.lower()
@@ -66,6 +57,16 @@ def load_config():
         try:
             config["timezone_offset"] = int(env_tz)
         except ValueError:
+            pass
+
+    # 2. config.json (highest priority — overrides env vars)
+    config_path = get_config_path()
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                file_config = json.load(f)
+            _deep_merge(config, file_config)
+        except (json.JSONDecodeError, IOError):
             pass
 
     return config

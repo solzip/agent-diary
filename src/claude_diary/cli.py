@@ -465,7 +465,15 @@ def cmd_config(args):
             for name, exp in value.items():
                 enabled = exp.get("enabled", False)
                 status = "enabled" if enabled else "disabled"
-                print("  %s: %s" % (name, status))
+                details = []
+                for k, v in exp.items():
+                    if k == "enabled":
+                        continue
+                    if k in ("api_token", "token", "webhook_url") and isinstance(v, str) and len(v) > 8:
+                        v = v[:4] + "..." + v[-4:]
+                    details.append("%s=%s" % (k, v))
+                detail_str = " (%s)" % ", ".join(details) if details else ""
+                print("  %s: %s%s" % (name, status, detail_str))
         elif isinstance(value, dict):
             print("%s: %s" % (key, json.dumps(value, ensure_ascii=False)))
         else:
@@ -575,72 +583,14 @@ def cmd_migrate(args):
 # ── Reindex ──
 
 def cmd_reindex(args):
+    from claude_diary.indexer import reindex_all
     config = load_config()
     diary_dir = os.path.expanduser(config["diary_dir"])
 
     print("Rebuilding search index...")
-
-    index = {"entries": [], "last_indexed": ""}
-    count = 0
-
-    for f in sorted(Path(diary_dir).glob("*.md")):
-        date_str = f.stem
-        stats = parse_daily_file(str(f))
-
-        if stats["sessions"] == 0:
-            continue
-
-        # Read file for more detail
-        try:
-            content = f.read_text(encoding="utf-8")
-        except Exception:
-            continue
-
-        # Extract entries by session marker
-        sessions = content.split("### ⏰")
-        for session in sessions[1:]:
-            time_match = re.match(r'\s*(\d{2}:\d{2}:\d{2})', session)
-            time_str = time_match.group(1) if time_match else ""
-
-            proj_match = re.search(r'📁 `([^`]+)`', session)
-            project = proj_match.group(1) if proj_match else ""
-
-            # Categories
-            cats = re.findall(r'(?:카테고리|Categories).*?`([^`]+)`', session)
-
-            # Files
-            files = re.findall(r'  - `([^`]+)`', session)
-
-            # Keywords from prompts
-            keywords = set()
-            prompt_section = re.search(r'(?:작업 요청|Task Requests).*?\n((?:\s+\d+\. .+\n?)+)', session)
-            if prompt_section:
-                for word in prompt_section.group(1).lower().split():
-                    w = word.strip(".,!?:;\"'()[]{}").strip()
-                    if len(w) > 2:
-                        keywords.add(w)
-
-            index["entries"].append({
-                "date": date_str,
-                "time": time_str,
-                "project": project,
-                "categories": cats,
-                "files": files[:20],
-                "keywords": sorted(keywords)[:30],
-                "git_commits": [],
-                "lines_added": 0,
-                "lines_deleted": 0,
-                "session_id": "",
-            })
-            count += 1
-
-    index["last_indexed"] = datetime.now().isoformat()
-
+    count = reindex_all(diary_dir)
     index_path = os.path.join(diary_dir, ".diary_index.json")
-    with open(index_path, "w", encoding="utf-8") as f:
-        json.dump(index, f, indent=2, ensure_ascii=False)
-
-    print("Indexed %d sessions from %d files." % (count, len(list(Path(diary_dir).glob("*.md")))))
+    print("Indexed %d sessions." % count)
     print("Index: %s" % index_path)
 
 
