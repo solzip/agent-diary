@@ -48,15 +48,14 @@ def categorize(entry_data, custom_rules=None):
     for category, keywords in rules.items():
         score = 0
         for kw in keywords:
-            kw_lower = kw.lower()
-            score += combined.count(kw_lower)
-            # File extension hints
-            if category == "style" and any(ext in file_text for ext in [".css", ".scss", ".styled"]):
-                score += 1
-            if category == "test" and any(ext in file_text for ext in ["test_", "_test.", ".test.", "spec."]):
-                score += 1
-            if category == "docs" and any(ext in file_text for ext in [".md", ".rst", ".txt"]):
-                score += 1
+            score += combined.count(kw.lower())
+        # File extension hints (once per category, not per keyword)
+        if category == "style" and any(ext in file_text for ext in [".css", ".scss", ".styled"]):
+            score += 2
+        if category == "test" and any(ext in file_text for ext in ["test_", "_test.", ".test.", "spec."]):
+            score += 2
+        if category == "docs" and any(ext in file_text for ext in [".md", ".rst", ".txt"]):
+            score += 2
         if score > 0:
             scores[category] = score
 

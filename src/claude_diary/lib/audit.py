@@ -78,11 +78,9 @@ def read_audit_log(diary_dir, days=None, limit=10):
     except Exception:
         return []
 
-    # Filter by days
+    # Filter by days (date string comparison, timezone-safe)
     if days is not None:
-        cutoff = datetime.now().isoformat()[:10]
-        from datetime import timedelta as td
-        cutoff_date = (datetime.now() - td(days=days)).isoformat()[:10]
+        cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
         entries = [e for e in entries if e.get("timestamp", "")[:10] >= cutoff_date]
 
     # Return newest first, limited

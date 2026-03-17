@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.1.0] - 2026-03-17 (Phase D)
+
+### Added
+- **Plugin**: `.claude-plugin/` directory for Claude Code marketplace
+- **Install**: 3 installation methods (pip / plugin / manual)
+- **GitHub**: Topics, badges, description optimization
+
+### Changed
+- Version sync across pyproject.toml, __init__.py, cli.py, plugin.json
+
+## [4.0.0] - 2026-03-17 (Phase C)
+
+### Added
+- **Team Security**: Path masking (glob patterns), content filtering (redact/skip), session opt-out
+- **Team Access**: member/lead/admin 3-tier role-based access control
+- **Team Repo**: Git central repo with `init --team`, `.team-config.json`
+- **Team CLI**: `team stats`, `team weekly`, `team init`, `team add-member`
+- **Team Notion**: Author column auto-set for shared Notion DB
+- **CLI**: `delete --last` / `delete --session` for session removal
+
 ## [3.0.0] - 2026-03-17 (Phase B)
 
 ### Added

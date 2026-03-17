@@ -146,47 +146,40 @@ export CLAUDE_DIARY_TZ_OFFSET="-5"  # EST (UTC-5)
 [Environment]::SetEnvironmentVariable("CLAUDE_DIARY_DIR", "$env:USERPROFILE\working-diary", "User")
 ```
 
-## Weekly Summary
+## CLI Commands
 
 ```bash
-# Generate this week's summary
-python ~/.claude/hooks/weekly-summary.py
-
-# Generate for a specific week
-python ~/.claude/hooks/weekly-summary.py 2026-03-10
+claude-diary search "keyword"             # Keyword search
+claude-diary filter --project my-app      # Filter by project
+claude-diary trace src/main.py            # File change history
+claude-diary stats                        # Terminal dashboard
+claude-diary weekly                       # Weekly summary
+claude-diary dashboard                    # HTML dashboard
+claude-diary audit                        # Security audit log
+claude-diary audit --verify               # Source code integrity check
+claude-diary config                       # View settings
+claude-diary team stats                   # Team statistics
+claude-diary team weekly                  # Team weekly report
 ```
 
-## Hook Configuration
+## Features
 
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python ~/.claude/hooks/working-diary.py"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-## Uninstall
-
-```bash
-./install.sh --uninstall
-```
-
-Your diary data (`~/working-diary/`) is preserved.
+| Feature | Description |
+|---------|-------------|
+| Auto Categories | feature/bugfix/refactor/docs/test/config/style auto-tagging |
+| Git Integration | Branch, commits, diff stats (+/- lines) auto-recorded |
+| Secret Scanning | Passwords, API keys, tokens auto-masked (11+ patterns) |
+| Search Index | Fast search across months of diary files |
+| 5 Exporters | Notion, Slack, Discord, Obsidian, GitHub plugins |
+| HTML Dashboard | GitHub-style heatmap, Chart.js charts |
+| Security Audit | Audit log, SHA-256 checksum tamper detection |
+| Team Mode | Access control, central Git repo, team reports |
 
 ## Requirements
 
-- Python 3.6+ (`python3` or `python`)
+- Python 3.7+ (`python3` or `python`)
 - Claude Code (with hooks support)
+- Zero external dependencies (core), no API tokens required
 
 ## Tips
 
@@ -198,25 +191,17 @@ Your diary data (`~/working-diary/`) is preserved.
 - Please output clear summaries when completing/implementing/fixing tasks
 ```
 
-**Track your diary with Git:**
-
-```bash
-cd ~/working-diary
-git init && git add -A && git commit -m "diary: $(date +%Y-%m-%d)"
-```
-
 ## Roadmap
 
-This project evolves in 3 phases:
-
-| Phase | Goal | Status |
-|-------|------|--------|
-| **A** | Personal productivity tool (categories, Git integration, CLI, plugins, dashboard) | 📋 Plan |
-| **B** | Open source community (security hardening, pip distribution, tests, CI/CD) | 📋 Plan |
-| **C** | Team/company tool (access control, central Git repo, team reports) | 📋 Plan |
+| Phase | Goal | Version | Status |
+|-------|------|---------|--------|
+| **A** | Personal productivity (categories, Git, CLI, plugins, dashboard) | v2.0.0 | ✅ Done |
+| **B** | Open source community (security, 40 tests, CI/CD) | v3.0.0 | ✅ Done |
+| **C** | Team/company tool (access control, central repo, team reports) | v4.0.0 | ✅ Done |
+| **D** | Distribution (plugin, PyPI, marketplace) | v4.1.0 | 🔄 In Progress |
 
 See [`docs/plans/`](docs/plans/) for detailed roadmaps.
 
 ## License
 
-MIT License
+MIT License — [LICENSE](LICENSE)
