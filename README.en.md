@@ -46,21 +46,33 @@ analyzes the transcript, and appends the work content to today's Markdown diary 
 
 ## Installation
 
+### Option 1: pip (Recommended)
+
 ```bash
-# 1. Clone the repository
+pip install claude-diary
+claude-diary init
+```
+
+### Option 2: Claude Code Plugin
+
+```bash
+# Inside Claude Code
+/plugin marketplace add https://github.com/solzip/claude-code-hooks-diary
+/plugin install working-diary
+```
+
+### Option 3: Manual Install
+
+```bash
 git clone https://github.com/solzip/claude-code-hooks-diary.git
 cd claude-code-hooks-diary/working-diary-system
-
-# 2. Run the installer
 ./install.sh
 ```
 
-The install script automatically:
-- Copies scripts to `~/.claude/hooks/`
-- Registers the Stop Hook in `~/.claude/settings.json`
-- Creates the `~/working-diary/` directory
-- Auto-detects Python command (`python3` or `python`)
-- (Unix only) Optionally registers a weekly summary cron job
+After installation:
+- Stop Hook registered (auto-runs on session end)
+- `~/working-diary/` directory created
+- Config file generated
 
 ## Directory Structure
 

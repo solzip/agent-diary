@@ -46,21 +46,33 @@ Claude Code 세션 종료
 
 ## 설치
 
+### 방법 1: pip (권장)
+
 ```bash
-# 1. 다운로드
+pip install claude-diary
+claude-diary init
+```
+
+### 방법 2: Claude Code 플러그인
+
+```bash
+# Claude Code 안에서
+/plugin marketplace add https://github.com/solzip/claude-code-hooks-diary
+/plugin install working-diary
+```
+
+### 방법 3: 수동 설치
+
+```bash
 git clone https://github.com/solzip/claude-code-hooks-diary.git
 cd claude-code-hooks-diary/working-diary-system
-
-# 2. 설치 스크립트 실행
 ./install.sh
 ```
 
-설치 스크립트가 자동으로:
-- `~/.claude/hooks/` 에 스크립트 복사
-- `~/.claude/settings.json` 에 Stop Hook 등록
+설치 후 자동으로:
+- Stop Hook 등록 (세션 종료마다 자동 실행)
 - `~/working-diary/` 디렉토리 생성
-- Python 명령어 자동 감지 (`python3` 또는 `python`)
-- (Unix only) 주간 요약 cron job 등록
+- 설정 파일 생성
 
 ## 디렉토리 구조
 
