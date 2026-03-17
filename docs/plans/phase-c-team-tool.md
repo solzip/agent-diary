@@ -1,5 +1,14 @@
 # Phase C — 팀/회사 도구 (Team/Company Tool)
 
+## Executive Summary
+
+| 관점 | 내용 |
+|------|------|
+| **Problem** | 개인 일지 도구로는 팀 단위 작업 추적/보안/리포팅이 불가능 |
+| **Solution** | 보안 강화(마스킹/필터/접근제어) + Git 중앙 repo + 팀 리포트 |
+| **Function UX Effect** | `init --team` 1분 온보딩 → 자동 팀 일지 수집 → `claude-diary team`으로 팀 현황 파악 |
+| **Core Value** | 팀 개발 활동의 가시성과 보안을 동시에 확보 |
+
 > Claude Code Working Diary v4.0
 > 작성일: 2026-03-17
 > 상태: Plan
@@ -25,7 +34,7 @@
 
 민감한 파일 경로를 자동 필터링.
 
-**config.json:**
+**`~/.config/claude-diary/config.json`:**
 
 ```json
 {
@@ -55,7 +64,7 @@
 
 프롬프트/요약에서 특정 키워드를 포함한 문장 제거.
 
-**config.json:**
+**`~/.config/claude-diary/config.json`:**
 
 ```json
 {
@@ -86,7 +95,7 @@
 **구현 방식:**
 - Git repo: GitHub/GitLab 팀 권한으로 제어
 - Notion DB: Notion 권한 시스템 활용
-- CLI: `diary team` 명령 시 config의 `role` 기반 필터링
+- CLI: `claude-diary team` 명령 시 config의 `role` 기반 필터링
 
 ### 2.4 세션 Opt-out
 
@@ -103,7 +112,7 @@ claude  # 세션 시작
 **방법 2 — 프로젝트별 제외:**
 
 ```json
-// config.json
+// ~/.config/claude-diary/config.json
 {
   "skip_projects": [
     "personal-notes",
@@ -116,10 +125,10 @@ claude  # 세션 시작
 
 ```bash
 # 직전 세션 삭제
-diary delete --last
+claude-diary delete --last
 
 # 특정 세션 삭제
-diary delete --session abc12345
+claude-diary delete --session abc12345
 ```
 
 ### 2.5 시크릿 스캔 강화 (B에서 확장)
@@ -238,19 +247,19 @@ Git repo와 병행 가능.
 
 ```bash
 # 팀 전체 이번 주 요약
-diary team
+claude-diary team
 
 # 프로젝트별 팀 활동
-diary team --project ai-chatbot
+claude-diary team --project ai-chatbot
 
 # 특정 팀원의 활동 (권한에 따라 상세도 다름)
-diary team --member alex
+claude-diary team --member alex
 
 # 팀 주간 리포트 생성
-diary team weekly
+claude-diary team weekly
 
 # 팀 월간 리포트
-diary team monthly --month 2026-03
+claude-diary team monthly --month 2026-03
 ```
 
 ### 4.2 팀 stats 출력 예시
@@ -334,7 +343,7 @@ claude-diary init --team https://github.com/org/team-diary.git
 
 ```bash
 # admin이 팀 config에 추가
-diary team add-member --name newbie --role member
+claude-diary team add-member --name newbie --role member
 
 # newbie가 자기 PC에서
 claude-diary init --team https://github.com/org/team-diary.git
@@ -361,14 +370,14 @@ claude-diary init --team https://github.com/org/team-diary.git
 2. .team-config.json 스키마 정의
 3. 보안 필터 → push 파이프라인 통합
 4. claude-diary init --team 명령어
-5. diary team 기본 명령어 (요약, 프로젝트별)
+5. claude-diary team 기본 명령어 (요약, 프로젝트별)
 ```
 
 ### Sprint C-3 — 팀 리포트 + 통계
 
 ```
-1. diary team stats (터미널 대시보드)
-2. diary team weekly/monthly (마크다운 리포트)
+1. claude-diary team stats (터미널 대시보드)
+2. claude-diary team weekly/monthly (마크다운 리포트)
 3. 팀원별 활동 조회 (권한 기반 필터링)
 4. 프로젝트 중심 뷰
 5. 팀 HTML 대시보드 (Phase A dashboard 확장)
@@ -401,7 +410,7 @@ claude-diary init --team https://github.com/org/team-diary.git
 ```
 팀 보안 규칙 (.team-config.json)
     ↓ (강화만 가능, 약화 불가)
-개인 보안 규칙 (config.json)
+개인 보안 규칙 (~/.config/claude-diary/config.json)
     ↓ (추가 규칙 가능)
 기본 시크릿 스캔 (항상 활성)
 ```
@@ -413,7 +422,7 @@ claude-diary init --team https://github.com/org/team-diary.git
 ### 7.2 Git Push 전략
 
 - auto push: 세션 종료마다 자동 (기본, 권장)
-- manual push: `diary team sync`로 수동
+- manual push: `claude-diary team sync`로 수동
 - batch push: 하루 1회 일괄 (cron/scheduler)
 
 config에서 선택:
@@ -439,11 +448,63 @@ config에서 선택:
 - [ ] 민감 경로가 자동 마스킹됨
 - [ ] 콘텐츠 필터가 키워드 기반으로 동작함
 - [ ] `CLAUDE_DIARY_SKIP=1`로 세션 제외 가능
-- [ ] `diary delete --last`로 직전 세션 삭제 가능
+- [ ] `claude-diary delete --last`로 직전 세션 삭제 가능
 - [ ] 팀 Git repo에 각 팀원 일지가 자동 push됨
 - [ ] `.team-config.json` 보안 규칙이 개인 설정보다 우선 적용됨
-- [ ] `diary team` 명령으로 팀 활동 조회 가능
-- [ ] `diary team weekly`로 팀 주간 리포트 생성 가능
+- [ ] `claude-diary team` 명령으로 팀 활동 조회 가능
+- [ ] `claude-diary team weekly`로 팀 주간 리포트 생성 가능
 - [ ] member/lead/admin 역할별 접근 범위가 다름
 - [ ] `claude-diary init --team`으로 1분 내 팀 온보딩 완료
 - [ ] 한국어/영어 모두 동작
+
+---
+
+## 9. YAGNI Review
+
+**전체 기능 유지: 0건 deferred.**
+
+Phase C에서 정의한 모든 기능은 유지 대상으로 확정됨.
+
+**검토 사항:**
+- 3-tier 접근 제어 (member/lead/admin)가 과도한지 논의됨 — Git repo 권한만으로 충분할 수 있으나, Notion DB나 향후 자체 서버 시나리오에서는 Git 권한으로 커버 불가능하므로 **유지** 결정.
+
+---
+
+## 10. Cross-Phase Validation
+
+### Phase A/B 의존성
+
+- **Phase A**: `src/claude_diary/` 패키지 구조를 그대로 사용. GitHub exporter를 팀 repo push에 재활용.
+- **Phase B**: `pip install claude-diary` 패키지 배포 기반, secret scanner 모듈, audit 기능 활용.
+
+### Config 우선순위 규칙
+
+- 팀 config (`.team-config.json`)는 개인 config (`~/.config/claude-diary/config.json`)를 override함.
+- **보안은 강화만 가능** — 팀에서 설정한 마스킹/필터/시크릿 패턴은 개인이 해제할 수 없고, 개인은 추가 규칙만 설정 가능.
+
+### Exporter 재사용
+
+- Phase A에서 구현한 GitHub exporter를 팀 repo push에 그대로 재사용.
+- 팀 모드에서는 보안 필터 파이프라인을 push 전에 추가 적용.
+
+---
+
+## 11. Brainstorming Log
+
+### 핵심 결정 사항
+
+1. **기능 우선순위**: 보안 > 프로젝트 뷰 > 팀 리포트 = 대시보드
+   - 팀 도구에서 보안이 확보되지 않으면 아무도 채택하지 않음. 보안이 반드시 먼저.
+
+2. **아키텍처 진행 순서**: Git repo → Notion → 자체 서버
+   - Git repo는 서버리스이고 팀 대부분이 이미 사용 중. 가장 낮은 진입 장벽.
+   - Notion은 비개발 직군과의 공유에 유용하므로 선택 옵션으로 추가.
+   - 자체 서버는 YAGNI 원칙에 따라 plan에만 기록하고, 실제 필요가 확인될 때까지 구현 보류.
+
+3. **Opt-out은 팀 채택의 핵심**
+   - 팀원이 "감시당한다"고 느끼면 도구 자체를 거부함.
+   - 환경변수/프로젝트별/대화형 삭제 등 다양한 opt-out 경로를 보장해야 자발적 채택이 가능.
+
+4. **하이브리드 아키텍처 + 자체 서버 YAGNI**
+   - Git + Notion 하이브리드로 대부분의 팀 시나리오를 커버 가능.
+   - 자체 서버는 수십 명 이상 규모에서만 의미가 있으므로, 현재 단계에서는 구현하지 않음.

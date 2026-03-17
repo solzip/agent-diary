@@ -1,5 +1,14 @@
 # Phase B — 오픈소스 커뮤니티 도구 (Open Source Community Tool)
 
+## Executive Summary
+
+| 관점 | 내용 |
+|------|------|
+| **Problem** | 개인 도구를 타인이 신뢰하고 사용하기 어려움 (설치 복잡, 보안 불투명) |
+| **Solution** | 보안 강화(audit/checksum) + pip 배포 + 테스트/CI + 커뮤니티 인프라 |
+| **Function UX Effect** | `pip install` 1줄 → `init` → 자동 동작 + `diary audit`으로 투명한 보안 |
+| **Core Value** | Claude Code 생태계 최초의 신뢰할 수 있는 작업일지 오픈소스 |
+
 > Claude Code Working Diary v3.0
 > 작성일: 2026-03-17
 > 상태: Plan
@@ -49,7 +58,14 @@ README 상단에 명시.
 
 ### 2.3 자동 시크릿 스캔
 
-일지에 기록하기 전 민감 정보를 자동 감지 및 마스킹.
+> **Note:** 기본 시크릿 스캐닝은 Phase A에서 이미 도입됨. Phase B에서는 이를 **강화**한다.
+
+**Phase B 강화 사항:**
+
+- **Audit 로그 연동** — 모든 마스킹이 audit 로그에 기록됨 (언제, 어떤 패턴, 몇 건)
+- **Checksum 검증** — 스캐너 자체의 무결성을 checksum으로 보장
+- **포괄적 패턴 확장** — Phase A 기본 패턴에 추가 패턴 보강
+- **`diary audit` CLI 명령어** — 마스킹 이력을 한눈에 조회
 
 **감지 패턴:**
 
@@ -69,6 +85,7 @@ SECRET_PATTERNS = [
 **동작:**
 - user_prompts, summary_hints, commands에서 패턴 매칭
 - 감지 시 `****` 로 치환
+- 모든 마스킹 이벤트가 audit 로그에 기록
 - `diary audit` 에서 "N개 시크릿 마스킹됨" 표시
 
 ### 2.4 Exporter 신뢰 등급
@@ -145,30 +162,16 @@ diary audit --verify           # checksum 무결성 검증
 
 ### 3.1 패키지 구조 (PyPI)
 
+> **Note:** `src/claude_diary/` 디렉토리 구조는 Phase A에서 이미 구성됨.
+> Phase B에서는 `pyproject.toml`, `tests/`, 패키징 인프라를 추가한다.
+
+**Phase B 추가 항목:**
+
 ```
 claude-diary/
-├── pyproject.toml
-├── src/
-│   └── claude_diary/
-│       ├── __init__.py
-│       ├── __main__.py        ← python -m claude_diary
-│       ├── cli.py             ← diary-cli 엔트리포인트
-│       ├── hook.py            ← Stop Hook 엔트리포인트
-│       ├── config.py          ← 설정 관리
-│       ├── lib/
-│       │   ├── parser.py
-│       │   ├── git_info.py
-│       │   ├── categorizer.py
-│       │   ├── stats.py
-│       │   └── secret_scanner.py
-│       └── exporters/
-│           ├── base.py
-│           ├── notion.py
-│           ├── obsidian.py
-│           ├── slack.py
-│           ├── discord.py
-│           └── github.py
-├── tests/
+├── pyproject.toml              ← Phase B 추가
+├── src/claude_diary/           ← Phase A에서 이미 존재
+├── tests/                      ← Phase B 추가
 │   ├── test_parser.py
 │   ├── test_categorizer.py
 │   ├── test_secret_scanner.py
@@ -190,6 +193,8 @@ claude-diary init
 # ✓ ~/.claude/settings.json에 Stop Hook 자동 등록
 # ✓ ~/working-diary/ 디렉토리 생성
 # ✓ config.json 대화형 생성 (언어, 타임존, exporter 선택)
+#     - Linux/macOS: ~/.config/claude-diary/config.json (XDG 표준)
+#     - Windows: %APPDATA%/claude-diary/config.json
 # ✓ alias 등록 안내 (diary → claude-diary cli)
 ```
 
@@ -370,7 +375,7 @@ MAJOR.MINOR.PATCH
 ### Sprint B-1 — 보안 기반 (최우선)
 
 ```
-1. secret_scanner.py 구현 (패턴 기반 시크릿 감지)
+1. secret_scanner.py 강화 (Phase A 기본 → audit 연동 + 패턴 확장)
 2. audit 로그 시스템 구현
 3. checksum 변조 감지
 4. 코어에서 exporter로 전달하는 데이터 범위 제한
@@ -380,11 +385,10 @@ MAJOR.MINOR.PATCH
 ### Sprint B-2 — PyPI 패키지화
 
 ```
-1. 디렉토리 구조를 src/ 레이아웃으로 리팩토링
-2. pyproject.toml 작성
-3. claude-diary init 대화형 설정
-4. 기존 install.sh → init 명령어로 마이그레이션
-5. PyPI 테스트 배포 (TestPyPI)
+1. pyproject.toml 작성 (src/ 레이아웃은 Phase A에서 이미 완료)
+2. claude-diary init 대화형 설정 (XDG 표준 경로 사용)
+3. 기존 install.sh → init 명령어로 마이그레이션
+4. PyPI 테스트 배포 (TestPyPI)
 ```
 
 ### Sprint B-3 — 테스트 + CI
@@ -423,3 +427,62 @@ MAJOR.MINOR.PATCH
 - [ ] PyPI에 정식 배포 완료
 - [ ] SECURITY.md, CONTRIBUTING.md, LICENSE 존재
 - [ ] README에 GIF 데모 + 커뮤니티 고지문 포함
+
+---
+
+## 10. YAGNI Review
+
+**결과: ALL features kept (0 deferred)**
+
+모든 기능을 검토한 결과, Phase B에 계획된 기능은 전부 유지한다.
+
+| 기능 | 판정 | 비고 |
+|------|------|------|
+| 보안 (audit/checksum/secret scan) | KEEP | 오픈소스 신뢰의 핵심 |
+| PyPI 패키징 | KEEP | 설치 간소화 필수 |
+| 테스트/CI | KEEP | 품질 보증 필수 |
+| 커뮤니티 인프라 | KEEP | 오픈소스 기본 요건 |
+| Exporter 신뢰 등급 | KEEP | 보안 중요도로 유지 |
+
+> **Note:** Exporter 신뢰 등급은 "과도한 설계 아닌가?" 검토되었으나, Stop Hook에서 타인의 코드를 실행하는 보안 민감성을 고려하여 유지 결정. 사용자가 어떤 코드를 신뢰할지 판단하는 데 필수적인 정보이다.
+
+---
+
+## 11. Cross-Phase Validation
+
+Phase A validation에서 확인된 **4건의 설계 충돌이 모두 해결됨**을 확인한다.
+
+Phase B는 Phase A에서 확립된 다음 사항들을 전제로 진행:
+
+- `src/claude_diary/` 디렉토리 구조가 Phase A에서 완성됨
+- 기본 시크릿 스캐너가 Phase A에서 도입됨 (Phase B에서 강화)
+- config 경로는 XDG 표준을 따르도록 통일
+- exporter/categorizer 플러그인 인터페이스는 ko/en 양 언어만 공식 지원
+
+Phase A에서 해결된 설계 충돌들이 Phase B 계획과 정합성을 유지하는지 검증 완료.
+
+---
+
+## 12. Brainstorming Log
+
+Phase B 기획 과정에서 내려진 핵심 결정들을 기록한다.
+
+### 결정 1: Security First
+- **논점:** 오픈소스 전환 시 가장 먼저 해야 할 것은?
+- **결정:** 보안을 최우선으로. audit 로그 + checksum + 시크릿 스캔 강화를 Sprint B-1에 배치
+- **근거:** Stop Hook은 모든 세션 종료 시 자동 실행되므로, 사용자 신뢰 없이는 채택 불가
+
+### 결정 2: pip over npx
+- **논점:** 패키지 매니저 선택 (pip vs npx vs brew)
+- **결정:** pip (PyPI)
+- **근거:** Claude Code 사용자 대부분이 개발자이고 Python 환경이 있음. pip은 크로스 플랫폼 + 버전 관리 + 의존성 관리가 성숙함
+
+### 결정 3: 플러그인은 exporter + categorizer만
+- **논점:** 어디까지 플러그인화할 것인가?
+- **결정:** exporter와 categorizer만 플러그인 인터페이스 제공, ko/en만 공식 지원
+- **근거:** YAGNI 원칙. parser나 hook 자체를 플러그인화하면 복잡도가 폭발. 실제 커스터마이징 수요는 "어디에 내보낼까"와 "어떻게 분류할까"에 집중
+
+### 결정 4: 발견성 채널
+- **논점:** 어떻게 사용자에게 도달할 것인가?
+- **결정:** PyPI + GitHub + Claude 커뮤니티 (Discord/Forum)
+- **근거:** Claude Code hooks 생태계가 아직 초기이므로, Claude 공식 커뮤니티에서의 노출이 가장 효과적. GitHub Topics + PyPI 검색은 장기적 유입 채널
