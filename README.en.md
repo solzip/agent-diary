@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 > [한국어](README.md) | **English**
 
@@ -177,7 +177,7 @@ claude-diary team weekly                  # Team weekly report
 
 ## Requirements
 
-- Python 3.7+ (`python3` or `python`)
+- Python 3.8+ (`python3` or `python`)
 - Claude Code (with hooks support)
 - Zero external dependencies (core), no API tokens required
 

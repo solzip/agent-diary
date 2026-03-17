@@ -11,7 +11,7 @@
 
 > Claude Code Working Diary v4.0
 > 작성일: 2026-03-17
-> 상태: Plan
+> 상태: ✅ Done
 > 선행 조건: Phase A + Phase B 완료
 
 ---
@@ -180,7 +180,7 @@ team-diary-repo/                    ← 팀 공유 Git 저장소
 세션 종료
     │
     ▼
-working-diary.py (코어)
+core.py (코어 파이프라인)
     ├── ~/working-diary/2026-03-17.md (개인 로컬)
     │
     └── GitHub exporter
@@ -445,17 +445,17 @@ config에서 선택:
 
 ## 8. Phase C 완료 기준
 
-- [ ] 민감 경로가 자동 마스킹됨
-- [ ] 콘텐츠 필터가 키워드 기반으로 동작함
-- [ ] `CLAUDE_DIARY_SKIP=1`로 세션 제외 가능
-- [ ] `claude-diary delete --last`로 직전 세션 삭제 가능
-- [ ] 팀 Git repo에 각 팀원 일지가 자동 push됨
-- [ ] `.team-config.json` 보안 규칙이 개인 설정보다 우선 적용됨
-- [ ] `claude-diary team` 명령으로 팀 활동 조회 가능
-- [ ] `claude-diary team weekly`로 팀 주간 리포트 생성 가능
-- [ ] member/lead/admin 역할별 접근 범위가 다름
-- [ ] `claude-diary init --team`으로 1분 내 팀 온보딩 완료
-- [ ] 한국어/영어 모두 동작
+- [x] 민감 경로가 자동 마스킹됨
+- [x] 콘텐츠 필터가 키워드 기반으로 동작함
+- [x] `CLAUDE_DIARY_SKIP=1`로 세션 제외 가능
+- [x] `claude-diary delete --last`로 직전 세션 삭제 가능
+- [x] 팀 Git repo에 각 팀원 일지가 자동 push됨
+- [x] `.team-config.json` 보안 규칙이 개인 설정보다 우선 적용됨
+- [x] `claude-diary team` 명령으로 팀 활동 조회 가능
+- [x] `claude-diary team weekly`로 팀 주간 리포트 생성 가능
+- [x] member/lead/admin 역할별 접근 범위가 다름
+- [x] `claude-diary init --team`으로 1분 내 팀 온보딩 완료
+- [x] 한국어/영어 모두 동작
 
 ---
 

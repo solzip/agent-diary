@@ -98,15 +98,15 @@ def process_session(session_id, transcript_path, cwd):
             custom_rules = config.get("custom_categories", {})
             categories = categorize(entry_data, custom_rules or None)
             entry_data["categories"] = categories
-        except Exception:
-            pass
+        except Exception as e:
+            sys.stderr.write("[diary] Auto-categorization failed: %s\n" % str(e))
 
     # 5. Secret scan (always runs)
     try:
         additional = config.get("security", {}).get("additional_secret_patterns", [])
         scan_entry_data(entry_data, additional or None)
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write("[diary] Secret scan failed: %s\n" % str(e))
 
     # 5.5 Team security filters (path masking + content filter)
     try:
@@ -124,8 +124,8 @@ def process_session(session_id, transcript_path, cwd):
             if not should_record:
                 sys.stderr.write("[diary] Session skipped (content filter)\n")
                 return False
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write("[diary] Team security filter failed: %s\n" % str(e))
 
     # 6. Format and write (CRITICAL — exit 1 on failure)
     try:
@@ -140,21 +140,21 @@ def process_session(session_id, transcript_path, cwd):
     # 7. Update search index (non-critical)
     try:
         update_index(diary_dir, entry_data)
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write("[diary] Index update failed: %s\n" % str(e))
 
     # 8. Retry previously failed exports (non-critical)
     try:
         from claude_diary.exporters.loader import retry_queued
         retry_queued(config, diary_dir)
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write("[diary] Export retry failed: %s\n" % str(e))
 
     # 9. Run exporters (non-critical)
     try:
         _run_exporters(config, entry_data)
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write("[diary] Exporter execution failed: %s\n" % str(e))
 
     # 10. Audit log (non-critical)
     try:
@@ -167,8 +167,8 @@ def process_session(session_id, transcript_path, cwd):
             secrets_masked=entry_data.get("secrets_masked", 0),
             tz_offset=tz_offset,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write("[diary] Audit log failed: %s\n" % str(e))
 
     # 11. Log success
     sys.stderr.write(

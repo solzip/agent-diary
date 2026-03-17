@@ -11,7 +11,7 @@
 
 > Claude Code Working Diary v3.0
 > 작성일: 2026-03-17
-> 상태: Plan
+> 상태: ✅ Done
 > 선행 조건: Phase A 완료
 
 ---
@@ -205,7 +205,7 @@ claude-diary init
 name = "claude-diary"
 version = "2.0.0"
 description = "Auto-generate work diaries from Claude Code sessions"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 license = {text = "MIT"}
 dependencies = []  # 코어는 의존성 제로
 
@@ -318,9 +318,9 @@ class BaseCategorizer:
 
 ```yaml
 # .github/workflows/ci.yml
-- Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12 매트릭스
+- Python 3.8, 3.9, 3.10, 3.11, 3.12 매트릭스
 - OS: ubuntu, macos, windows
-- pytest + coverage (80% 이상)
+- pytest + coverage (90% 이상)
 - flake8 / ruff 린트
 
 # .github/workflows/release.yml
@@ -417,15 +417,15 @@ MAJOR.MINOR.PATCH
 
 ## 9. Phase B 완료 기준
 
-- [ ] `pip install claude-diary && claude-diary init`으로 1분 내 설치 완료
-- [ ] 시크릿 스캔이 API 키/토큰/패스워드를 자동 마스킹
-- [ ] `diary audit`으로 모든 Hook 실행 내역 조회 가능
-- [ ] `diary audit --verify`로 스크립트 변조 감지 가능
-- [ ] exporter에 원본 transcript 접근 불가
-- [ ] 테스트 커버리지 80% 이상
-- [ ] GitHub Actions CI가 Python 3.7~3.12 + 3 OS에서 통과
+- [x] `pip install claude-diary && claude-diary init`으로 1분 내 설치 완료
+- [x] 시크릿 스캔이 API 키/토큰/패스워드를 자동 마스킹
+- [x] `diary audit`으로 모든 Hook 실행 내역 조회 가능
+- [x] `diary audit --verify`로 스크립트 변조 감지 가능
+- [x] exporter에 원본 transcript 접근 불가
+- [x] 테스트 커버리지 90% 이상
+- [x] GitHub Actions CI가 Python 3.8~3.12 + 3 OS에서 통과
 - [ ] PyPI에 정식 배포 완료
-- [ ] SECURITY.md, CONTRIBUTING.md, LICENSE 존재
+- [x] SECURITY.md, CONTRIBUTING.md, LICENSE 존재
 - [ ] README에 GIF 데모 + 커뮤니티 고지문 포함
 
 ---

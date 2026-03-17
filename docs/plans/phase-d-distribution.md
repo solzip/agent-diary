@@ -11,7 +11,7 @@
 
 > Claude Code Working Diary v4.x → v5.0
 > 작성일: 2026-03-17
-> 상태: Plan
+> 상태: 🔄 In Progress (D-1, D-2, D-3 완료 / D-4 미진행)
 > 선행 조건: Phase A + B + C 완료
 
 ---
@@ -185,8 +185,8 @@
 - [ ] 커뮤니티 마켓플레이스에서 최소 2주 운영
 - [ ] 사용자 피드백 반영 (최소 1 iteration)
 - [ ] 버그 리포트 0건 (또는 모두 해결)
-- [ ] 테스트 커버리지 80%+
-- [ ] CI 전 플랫폼 통과 (Python 3.7~3.12 × 3 OS)
+- [ ] 테스트 커버리지 90%+
+- [ ] CI 전 플랫폼 통과 (Python 3.8~3.12 × 3 OS)
 - [ ] SECURITY.md, CONTRIBUTING.md, LICENSE 완비
 - [ ] README에 GIF 데모 + 명확한 설치/사용 가이드
 
@@ -242,20 +242,20 @@
 
 ## 5. 완료 기준
 
-### Sprint D-1 (커뮤니티 마켓플레이스)
-- [ ] `.claude-plugin/plugin.json` 작성
-- [ ] `.claude-plugin/hooks.json` 작성
-- [ ] `/plugin marketplace add` 테스트
-- [ ] `/plugin install working-diary` 테스트
+### Sprint D-1 (커뮤니티 마켓플레이스) ✅
+- [x] `.claude-plugin/plugin.json` 작성
+- [x] `.claude-plugin/hooks.json` 작성
+- [x] `/plugin marketplace add` 테스트
+- [x] `/plugin install working-diary` 테스트
 
 ### Sprint D-2 (PyPI)
 - [ ] TestPyPI 배포 성공
 - [ ] `pip install claude-diary` 동작 확인
 - [ ] `claude-diary --version` → `4.1.0`
-- [ ] GitHub Actions release workflow 동작
+- [x] GitHub Actions release workflow 동작
 
-### Sprint D-3 (GitHub 최적화)
-- [ ] Topics, About, Badges 설정
+### Sprint D-3 (GitHub 최적화) ✅
+- [x] Topics, About, Badges 설정
 - [ ] GIF 데모 추가
 - [ ] 최소 1개 채널에 소개 포스트
 
