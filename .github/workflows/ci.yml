@@ -37,4 +37,4 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         continue-on-error: false
         run: |
-          pytest tests/ --cov=claude_diary --cov-fail-under=70
+          pytest tests/ --cov=claude_diary --cov-fail-under=90

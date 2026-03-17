@@ -220,6 +220,7 @@ def _fallback_search_from_files(diary_dir, keyword):
 
 def cmd_filter(args):
     config = load_config()
+    lang = config.get("lang", "ko")
     diary_dir = os.path.expanduser(config["diary_dir"])
     index = load_index(diary_dir)
     entries = index.get("entries", [])
@@ -239,10 +240,10 @@ def cmd_filter(args):
         results.append(e)
 
     if not results:
-        print(get_label("cli_no_match", load_config().get("lang", "ko")))
+        print(get_label("cli_no_match", lang))
         return
 
-    print(L("cli_found_entries") % len(results))
+    print(get_label("cli_found_entries", lang) % len(results))
     print()
     for e in results:
         cats = ",".join(e.get("categories", [])) or "-"
@@ -290,8 +291,15 @@ def cmd_stats(args):
 
     # Determine date range
     if args.month:
-        year, month = args.month.split("-")
-        year, month = int(year), int(month)
+        try:
+            year, month = args.month.split("-")
+            year, month = int(year), int(month)
+            if not (1 <= month <= 12):
+                print("Invalid month: %s (use YYYY-MM, month 1-12)" % args.month)
+                return
+        except (ValueError, TypeError):
+            print("Invalid month format: %s (use YYYY-MM)" % args.month)
+            return
     else:
         now = datetime.now(local_tz)
         year, month = now.year, now.month
@@ -605,9 +613,9 @@ def cmd_init(args):
     claude_settings = os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
     if os.path.exists(claude_settings):
         try:
-            with open(claude_settings, "r") as f:
+            with open(claude_settings, "r", encoding="utf-8") as f:
                 settings = json.load(f)
-        except Exception:
+        except (json.JSONDecodeError, IOError, ValueError):
             settings = {}
 
         if "hooks" not in settings:
@@ -628,7 +636,7 @@ def cmd_init(args):
             settings["hooks"]["Stop"].append({
                 "hooks": [{"type": "command", "command": hook_cmd}]
             })
-            with open(claude_settings, "w") as f:
+            with open(claude_settings, "w", encoding="utf-8") as f:
                 json.dump(settings, f, indent=2, ensure_ascii=False)
             print("  [ok] Stop Hook registered: %s" % hook_cmd)
         else:

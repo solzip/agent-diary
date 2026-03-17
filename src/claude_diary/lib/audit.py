@@ -124,4 +124,4 @@ def _compute_source_checksum():
                 except Exception:
                     pass
 
-    return "sha256:" + hasher.hexdigest()[:16]
+    return "sha256:" + hasher.hexdigest()

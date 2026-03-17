@@ -32,14 +32,14 @@ def update_session_count(diary_dir, date_str):
     counts = {}
     if os.path.exists(count_file):
         try:
-            with open(count_file, "r") as f:
+            with open(count_file, "r", encoding="utf-8") as f:
                 counts = json.load(f)
-        except Exception:
+        except (json.JSONDecodeError, IOError, ValueError):
             counts = {}
 
     counts[date_str] = counts.get(date_str, 0) + 1
 
-    with open(count_file, "w") as f:
+    with open(count_file, "w", encoding="utf-8") as f:
         json.dump(counts, f, indent=2)
 
     return counts[date_str]

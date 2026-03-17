@@ -30,6 +30,14 @@ def main():
     transcript_path = input_data.get("transcript_path", "")
     cwd = input_data.get("cwd", "")
 
+    # Validate inputs are strings
+    if not isinstance(session_id, str):
+        session_id = "unknown"
+    if not isinstance(transcript_path, str):
+        transcript_path = ""
+    if not isinstance(cwd, str):
+        cwd = ""
+
     try:
         process_session(session_id, transcript_path, cwd)
         sys.exit(0)

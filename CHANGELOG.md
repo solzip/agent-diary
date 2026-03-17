@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Security**: SHA-256 checksum verification (`claude-diary audit --verify`)
 - **Security**: SECURITY.md with transparency documentation
 - **Testing**: 40 unit tests (parser, categorizer, secret_scanner, config, audit)
-- **CI/CD**: GitHub Actions (Python 3.7~3.12 × 3 OS)
+- **CI/CD**: GitHub Actions (Python 3.8~3.12 × 3 OS)
 - **CI/CD**: PyPI auto-release on tag push
 - **Community**: LICENSE (MIT), CONTRIBUTING.md, Issue/PR templates
 - **Community**: CHANGELOG.md

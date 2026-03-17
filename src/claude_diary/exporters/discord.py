@@ -11,7 +11,7 @@ class DiscordExporter(BaseExporter):
 
     def validate_config(self):
         url = self.config.get("webhook_url", "")
-        return "discord.com/api/webhooks/" in url
+        return url.startswith("https://discord.com/api/webhooks/")
 
     def export(self, entry_data):
         url = self.config["webhook_url"]

@@ -12,6 +12,9 @@ BASIC_PATTERNS = [
     (r'xoxb-[a-zA-Z0-9\-]+', '****'),
     (r'AKIA[A-Z0-9]{16}', '****'),
     (r'(?i)bearer\s+[a-zA-Z0-9\-._~+/]+=*', 'Bearer ****'),
+    (r'AIza[0-9A-Za-z_-]{35}', '****'),
+    (r'-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----', '****PRIVATE_KEY****'),
+    (r'(?i)(aws_secret_access_key|aws_secret)\s*[=:]\s*\S+', r'\1=****'),
 ]
 
 

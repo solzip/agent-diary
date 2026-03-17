@@ -2,7 +2,7 @@
 
 > Claude Code Working Diary v2.0
 > 작성일: 2026-03-17
-> 상태: Plan
+> 상태: ✅ Done
 
 ## Executive Summary
 
@@ -594,20 +594,20 @@ claude-diary migrate
 
 ## 6. Phase A 완료 기준
 
-- [ ] 자동 카테고리가 일지에 표시됨
-- [ ] Git 커밋/브랜치가 일지에 표시됨
-- [ ] 코드 변경량(+/- lines)이 일지에 표시됨
-- [ ] 기본 시크릿 스캔이 일지 기록 전 실행됨
-- [ ] `claude-diary search` / `claude-diary filter` / `claude-diary trace`가 동작함
-- [ ] `claude-diary stats`로 터미널 대시보드 확인 가능
-- [ ] 최소 1개 exporter (Notion 또는 Slack)가 동작함
-- [ ] `claude-diary config`로 설정 관리 가능
-- [ ] Windows/macOS/Linux 모두 동작
-- [ ] 한국어/영어 모두 동작
-- [ ] 기존 v1.0 기능 회귀 없음
-- [ ] transcript 부족 시 git diff로 보완되어 기록됨
-- [ ] `claude-diary migrate`로 v1.0 설정 자동 전환
-- [ ] 검색 인덱스로 수개월 일지에서도 빠른 검색 가능
+- [x] 자동 카테고리가 일지에 표시됨
+- [x] Git 커밋/브랜치가 일지에 표시됨
+- [x] 코드 변경량(+/- lines)이 일지에 표시됨
+- [x] 기본 시크릿 스캔이 일지 기록 전 실행됨
+- [x] `claude-diary search` / `claude-diary filter` / `claude-diary trace`가 동작함
+- [x] `claude-diary stats`로 터미널 대시보드 확인 가능
+- [x] 최소 1개 exporter (Notion 또는 Slack)가 동작함
+- [x] `claude-diary config`로 설정 관리 가능
+- [x] Windows/macOS/Linux 모두 동작
+- [x] 한국어/영어 모두 동작
+- [x] 기존 v1.0 기능 회귀 없음
+- [x] transcript 부족 시 git diff로 보완되어 기록됨
+- [x] `claude-diary migrate`로 v1.0 설정 자동 전환
+- [x] 검색 인덱스로 수개월 일지에서도 빠른 검색 가능
 
 ---
 
