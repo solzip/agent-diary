@@ -44,7 +44,8 @@ def process_session(session_id, transcript_path, cwd):
     time_str = now.strftime("%H:%M:%S")
 
     # 1. Parse transcript
-    parsed = parse_transcript(transcript_path)
+    max_lines = config.get("max_transcript_lines")
+    parsed = parse_transcript(transcript_path, max_lines=max_lines)
 
     # Check if session has meaningful content
     has_content = (

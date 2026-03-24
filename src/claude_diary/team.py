@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -10,6 +11,23 @@ from pathlib import Path
 
 from claude_diary.config import load_config
 from claude_diary.lib.stats import parse_daily_file
+
+
+_VALID_MEMBER_NAME = re.compile(r'^[a-zA-Z0-9_\-\.]+$')
+
+
+def validate_member_name(name):
+    """Validate member name to prevent path traversal.
+
+    Raises ValueError if name contains unsafe characters.
+    """
+    if not name or not _VALID_MEMBER_NAME.match(name):
+        raise ValueError(
+            "Invalid member name: '%s' (only alphanumeric, dash, underscore, dot allowed)" % name
+        )
+    if name in (".", ".."):
+        raise ValueError("Invalid member name: '%s'" % name)
+    return name
 
 
 def load_team_config(team_repo_path):
@@ -44,6 +62,8 @@ def init_team(repo_url, member_name=None):
 
     if not member_name:
         member_name = os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
+
+    validate_member_name(member_name)
 
     # Clone team repo
     diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))

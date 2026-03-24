@@ -14,6 +14,7 @@ from claude_diary.team import (
     print_team_stats,
     team_stats,
     team_weekly_report,
+    validate_member_name,
 )
 
 
@@ -588,3 +589,43 @@ class TestTeamStatsNonDirSkip:
 
         result = team_stats(str(tmp_path), month="2026-03")
         assert result["members"]["alice"]["files"] >= 1
+
+
+class TestValidateMemberName:
+    """Tests for validate_member_name()."""
+
+    def test_valid_names(self):
+        assert validate_member_name("alice") == "alice"
+        assert validate_member_name("bob-123") == "bob-123"
+        assert validate_member_name("user_name") == "user_name"
+        assert validate_member_name("j.doe") == "j.doe"
+
+    def test_rejects_path_traversal(self):
+        with pytest.raises(ValueError):
+            validate_member_name("../etc")
+
+    def test_rejects_dot_dot(self):
+        with pytest.raises(ValueError):
+            validate_member_name("..")
+
+    def test_rejects_single_dot(self):
+        with pytest.raises(ValueError):
+            validate_member_name(".")
+
+    def test_rejects_empty(self):
+        with pytest.raises(ValueError):
+            validate_member_name("")
+
+    def test_rejects_none(self):
+        with pytest.raises(ValueError):
+            validate_member_name(None)
+
+    def test_rejects_slashes(self):
+        with pytest.raises(ValueError):
+            validate_member_name("a/b")
+        with pytest.raises(ValueError):
+            validate_member_name("a\\b")
+
+    def test_rejects_spaces(self):
+        with pytest.raises(ValueError):
+            validate_member_name("my name")

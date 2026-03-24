@@ -248,9 +248,18 @@ new Chart(document.getElementById('categoryChart'), {
     const row = document.createElement('div');
     row.className = 'file-row';
     const barWidth = Math.max(10, (item.count / maxCount) * 200);
-    row.innerHTML = '<span class="file-name">' + item.file + '</span>' +
-      '<div class="file-bar" style="width:' + barWidth + 'px"></div>' +
-      '<span class="file-count">' + item.count + '</span>';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'file-name';
+    nameSpan.textContent = item.file;
+    const barDiv = document.createElement('div');
+    barDiv.className = 'file-bar';
+    barDiv.style.width = barWidth + 'px';
+    const countSpan = document.createElement('span');
+    countSpan.className = 'file-count';
+    countSpan.textContent = item.count;
+    row.appendChild(nameSpan);
+    row.appendChild(barDiv);
+    row.appendChild(countSpan);
     container.appendChild(row);
   });
   if (hotFilesData.length === 0) container.innerHTML = '<p style="color:#484f58">No data yet</p>';
