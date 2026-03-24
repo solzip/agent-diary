@@ -208,14 +208,14 @@ class TestReindexAll:
         content = (
             "# 2026-03-17\n\n"
             "### \u23f0 10:00:00\n"
-            "\ud83d\udcc1 `my-project`\n\n"
+            "\U0001f4c1 `my-project`\n\n"
             "\uce74\ud14c\uace0\ub9ac: `feature`\n\n"
             "\uc791\uc5c5 \uc694\uccad:\n"
             "  1. Build authentication module\n"
             "  2. Write tests for login\n\n"
             "  - `src/auth.py`\n\n"
             "### \u23f0 14:00:00\n"
-            "\ud83d\udcc1 `other-project`\n"
+            "\U0001f4c1 `other-project`\n"
         )
         (tmp_path / "2026-03-17.md").write_text(content, encoding="utf-8")
 
@@ -236,11 +236,11 @@ class TestReindexAll:
     def test_reindex_multiple_files(self, tmp_path):
         day1 = (
             "### \u23f0 10:00:00\n"
-            "\ud83d\udcc1 `proj-a`\n"
+            "\U0001f4c1 `proj-a`\n"
         )
         day2 = (
             "### \u23f0 09:00:00\n"
-            "\ud83d\udcc1 `proj-b`\n"
+            "\U0001f4c1 `proj-b`\n"
         )
         (tmp_path / "2026-03-16.md").write_text(day1, encoding="utf-8")
         (tmp_path / "2026-03-17.md").write_text(day2, encoding="utf-8")
@@ -255,7 +255,7 @@ class TestReindexAll:
     def test_reindex_extracts_keywords_from_task_requests(self, tmp_path):
         content = (
             "### \u23f0 10:00:00\n"
-            "\ud83d\udcc1 `proj`\n\n"
+            "\U0001f4c1 `proj`\n\n"
             "\uc791\uc5c5 \uc694\uccad:\n"
             "  1. Implement authentication flow\n"
         )
@@ -267,7 +267,7 @@ class TestReindexAll:
 
     def test_reindex_handles_unreadable_file(self, tmp_path):
         """A file that parse_daily_file can read but read_text fails for."""
-        content = "### \u23f0 10:00:00\n\ud83d\udcc1 `proj`\n"
+        content = "### \u23f0 10:00:00\n\U0001f4c1 `proj`\n"
         f = tmp_path / "2026-03-17.md"
         f.write_text(content, encoding="utf-8")
 
@@ -288,7 +288,7 @@ class TestReindexAll:
     def test_reindex_session_without_time(self, tmp_path):
         content = (
             "### \u23f0\n"
-            "\ud83d\udcc1 `proj`\n"
+            "\U0001f4c1 `proj`\n"
         )
         (tmp_path / "2026-03-17.md").write_text(content, encoding="utf-8")
         count = reindex_all(str(tmp_path))
@@ -305,7 +305,7 @@ class TestReindexAll:
         assert index["entries"][0]["project"] == ""
 
     def test_reindex_sets_last_indexed(self, tmp_path):
-        content = "### \u23f0 10:00:00\n\ud83d\udcc1 `proj`\n"
+        content = "### \u23f0 10:00:00\n\U0001f4c1 `proj`\n"
         (tmp_path / "2026-03-17.md").write_text(content, encoding="utf-8")
         reindex_all(str(tmp_path))
         index = load_index(str(tmp_path))
