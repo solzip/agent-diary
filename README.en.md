@@ -200,14 +200,30 @@ claude-diary team weekly                  # Team weekly report
 - Please output clear summaries when completing/implementing/fixing tasks
 ```
 
+## FAQ
+
+**"Isn't `git log` enough?"**
+
+git log records *what you committed*. claude-diary records *what you tried, asked for, and debugged* — including sessions where you didn't commit anything. It captures the original prompts ("implement JWT auth"), commands run, errors encountered, and time spent. Think of it as the gap between your commit history and your actual workday.
+
+**"Does it work with Cursor / Windsurf / Copilot?"**
+
+Not yet — currently Claude Code only (via Stop Hook). But the core pipeline just needs `session_id + transcript + cwd`, so adding other AI IDEs is architecturally straightforward. See roadmap below.
+
+**"Why JSON index instead of SQLite?"**
+
+The current JSON index is simple and has zero dependencies. SQLite (which is in Python's stdlib) is planned for v5.0 to enable full-text search and faster queries across months of data.
+
 ## Roadmap
 
 | Phase | Goal | Version | Status |
 |-------|------|---------|--------|
 | **A** | Personal productivity (categories, Git, CLI, plugins, dashboard) | v2.0.0 | ✅ Done |
-| **B** | Open source community (security, 40 tests, CI/CD) | v3.0.0 | ✅ Done |
+| **B** | Open source community (security, 420+ tests, CI/CD) | v3.0.0 | ✅ Done |
 | **C** | Team/company tool (access control, central repo, team reports) | v4.0.0 | ✅ Done |
 | **D** | Distribution (plugin, PyPI, marketplace) | v4.1.0 | ✅ Done |
+| **E** | Multi-IDE support (Cursor, Windsurf, VS Code extension) | v5.0.0 | 📋 Planned |
+| **F** | SQLite index + full-text search + analytics API | v5.1.0 | 📋 Planned |
 
 See [`docs/plans/`](docs/plans/) for detailed roadmaps.
 

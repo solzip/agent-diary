@@ -43,6 +43,10 @@ That's it. Every Claude Code session now auto-generates entries like this:
 - `claude-diary search "keyword"` — search across months of work
 - Team mode with access control and central repo
 
+**"Isn't git log enough?"** — git log records what you committed. This records what you *asked for*, *tried*, and *debugged* — including sessions where you committed nothing.
+
+**Coming next:** Cursor/Windsurf/VS Code support (v5.0), SQLite full-text search (v5.1)
+
 GitHub: https://github.com/solzip/claude-code-hooks-diary
 
 MIT licensed, Python 3.8+, zero dependencies. Feedback welcome!
