@@ -22,7 +22,8 @@ def main():
         prog="claude-diary",
         description="Auto-generated work diary from Claude Code sessions",
     )
-    parser.add_argument("--version", action="version", version="claude-diary 4.1.0")
+    from claude_diary import __version__
+    parser.add_argument("--version", action="version", version="claude-diary %s" % __version__)
 
     sub = parser.add_subparsers(dest="command")
 
@@ -642,7 +643,18 @@ def cmd_init(args):
         else:
             print("  [ok] Stop Hook already registered")
     else:
-        print("  [skip] ~/.claude/settings.json not found")
+        # Create settings.json with hook registration
+        claude_dir = os.path.join(os.path.expanduser("~"), ".claude")
+        Path(claude_dir).mkdir(parents=True, exist_ok=True)
+        hook_cmd = "python -m claude_diary.hook"
+        settings = {
+            "hooks": {
+                "Stop": [{"hooks": [{"type": "command", "command": hook_cmd}]}]
+            }
+        }
+        with open(claude_settings, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2, ensure_ascii=False)
+        print("  [ok] Created %s with Stop Hook" % claude_settings)
 
     print()
     print("Done! Claude Code sessions will be auto-logged.")
@@ -718,7 +730,13 @@ def cmd_team(args):
             print("No team data found.")
 
     elif args.action == "add-member":
+        from claude_diary.team import validate_member_name
         name = args.name or input("Member name: ").strip()
+        try:
+            validate_member_name(name)
+        except ValueError as e:
+            print(str(e))
+            return
         role = args.role
         team_config_path = os.path.join(repo_path, ".team-config.json")
         tc = {}

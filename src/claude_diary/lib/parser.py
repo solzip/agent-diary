@@ -4,10 +4,10 @@ import json
 import os
 import re
 
-MAX_TRANSCRIPT_LINES = 2000
+DEFAULT_MAX_TRANSCRIPT_LINES = 2000
 
 
-def parse_transcript(transcript_path, max_lines=MAX_TRANSCRIPT_LINES):
+def parse_transcript(transcript_path, max_lines=None):
     """Parse JSONL transcript and extract key work content.
 
     Returns dict with:
@@ -26,6 +26,9 @@ def parse_transcript(transcript_path, max_lines=MAX_TRANSCRIPT_LINES):
         "session_start": None,
         "session_end": None,
     }
+
+    if max_lines is None:
+        max_lines = DEFAULT_MAX_TRANSCRIPT_LINES
 
     if not transcript_path or not os.path.exists(transcript_path):
         return _finalize(result)
