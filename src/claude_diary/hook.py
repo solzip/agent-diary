@@ -18,6 +18,9 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from claude_diary.core import process_session
+from claude_diary.log import get_logger
+
+logger = get_logger("claude_diary.hook")
 
 
 def main():
@@ -42,7 +45,7 @@ def main():
         process_session(session_id, transcript_path, cwd)
         sys.exit(0)
     except Exception as e:
-        sys.stderr.write("[diary] Fatal error: %s\n" % str(e))
+        logger.error("Fatal error: %s", e)
         sys.exit(0)  # Never block Claude Code exit
 
 

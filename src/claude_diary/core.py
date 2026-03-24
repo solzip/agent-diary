@@ -5,6 +5,9 @@ import sys
 from datetime import datetime, timezone, timedelta
 
 from claude_diary.config import load_config
+from claude_diary.log import get_logger, configure_from_config
+
+logger = get_logger("claude_diary.core")
 from claude_diary.lib.parser import parse_transcript, get_session_time_range
 from claude_diary.lib.git_info import collect_git_info
 from claude_diary.lib.categorizer import categorize
@@ -27,6 +30,7 @@ def process_session(session_id, transcript_path, cwd):
         True if entry was written, False if skipped (no content).
     """
     config = load_config()
+    configure_from_config(config)
     lang = config.get("lang", "ko")
     tz_offset = config.get("timezone_offset", 9)
     diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
@@ -35,7 +39,7 @@ def process_session(session_id, transcript_path, cwd):
     # 0. Session opt-out check
     from claude_diary.lib.team_security import should_skip_session
     if should_skip_session(cwd, config):
-        sys.stderr.write("[diary] Session skipped (opt-out)\n")
+        logger.info("Session skipped (opt-out)")
         return False
 
     local_tz = timezone(timedelta(hours=tz_offset))
@@ -91,7 +95,7 @@ def process_session(session_id, transcript_path, cwd):
                 # Supplement files from git if transcript was incomplete
                 _supplement_from_git(entry_data, git_info)
         except Exception as e:
-            sys.stderr.write("[diary] Git enrichment failed: %s\n" % str(e))
+            logger.warning("Git enrichment failed: %s", e)
 
     # 4. Enrichment: Auto-categorization
     if enrichment.get("auto_category", True):
@@ -100,14 +104,14 @@ def process_session(session_id, transcript_path, cwd):
             categories = categorize(entry_data, custom_rules or None)
             entry_data["categories"] = categories
         except Exception as e:
-            sys.stderr.write("[diary] Auto-categorization failed: %s\n" % str(e))
+            logger.warning("Auto-categorization failed: %s", e)
 
     # 5. Secret scan (always runs)
     try:
         additional = config.get("security", {}).get("additional_secret_patterns", [])
         scan_entry_data(entry_data, additional or None)
     except Exception as e:
-        sys.stderr.write("[diary] Secret scan failed: %s\n" % str(e))
+        logger.warning("Secret scan failed: %s", e)
 
     # 5.5 Team security filters (path masking + content filter)
     try:
@@ -123,10 +127,10 @@ def process_session(session_id, transcript_path, cwd):
         if content_filters:
             should_record = filter_entry_data(entry_data, content_filters, filter_mode)
             if not should_record:
-                sys.stderr.write("[diary] Session skipped (content filter)\n")
+                logger.info("Session skipped (content filter)")
                 return False
     except Exception as e:
-        sys.stderr.write("[diary] Team security filter failed: %s\n" % str(e))
+        logger.warning("Team security filter failed: %s", e)
 
     # 6. Format and write (CRITICAL — exit 1 on failure)
     try:
@@ -135,27 +139,27 @@ def process_session(session_id, transcript_path, cwd):
         append_entry(diary_dir, date_str, entry_text, lang)
         count = update_session_count(diary_dir, date_str)
     except Exception as e:
-        sys.stderr.write("[diary] FATAL: Failed to write diary: %s\n" % str(e))
+        logger.error("FATAL: Failed to write diary: %s", e)
         sys.exit(1)
 
     # 7. Update search index (non-critical)
     try:
         update_index(diary_dir, entry_data)
     except Exception as e:
-        sys.stderr.write("[diary] Index update failed: %s\n" % str(e))
+        logger.warning("Index update failed: %s", e)
 
     # 8. Retry previously failed exports (non-critical)
     try:
         from claude_diary.exporters.loader import retry_queued
         retry_queued(config, diary_dir)
     except Exception as e:
-        sys.stderr.write("[diary] Export retry failed: %s\n" % str(e))
+        logger.warning("Export retry failed: %s", e)
 
     # 9. Run exporters (non-critical)
     try:
         _run_exporters(config, entry_data)
     except Exception as e:
-        sys.stderr.write("[diary] Exporter execution failed: %s\n" % str(e))
+        logger.warning("Exporter execution failed: %s", e)
 
     # 10. Audit log (non-critical)
     try:
@@ -169,12 +173,12 @@ def process_session(session_id, transcript_path, cwd):
             tz_offset=tz_offset,
         )
     except Exception as e:
-        sys.stderr.write("[diary] Audit log failed: %s\n" % str(e))
+        logger.warning("Audit log failed: %s", e)
 
     # 11. Log success
-    sys.stderr.write(
-        "[diary] Session #%d for %s | project: %s | categories: %s\n"
-        % (count, date_str, project, ",".join(entry_data["categories"]) or "none")
+    logger.info(
+        "Session #%d for %s | project: %s | categories: %s",
+        count, date_str, project, ",".join(entry_data["categories"]) or "none",
     )
 
     return True
@@ -220,4 +224,4 @@ def _run_exporters(config, entry_data):
     if exporters:
         result = run_exporters(exporters, entry_data, diary_dir)
         if result["failed"]:
-            sys.stderr.write("[diary] Failed exporters: %s\n" % ", ".join(result["failed"]))
+            logger.warning("Failed exporters: %s", ", ".join(result["failed"]))
