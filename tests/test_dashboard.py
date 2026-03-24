@@ -92,7 +92,7 @@ class TestRenderHtml:
         assert "src/app.py" in html
         assert "hotFilesData" in html
 
-    def test_chart_js_included(self):
+    def test_no_external_cdn(self):
         html = _render_html(
             total_sessions=0,
             total_files_created=0,
@@ -104,7 +104,9 @@ class TestRenderHtml:
             months=1,
         )
 
-        assert "chart.js" in html
+        # Dashboard must work offline — no external script tags
+        assert "cdn.jsdelivr.net" not in html
+        assert "bar-track" in html
 
     def test_months_in_heatmap_title(self):
         html = _render_html(
@@ -314,4 +316,5 @@ class TestGenerateDashboard:
         output_path = generate_dashboard(str(tmp_path), months=1)
         with open(output_path, "r", encoding="utf-8") as f:
             content = f.read()
-        assert "categoryChart" in content
+        assert "Categories" in content
+        assert "refactor" in content

@@ -5,6 +5,10 @@ import json
 import os
 import sys
 
+from claude_diary.log import get_logger
+
+logger = get_logger("claude_diary.exporters.loader")
+
 
 def load_exporters(config):
     """Load enabled exporters from config.
@@ -22,17 +26,17 @@ def load_exporters(config):
             class_name = "%sExporter" % name.capitalize()
             exporter_class = getattr(module, class_name, None)
             if exporter_class is None:
-                sys.stderr.write("[diary] Exporter '%s': class '%s' not found\n" % (name, class_name))
+                logger.warning("Exporter '%s': class '%s' not found", name, class_name)
                 continue
             instance = exporter_class(exp_config)
             if instance.validate_config():
                 loaded.append((name, instance))
             else:
-                sys.stderr.write("[diary] Exporter '%s': invalid config\n" % name)
+                logger.warning("Exporter '%s': invalid config", name)
         except ImportError:
-            sys.stderr.write("[diary] Exporter '%s': module not found\n" % name)
+            logger.warning("Exporter '%s': module not found", name)
         except Exception as e:
-            sys.stderr.write("[diary] Exporter '%s': load error: %s\n" % (name, str(e)))
+            logger.warning("Exporter '%s': load error: %s", name, e)
 
     return loaded
 
@@ -55,7 +59,7 @@ def run_exporters(exporters, entry_data, diary_dir=None):
                 _queue_failed(diary_dir, name, entry_data, "export returned False")
         except Exception as e:
             result["failed"].append(name)
-            sys.stderr.write("[diary] Exporter '%s' failed: %s\n" % (name, str(e)))
+            logger.warning("Exporter '%s' failed: %s", name, e)
             _queue_failed(diary_dir, name, entry_data, str(e))
 
     return result
@@ -85,7 +89,7 @@ def retry_queued(config, diary_dir):
         retries = item.get("retries", 0)
 
         if retries >= 3:
-            sys.stderr.write("[diary] Exporter '%s': max retries reached, dropping\n" % name)
+            logger.warning("Exporter '%s': max retries reached, dropping", name)
             continue
 
         if name not in exporter_map:

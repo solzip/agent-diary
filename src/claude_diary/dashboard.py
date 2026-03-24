@@ -119,15 +119,46 @@ def _render_html(total_sessions, total_files_created, total_files_modified,
                  projects, categories, daily_data, hot_files, months):
     """Render the complete HTML dashboard."""
 
-    # Prepare chart data as JSON
-    project_labels = json.dumps([p for p, _ in projects.most_common(10)])
-    project_values = json.dumps([c for _, c in projects.most_common(10)])
-    cat_labels = json.dumps([c for c, _ in categories.most_common(10)])
-    cat_values = json.dumps([v for _, v in categories.most_common(10)])
+    # Prepare data as JSON (heatmap + hot files still use inline JS)
     heatmap_data = json.dumps(daily_data)
     hot_files_data = json.dumps([
         {"file": f, "count": c} for f, c in hot_files.most_common(10)
     ])
+
+    # Build CSS bar chart HTML for projects
+    bar_colors = ['#58a6ff','#3fb950','#d29922','#f85149','#bc8cff',
+                  '#79c0ff','#56d364','#e3b341','#ff7b72','#d2a8ff']
+    project_items = projects.most_common(10)
+    project_max = project_items[0][1] if project_items else 1
+    project_bars_html = ""
+    for i, (label, value) in enumerate(project_items):
+        pct = max(5, int(value / project_max * 100))
+        color = bar_colors[i % len(bar_colors)]
+        project_bars_html += (
+            '<div class="bar-row">'
+            '<span class="bar-label">%s</span>'
+            '<div class="bar-track"><div class="bar-fill" style="width:%d%%;background:%s"></div></div>'
+            '<span class="bar-value">%d</span>'
+            '</div>\n' % (_html_escape(label), pct, color, value)
+        )
+    if not project_items:
+        project_bars_html = '<p style="color:#484f58">No data yet</p>'
+
+    # Build CSS bar chart HTML for categories
+    cat_items = categories.most_common(10)
+    cat_max = cat_items[0][1] if cat_items else 1
+    cat_bars_html = ""
+    for _i, (label, value) in enumerate(cat_items):
+        pct = max(5, int(value / cat_max * 100))
+        cat_bars_html += (
+            '<div class="bar-row">'
+            '<span class="bar-label">%s</span>'
+            '<div class="bar-track"><div class="bar-fill" style="width:%d%%;background:#238636"></div></div>'
+            '<span class="bar-value">%d</span>'
+            '</div>\n' % (_html_escape(label), pct, value)
+        )
+    if not cat_items:
+        cat_bars_html = '<p style="color:#484f58">No data yet</p>'
 
     return """<!DOCTYPE html>
 <html lang="en">
@@ -135,7 +166,6 @@ def _render_html(total_sessions, total_files_created, total_files_modified,
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Diary Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; }
@@ -147,6 +177,11 @@ h1 { color: #58a6ff; margin-bottom: 24px; }
 .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
 .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
 .chart-card h3 { color: #c9d1d9; margin-bottom: 16px; }
+.bar-row { display: flex; align-items: center; margin-bottom: 10px; }
+.bar-label { min-width: 100px; max-width: 140px; font-size: 0.85em; color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+.bar-track { flex: 1; height: 18px; background: #21262d; border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%%; border-radius: 4px; transition: width 0.3s; }
+.bar-value { min-width: 36px; text-align: right; font-size: 0.85em; color: #8b949e; margin-left: 10px; }
 .heatmap { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 32px; }
 .heatmap h3 { margin-bottom: 12px; }
 .heatmap-grid { display: flex; flex-wrap: wrap; gap: 3px; }
@@ -179,11 +214,11 @@ footer { text-align: center; color: #484f58; margin-top: 32px; font-size: 0.85em
 <div class="charts-grid">
   <div class="chart-card">
     <h3>🗂️ Projects</h3>
-    <canvas id="projectChart"></canvas>
+    %(project_bars)s
   </div>
   <div class="chart-card">
     <h3>🏷️ Categories</h3>
-    <canvas id="categoryChart"></canvas>
+    %(cat_bars)s
   </div>
 </div>
 
@@ -220,26 +255,6 @@ const hotFilesData = %(hot_files_data)s;
   }
 })();
 
-// Projects chart
-new Chart(document.getElementById('projectChart'), {
-  type: 'doughnut',
-  data: {
-    labels: %(project_labels)s,
-    datasets: [{ data: %(project_values)s, backgroundColor: ['#58a6ff','#3fb950','#d29922','#f85149','#bc8cff','#79c0ff','#56d364','#e3b341','#ff7b72','#d2a8ff'] }]
-  },
-  options: { plugins: { legend: { position: 'bottom', labels: { color: '#c9d1d9' } } } }
-});
-
-// Categories chart
-new Chart(document.getElementById('categoryChart'), {
-  type: 'bar',
-  data: {
-    labels: %(cat_labels)s,
-    datasets: [{ label: 'Count', data: %(cat_values)s, backgroundColor: '#238636' }]
-  },
-  options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#8b949e' } }, y: { ticks: { color: '#8b949e' } } } }
-});
-
 // Hot files
 (function() {
   const container = document.getElementById('hotFiles');
@@ -273,9 +288,18 @@ new Chart(document.getElementById('categoryChart'), {
         "total_files_modified": total_files_modified,
         "months": months,
         "heatmap_data": heatmap_data,
-        "project_labels": project_labels,
-        "project_values": project_values,
-        "cat_labels": cat_labels,
-        "cat_values": cat_values,
+        "project_bars": project_bars_html,
+        "cat_bars": cat_bars_html,
         "hot_files_data": hot_files_data,
     }
+
+
+def _html_escape(text):
+    """Minimal HTML escape for label text."""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
