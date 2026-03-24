@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 460">
+  <style>
+    @keyframes typing { from { width: 0 } to { width: 100% } }
+    @keyframes blink { 50% { opacity: 0 } }
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+    .term-bg { fill: #0d1117; }
+    .term-bar { fill: #161b22; }
+    .term-btn-r { fill: #ff5f57; }
+    .term-btn-y { fill: #febc2e; }
+    .term-btn-g { fill: #28c840; }
+    .term-title { fill: #8b949e; font: 12px -apple-system, 'Segoe UI', sans-serif; }
+    .prompt { fill: #7ee787; font: bold 13px 'Menlo', 'Consolas', monospace; }
+    .cmd { fill: #c9d1d9; font: 13px 'Menlo', 'Consolas', monospace; }
+    .output { fill: #8b949e; font: 13px 'Menlo', 'Consolas', monospace; }
+    .highlight { fill: #58a6ff; font: 13px 'Menlo', 'Consolas', monospace; }
+    .success { fill: #3fb950; font: 13px 'Menlo', 'Consolas', monospace; }
+    .emoji { font: 13px 'Menlo', 'Consolas', monospace; }
+    .dim { fill: #484f58; font: 13px 'Menlo', 'Consolas', monospace; }
+    .phase1 { animation: fadeIn 0.5s ease 0.5s both; }
+    .phase2 { animation: fadeIn 0.5s ease 2.0s both; }
+    .phase3 { animation: fadeIn 0.5s ease 3.5s both; }
+    .phase4 { animation: fadeIn 0.5s ease 5.0s both; }
+  </style>
+
+  <!-- Terminal window -->
+  <rect class="term-bg" width="720" height="460" rx="10"/>
+  <rect class="term-bar" width="720" height="36" rx="10"/>
+  <rect class="term-bg" x="0" y="26" width="720" height="10"/>
+  <circle class="term-btn-r" cx="20" cy="18" r="6"/>
+  <circle class="term-btn-y" cx="40" cy="18" r="6"/>
+  <circle class="term-btn-g" cx="60" cy="18" r="6"/>
+  <text class="term-title" x="360" y="22" text-anchor="middle">Terminal — claude-diary</text>
+
+  <!-- Phase 1: Install -->
+  <g class="phase1">
+    <text class="prompt" x="20" y="62">$</text>
+    <text class="cmd" x="36" y="62">pip install claude-diary &amp;&amp; claude-diary init</text>
+    <text class="success" x="20" y="82">  [ok] Diary directory: ~/working-diary</text>
+    <text class="success" x="20" y="100">  [ok] Config: ~/.config/claude-diary/config.json</text>
+    <text class="success" x="20" y="118">  [ok] Stop Hook registered: python -m claude_diary.hook</text>
+    <text class="output" x="20" y="140">Done! Claude Code sessions will be auto-logged.</text>
+  </g>
+
+  <!-- Phase 2: Session ends, diary generated -->
+  <g class="phase2">
+    <text class="dim" x="20" y="168">── Claude Code session ends ──</text>
+    <text class="highlight" x="20" y="190">[diary] Session #3 for 2026-03-24 | project: my-app | categories: feature,test</text>
+
+    <text class="prompt" x="20" y="218">$</text>
+    <text class="cmd" x="36" y="218">cat ~/working-diary/2026-03-24.md</text>
+  </g>
+
+  <!-- Phase 3: Diary content preview -->
+  <g class="phase3">
+    <text class="output" x="20" y="244">### ⏰ 14:30:15 | 📁 `my-app`</text>
+    <text class="output" x="20" y="262">**🏷️ Categories:** `feature` `test`</text>
+    <text class="output" x="20" y="282">**📋 Task Requests:**</text>
+    <text class="output" x="20" y="300">  1. Add user authentication with JWT</text>
+    <text class="output" x="20" y="318">  2. Write integration tests for login flow</text>
+    <text class="output" x="20" y="338">**📄 Files Created:**</text>
+    <text class="output" x="20" y="356">  - `src/auth/jwt_handler.py`</text>
+    <text class="output" x="20" y="374">  - `tests/test_auth.py`</text>
+    <text class="output" x="20" y="394">**📊 Code Stats:** +145 / -12 lines (5 files)</text>
+    <text class="output" x="20" y="412">**🔒 2 secrets masked**</text>
+  </g>
+
+  <!-- Phase 4: Dashboard hint -->
+  <g class="phase4">
+    <text class="prompt" x="20" y="442">$</text>
+    <text class="cmd" x="36" y="442">claude-diary dashboard</text>
+    <text class="highlight" x="280" y="442">← HTML dashboard with heatmap &amp; charts</text>
+  </g>
+</svg>

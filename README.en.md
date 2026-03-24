@@ -1,14 +1,25 @@
 # 📓 Claude Code Working Diary
 
+**Your Claude Code sessions, automatically documented.**
+
 [![CI](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/solzip/claude-code-hooks-diary)
 
 > [한국어](README.md) | **English**
 
 > ⚠️ This is a community project, not officially affiliated with Anthropic.
 
-Automatically logs your Claude Code sessions into **daily/weekly work diaries** in Markdown format.
+Every Claude Code session you run is full of valuable work — tasks completed, files changed, bugs fixed. But when the session ends, that context disappears. **claude-diary** captures it all automatically.
+
+```bash
+pip install claude-diary && claude-diary init  # That's it. You're done.
+```
+
+<p align="center">
+  <img src="docs/demo.svg" alt="claude-diary demo" width="680">
+</p>
 
 ## How It Works
 
@@ -16,18 +27,16 @@ Automatically logs your Claude Code sessions into **daily/weekly work diaries** 
 Claude Code session ends
         │
         ▼
-  Stop Hook fires ──→ working-diary.py
+  Stop Hook fires automatically
         │
         ▼
-  Parses transcript.jsonl
-  (extracts user requests, modified files, commands)
+  Parses transcript → extracts tasks, files, commands, git info
         │
         ▼
-  Appends to ~/working-diary/2026-03-17.md
+  ~/working-diary/2026-03-24.md  ← auto-generated diary entry
 ```
 
-Every time a Claude Code session ends, the **Stop Hook** automatically runs,
-analyzes the transcript, and appends the work content to today's Markdown diary file.
+Zero config needed. Every session end triggers the hook, analyzes what you did, and appends a structured Markdown entry to today's diary.
 
 ## Supported Platforms
 
@@ -171,7 +180,7 @@ claude-diary team weekly                  # Team weekly report
 | Secret Scanning | Passwords, API keys, tokens auto-masked (11+ patterns) |
 | Search Index | Fast search across months of diary files |
 | 5 Exporters | Notion, Slack, Discord, Obsidian, GitHub plugins |
-| HTML Dashboard | GitHub-style heatmap, Chart.js charts |
+| HTML Dashboard | GitHub-style heatmap, offline charts (zero CDN) |
 | Security Audit | Audit log, SHA-256 checksum tamper detection |
 | Team Mode | Access control, central Git repo, team reports |
 
@@ -198,7 +207,7 @@ claude-diary team weekly                  # Team weekly report
 | **A** | Personal productivity (categories, Git, CLI, plugins, dashboard) | v2.0.0 | ✅ Done |
 | **B** | Open source community (security, 40 tests, CI/CD) | v3.0.0 | ✅ Done |
 | **C** | Team/company tool (access control, central repo, team reports) | v4.0.0 | ✅ Done |
-| **D** | Distribution (plugin, PyPI, marketplace) | v4.1.0 | 🔄 In Progress |
+| **D** | Distribution (plugin, PyPI, marketplace) | v4.1.0 | ✅ Done |
 
 See [`docs/plans/`](docs/plans/) for detailed roadmaps.
 
