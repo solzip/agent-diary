@@ -196,12 +196,8 @@ class TestCollectGitInfo:
             assert result["diff_stat"]["added"] == 3
 
     def test_returns_none_on_exception(self):
-        def fake_run(cmd, **kwargs):
-            if "rev-parse" in cmd:
-                return MagicMock(returncode=0)
-            raise RuntimeError("unexpected error")
-
-        with patch("claude_diary.lib.git_info.subprocess.run", side_effect=fake_run):
+        with patch("claude_diary.lib.git_info._is_git_repo", return_value=True), \
+             patch("claude_diary.lib.git_info._get_branch", side_effect=RuntimeError("unexpected error")):
             result = collect_git_info("/repo")
             assert result is None
 

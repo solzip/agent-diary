@@ -295,72 +295,76 @@ class TestNotionExporter:
         from claude_diary.exporters.notion import NotionExporter
         assert not NotionExporter({}).validate_config()
 
-    @patch("requests.post")
-    def test_export_success(self, mock_post):
+    def test_export_success(self):
         from claude_diary.exporters.notion import NotionExporter
+        mock_requests = MagicMock()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_post.return_value = mock_resp
+        mock_requests.post.return_value = mock_resp
 
-        exp = NotionExporter({"api_token": "secret_abc", "database_id": "db123"})
-        result = exp.export(SAMPLE_ENTRY)
-        assert result is True
-        mock_post.assert_called_once()
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            exp = NotionExporter({"api_token": "secret_abc", "database_id": "db123"})
+            result = exp.export(SAMPLE_ENTRY)
+            assert result is True
+            mock_requests.post.assert_called_once()
 
-        # Verify the API call — requests.post(url, headers=..., json=..., timeout=...)
-        call_kwargs = mock_post.call_args
-        assert call_kwargs[0][0] == "https://api.notion.com/v1/pages"
-        headers = call_kwargs[1]["headers"]
-        assert headers["Authorization"] == "Bearer secret_abc"
-        assert headers["Notion-Version"] == "2022-06-28"
+            # Verify the API call — requests.post(url, headers=..., json=..., timeout=...)
+            call_kwargs = mock_requests.post.call_args
+            assert call_kwargs[0][0] == "https://api.notion.com/v1/pages"
+            headers = call_kwargs[1]["headers"]
+            assert headers["Authorization"] == "Bearer secret_abc"
+            assert headers["Notion-Version"] == "2022-06-28"
 
-    @patch("requests.post")
-    def test_export_failure_status(self, mock_post):
+    def test_export_failure_status(self):
         from claude_diary.exporters.notion import NotionExporter
+        mock_requests = MagicMock()
         mock_resp = MagicMock()
         mock_resp.status_code = 400
-        mock_post.return_value = mock_resp
+        mock_requests.post.return_value = mock_resp
 
-        exp = NotionExporter({"api_token": "secret_abc", "database_id": "db123"})
-        result = exp.export(SAMPLE_ENTRY)
-        assert result is False
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            exp = NotionExporter({"api_token": "secret_abc", "database_id": "db123"})
+            result = exp.export(SAMPLE_ENTRY)
+            assert result is False
 
-    @patch("requests.post")
-    def test_export_with_team_member(self, mock_post):
+    def test_export_with_team_member(self):
         """Team mode: Author field should be included in properties."""
         from claude_diary.exporters.notion import NotionExporter
+        mock_requests = MagicMock()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_post.return_value = mock_resp
+        mock_requests.post.return_value = mock_resp
 
-        exp = NotionExporter({
-            "api_token": "secret_abc",
-            "database_id": "db123",
-            "member_name": "alice",
-        })
-        exp.export(SAMPLE_ENTRY)
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            exp = NotionExporter({
+                "api_token": "secret_abc",
+                "database_id": "db123",
+                "member_name": "alice",
+            })
+            exp.export(SAMPLE_ENTRY)
 
-        call_kwargs = mock_post.call_args
-        properties = call_kwargs[1]["json"]["properties"]
-        assert "Author" in properties
-        assert properties["Author"]["select"]["name"] == "alice"
+            call_kwargs = mock_requests.post.call_args
+            properties = call_kwargs[1]["json"]["properties"]
+            assert "Author" in properties
+            assert properties["Author"]["select"]["name"] == "alice"
 
-    @patch("requests.post")
-    def test_export_properties_structure(self, mock_post):
+    def test_export_properties_structure(self):
         """Verify properties include git commits and code stats when present."""
         from claude_diary.exporters.notion import NotionExporter
+        mock_requests = MagicMock()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_post.return_value = mock_resp
+        mock_requests.post.return_value = mock_resp
 
-        exp = NotionExporter({"api_token": "secret_abc", "database_id": "db123"})
-        exp.export(RICH_ENTRY)
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            exp = NotionExporter({"api_token": "secret_abc", "database_id": "db123"})
+            exp.export(RICH_ENTRY)
 
-        call_kwargs = mock_post.call_args
-        properties = call_kwargs[1]["json"]["properties"]
-        assert "Git Commits" in properties
-        assert "Lines Changed" in properties
-        assert properties["Lines Changed"]["number"] == 60  # 50 added + 10 deleted
+            call_kwargs = mock_requests.post.call_args
+            properties = call_kwargs[1]["json"]["properties"]
+            assert "Git Commits" in properties
+            assert "Lines Changed" in properties
+            assert properties["Lines Changed"]["number"] == 60  # 50 added + 10 deleted
 
     def test_export_requests_not_installed(self):
         """When requests is not installed, export should return False."""

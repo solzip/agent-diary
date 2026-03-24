@@ -52,9 +52,9 @@ class TestParseDailyFileProjects:
     def test_extracts_projects(self, tmp_path):
         content = (
             "### \u23f0 10:00:00\n"
-            "\ud83d\udcc1 `my-project`\n"
+            "\U0001f4c1 `my-project`\n"
             "### \u23f0 14:00:00\n"
-            "\ud83d\udcc1 `other-project`\n"
+            "\U0001f4c1 `other-project`\n"
         )
         f = tmp_path / "2026-03-17.md"
         f.write_text(content, encoding="utf-8")
@@ -64,9 +64,9 @@ class TestParseDailyFileProjects:
     def test_duplicate_projects(self, tmp_path):
         content = (
             "### \u23f0 10:00:00\n"
-            "\ud83d\udcc1 `my-project`\n"
+            "\U0001f4c1 `my-project`\n"
             "### \u23f0 14:00:00\n"
-            "\ud83d\udcc1 `my-project`\n"
+            "\U0001f4c1 `my-project`\n"
         )
         f = tmp_path / "2026-03-17.md"
         f.write_text(content, encoding="utf-8")
@@ -225,9 +225,9 @@ class TestParseDailyFileRawEntries:
 class TestParseDailyFileFullDocument:
     def test_full_diary_entry(self, tmp_path):
         content = (
-            "# \ud83d\udcdd 2026-03-17\n\n"
+            "# \U0001f4dd 2026-03-17\n\n"
             "### \u23f0 10:00:00\n"
-            "\ud83d\udcc1 `my-app`\n\n"
+            "\U0001f4c1 `my-app`\n\n"
             "\uce74\ud14c\uace0\ub9ac: `feature`\n\n"
             "\uc0dd\uc131\ub41c \ud30c\uc77c:\n"
             "  - `src/new.py`\n\n"
@@ -240,7 +240,7 @@ class TestParseDailyFileFullDocument:
             "\uc791\uc5c5 \uc694\uccad:\n"
             "  1. Build the feature\n\n"
             "### \u23f0 14:00:00\n"
-            "\ud83d\udcc1 `other-app`\n"
+            "\U0001f4c1 `other-app`\n"
         )
         f = tmp_path / "2026-03-17.md"
         f.write_text(content, encoding="utf-8")
