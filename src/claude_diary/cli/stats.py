@@ -52,8 +52,8 @@ def cmd_stats(args):
 
         total_sessions += sessions
         daily_sessions[day] = sessions
-        for p in stats["projects"]:
-            all_projects[p] += sessions
+        for p, count in stats.get("project_sessions", {}).items():
+            all_projects[p] += count
         for c in stats.get("categories", []):
             all_categories[c] += 1
         total_files_created += len(stats["files_created"])
@@ -72,10 +72,11 @@ def cmd_stats(args):
     if all_projects:
         print("  Projects:")
         max_count = max(all_projects.values()) if all_projects else 1
+        max_name_len = max(len(p) for p in all_projects) + 1
         for proj, count in all_projects.most_common(10):
             bar_len = int(count / max_count * 16)
             bar = "█" * bar_len + "░" * (16 - bar_len)
-            print("  %-20s %s %d" % (proj, bar, count))
+            print("  %-*s %s %d" % (max_name_len, proj, bar, count))
         print()
 
     if all_categories:
