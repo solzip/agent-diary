@@ -35,6 +35,10 @@ def parse_daily_file(filepath):
     project_matches = re.findall(r'📁 `([^`]+)`', content)
     stats["projects"] = set(project_matches)
 
+    # Per-project session counts
+    project_counter = Counter(project_matches)
+    stats["project_sessions"] = dict(project_counter)
+
     # Files created (KO/EN)
     created_matches = re.findall(
         r'(?:생성된 파일|Files Created).*?\n((?:\s+- `[^`]+`\n?)+)', content

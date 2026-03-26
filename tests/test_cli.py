@@ -694,6 +694,7 @@ class TestCmdStatsExtra:
         mock_config.return_value = base_config
         mock_parse.return_value = {
             "sessions": 5, "projects": {"my-app"},
+            "project_sessions": {"my-app": 5},
             "files_created": ["a.py"], "files_modified": ["b.py"],
             "tasks": [], "categories": ["feature", "bugfix"],
         }
