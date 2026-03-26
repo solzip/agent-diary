@@ -18,6 +18,7 @@ from claude_diary.cli.stats import cmd_stats, cmd_weekly, _get_terminal_width, _
 from claude_diary.cli.config import cmd_config, cmd_init, cmd_migrate, _add_exporter_interactive
 from claude_diary.cli.team import cmd_team
 from claude_diary.cli.maintenance import cmd_reindex, cmd_audit, cmd_delete, cmd_dashboard
+from claude_diary.cli.setup import cmd_install, cmd_uninstall
 
 
 def main():
@@ -104,6 +105,10 @@ def main():
     p_dashboard.add_argument("--port", type=int, default=8787, help="Server port (default: 8787)")
     p_dashboard.add_argument("--months", type=int, default=3, help="Months of data (default: 3)")
 
+    # install / uninstall
+    sub.add_parser("install", help="Register claude-diary hook in Claude Code")
+    sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -124,6 +129,8 @@ def main():
         "audit": cmd_audit,
         "delete": cmd_delete,
         "dashboard": cmd_dashboard,
+        "install": cmd_install,
+        "uninstall": cmd_uninstall,
     }
 
     fn = commands.get(args.command)
