@@ -25,6 +25,8 @@ def cmd_config(args):
             config[key] = value
         elif key == "diary_dir":
             config[key] = value
+        elif key == "manual_diary_dir":
+            config[key] = value
         elif key == "timezone_offset":
             try:
                 tz = int(value)
@@ -36,7 +38,7 @@ def cmd_config(args):
                 print("Invalid timezone_offset: %s (must be integer)" % value)
                 return
         else:
-            print("Unknown config key: %s (available: lang, diary_dir, timezone_offset)" % key)
+            print("Unknown config key: %s (available: lang, diary_dir, manual_diary_dir, timezone_offset)" % key)
             return
         _cli.save_config(config)
         print("Set %s = %s" % (key, value))

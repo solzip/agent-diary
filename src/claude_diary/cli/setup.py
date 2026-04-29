@@ -12,6 +12,22 @@ HOOK_ENTRY = {
     "command": HOOK_COMMAND,
 }
 
+DIARY_SLASH_COMMAND = """\
+---
+description: 현재 세션 작업일지를 <manual_dir>/<date>/<project>/<date>.md 에 기록 (있으면 append)
+allowed-tools:
+  - Bash
+---
+
+!`claude-diary write`
+"""
+
+
+def _get_slash_command_path():
+    """Return path to ~/.claude/commands/diary.md."""
+    home = os.path.expanduser("~")
+    return os.path.join(home, ".claude", "commands", "diary.md")
+
 
 def _get_claude_settings_path():
     """Return path to ~/.claude/settings.json."""
@@ -58,34 +74,64 @@ def _find_existing_hook(settings):
 
 
 def cmd_install(args):
-    """Register claude-diary Stop hook in ~/.claude/settings.json."""
+    """Register claude-diary Stop hook + /diary slash command."""
     settings_path = _get_claude_settings_path()
     settings = _load_claude_settings(settings_path)
 
     if _find_existing_hook(settings):
-        print("claude-diary hook is already installed.")
-        print("  Settings: %s" % settings_path)
-        return
+        hook_status = "already installed"
+    else:
+        if "hooks" not in settings:
+            settings["hooks"] = {}
+        if "Stop" not in settings["hooks"]:
+            settings["hooks"]["Stop"] = []
+        settings["hooks"]["Stop"].append({"hooks": [HOOK_ENTRY]})
+        _save_claude_settings(settings_path, settings)
+        hook_status = "installed"
 
-    # Ensure hooks.Stop structure exists
-    if "hooks" not in settings:
-        settings["hooks"] = {}
-    if "Stop" not in settings["hooks"]:
-        settings["hooks"]["Stop"] = []
+    # Slash command install runs unconditionally — fixes upgrade path for
+    # users who installed before /diary was a feature.
+    slash_path = _get_slash_command_path()
+    slash_status = _install_slash_command(slash_path)
 
-    # Add hook
-    settings["hooks"]["Stop"].append({
-        "hooks": [HOOK_ENTRY],
-    })
-
-    _save_claude_settings(settings_path, settings)
-
-    print("claude-diary hook installed successfully!")
-    print()
-    print("  Hook: %s" % HOOK_COMMAND)
+    print("claude-diary install:")
+    print("  Hook: %s (%s)" % (HOOK_COMMAND, hook_status))
     print("  Settings: %s" % settings_path)
+    print("  Slash command: %s (%s)" % (slash_path, slash_status))
     print()
-    print("Every Claude Code session will now auto-generate a diary entry on exit.")
+    print("Stop Hook auto-writes a diary entry on session exit.")
+    print("Type /diary inside any session to write a manual entry on demand.")
+
+
+def _install_slash_command(path):
+    """Create ~/.claude/commands/diary.md if missing.
+
+    Returns 'installed', 'already exists', or 'failed: <reason>'.
+    """
+    if os.path.exists(path):
+        return "already exists"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(DIARY_SLASH_COMMAND)
+        return "installed"
+    except OSError as e:
+        return "failed: %s" % e
+
+
+def _uninstall_slash_command(path):
+    """Remove ~/.claude/commands/diary.md if it matches our content."""
+    if not os.path.exists(path):
+        return "not present"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            existing = f.read()
+        if "claude-diary write" not in existing:
+            return "skipped (modified by user)"
+        os.remove(path)
+        return "removed"
+    except OSError as e:
+        return "failed: %s" % e
 
 
 def cmd_uninstall(args):
@@ -115,5 +161,9 @@ def cmd_uninstall(args):
 
     _save_claude_settings(settings_path, settings)
 
+    slash_path = _get_slash_command_path()
+    slash_status = _uninstall_slash_command(slash_path)
+
     print("claude-diary hook uninstalled.")
     print("  Settings: %s" % settings_path)
+    print("  Slash command: %s (%s)" % (slash_path, slash_status))

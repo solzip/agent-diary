@@ -101,6 +101,23 @@ cd claude-code-hooks-diary/working-diary-system
     └── W12_2026-03-16.md
 ```
 
+## 수동 일지 — `/diary` 슬래시 커맨드
+
+세션 종료를 기다리지 않고 작업 도중 즉시 일지를 남기고 싶을 때 사용합니다. 자동 일지(Stop Hook)와 **공존**하며, 별도 경로에 프로젝트별로 정리됩니다.
+
+```
+~/working-diary/manual/
+└── 2026-04-29/
+    └── claude-code-hooks-diary/
+        └── 2026-04-29.md      ← 같은 날 같은 프로젝트면 append
+```
+
+**사용법:**
+- Claude Code 세션에서 `/diary` 입력 → 현재 cwd의 transcript를 읽고 기록
+- 또는 터미널에서 `claude-diary write`
+
+`claude-diary install` 시 `~/.claude/commands/diary.md`가 함께 설치되어 모든 프로젝트에서 `/diary` 사용 가능. 이미 설치한 적 있다면 한 번 더 실행해서 슬래시 커맨드만 추가하세요 (멱등). `claude-diary uninstall` 시 함께 제거됩니다 (사용자가 수정한 파일은 보존).
+
 ## 일지 예시
 
 ```markdown
@@ -138,7 +155,8 @@ cd claude-code-hooks-diary/working-diary-system
 | 환경변수 | 설명 | 기본값 |
 |----------|------|--------|
 | `CLAUDE_DIARY_LANG` | 일지 언어 (`ko` 또는 `en`) | `ko` |
-| `CLAUDE_DIARY_DIR` | 일지 저장 경로 | `~/working-diary` |
+| `CLAUDE_DIARY_DIR` | 자동 일지 저장 경로 | `~/working-diary` |
+| `CLAUDE_DIARY_MANUAL_DIR` | 수동 일지(`/diary`) 저장 경로 | `~/working-diary/manual` |
 | `CLAUDE_DIARY_TZ_OFFSET` | UTC 오프셋 | `9` (KST) |
 
 ```bash
@@ -158,6 +176,7 @@ export CLAUDE_DIARY_TZ_OFFSET="9"
 ## CLI 명령어
 
 ```bash
+claude-diary write                        # 현재 세션 작업일지를 즉시 기록 (`/diary` 슬래시 커맨드로도 호출)
 claude-diary search "키워드"              # 키워드 검색
 claude-diary filter --project my-app      # 프로젝트 필터
 claude-diary trace src/main.py            # 파일 변경 이력

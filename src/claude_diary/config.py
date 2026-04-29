@@ -9,6 +9,7 @@ DEFAULT_CONFIG = {
     "lang": "ko",
     "timezone_offset": 9,
     "diary_dir": os.path.join(os.path.expanduser("~"), "working-diary"),
+    "manual_diary_dir": os.path.join(os.path.expanduser("~"), "working-diary", "manual"),
     "enrichment": {
         "git_info": True,
         "auto_category": True,
@@ -51,6 +52,10 @@ def load_config():
     env_dir = os.environ.get("CLAUDE_DIARY_DIR")
     if env_dir:
         config["diary_dir"] = os.path.expanduser(env_dir)
+
+    env_manual_dir = os.environ.get("CLAUDE_DIARY_MANUAL_DIR")
+    if env_manual_dir:
+        config["manual_diary_dir"] = os.path.expanduser(env_manual_dir)
 
     env_tz = os.environ.get("CLAUDE_DIARY_TZ_OFFSET")
     if env_tz:
