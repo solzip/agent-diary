@@ -461,12 +461,13 @@ class TestMain:
         assert "usage:" in captured.out.lower() or "claude-diary" in captured.out.lower()
 
     def test_version_flag(self, capsys):
+        from claude_diary import __version__
         with patch("sys.argv", ["claude-diary", "--version"]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
         captured = capsys.readouterr()
-        assert "4.1.0" in captured.out
+        assert __version__ in captured.out
 
     @patch("claude_diary.cli.cmd_trace")
     def test_main_dispatches_trace(self, mock_cmd, capsys):

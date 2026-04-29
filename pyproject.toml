@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-diary"
-version = "4.1.0"
+version = "4.2.0"
 description = "Auto-generate work diaries from Claude Code sessions"
 readme = "README.en.md"
 license = {text = "MIT"}
