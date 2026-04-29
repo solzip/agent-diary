@@ -101,6 +101,23 @@ After installation:
     └── W12_2026-03-16.md
 ```
 
+## Manual Diary — `/diary` Slash Command
+
+For when you want to record an entry mid-session without waiting for the Stop Hook. **Coexists** with the auto diary and lives at a separate, project-organized path.
+
+```
+~/working-diary/manual/
+└── 2026-04-29/
+    └── claude-code-hooks-diary/
+        └── 2026-04-29.md      ← appended on subsequent calls within the same day/project
+```
+
+**Usage:**
+- Inside a Claude Code session: type `/diary` — reads the current cwd's transcript and writes the entry
+- Or from the terminal: `claude-diary write`
+
+`claude-diary install` installs `~/.claude/commands/diary.md` so `/diary` works in every project. Re-run it once if you installed before this feature shipped (it's idempotent). `claude-diary uninstall` removes it (preserves user-modified files).
+
 ## Diary Example
 
 ```markdown
@@ -138,7 +155,8 @@ After installation:
 | Environment Variable | Description | Default |
 |---------------------|-------------|---------|
 | `CLAUDE_DIARY_LANG` | Diary language (`ko` or `en`) | `ko` |
-| `CLAUDE_DIARY_DIR` | Diary storage path | `~/working-diary` |
+| `CLAUDE_DIARY_DIR` | Auto diary storage path | `~/working-diary` |
+| `CLAUDE_DIARY_MANUAL_DIR` | Manual diary (`/diary`) storage path | `~/working-diary/manual` |
 | `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` (KST) |
 
 ```bash
@@ -158,6 +176,7 @@ export CLAUDE_DIARY_TZ_OFFSET="-5"  # EST (UTC-5)
 ## CLI Commands
 
 ```bash
+claude-diary write                        # Write current session diary on demand (also via `/diary` slash command)
 claude-diary search "keyword"             # Keyword search
 claude-diary filter --project my-app      # Filter by project
 claude-diary trace src/main.py            # File change history

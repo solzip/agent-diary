@@ -27,35 +27,74 @@ logger = get_logger("claude_diary.cli.write")
 def _encode_cwd(cwd):
     """Encode cwd to Claude Code's project dir name format.
 
-    Replaces every non-alphanumeric char with '-'.
-    Matches Claude Code's encoding for ~/.claude/projects/<encoded>/
+    Replaces every non-alphanumeric char with '-'. Verified consistent
+    across Windows/macOS/Linux via Claude Code's transcript storage:
+      Linux:   /home/user/myapp   → -home-user-myapp
+      macOS:   /Users/foo/proj    → -Users-foo-proj
+      Windows: C:\\Users\\foo\\proj → C--Users-foo-proj
     """
     if not cwd:
         return ""
     return re.sub(r"[^A-Za-z0-9]", "-", cwd)
 
 
-def _find_latest_transcript(cwd):
-    """Locate the most recent transcript .jsonl for current cwd.
+def _candidate_project_dirs(cwd):
+    """Return candidate ~/.claude/projects/<encoded>/ paths to probe.
 
-    Strategy:
-      1. $CLAUDE_TRANSCRIPT_PATH env var (if set by harness)
-      2. ~/.claude/projects/<encoded-cwd>/*.jsonl — latest mtime
+    Tries multiple cwd normalizations because the harness may have
+    recorded the path differently than os.getcwd() returns it (case,
+    symlinks, abspath vs realpath).
+    """
+    base = Path(os.path.expanduser("~/.claude/projects"))
+    seen = set()
+    candidates = []
+    for variant in (
+        cwd,
+        os.path.abspath(cwd) if cwd else None,
+        os.path.realpath(cwd) if cwd else None,
+    ):
+        if not variant:
+            continue
+        encoded = _encode_cwd(variant)
+        if encoded in seen:
+            continue
+        seen.add(encoded)
+        candidates.append(base / encoded)
+    return candidates
+
+
+def _find_latest_transcript(cwd):
+    """Locate the most recent transcript .jsonl for the current session.
+
+    Strategy (first hit wins):
+      1. $CLAUDE_TRANSCRIPT_PATH env var (if harness ever exposes it)
+      2. ~/.claude/projects/<encoded-cwd>/*.jsonl — multiple cwd variants,
+         latest by mtime
+      3. Fallback: globally most-recently-modified .jsonl across all
+         projects, but only if modified within the last hour (likely the
+         current live session) — defensive for unexpected encoding edge cases
     """
     env_path = os.environ.get("CLAUDE_TRANSCRIPT_PATH")
     if env_path and os.path.exists(env_path):
         return env_path
 
-    encoded = _encode_cwd(os.path.abspath(cwd))
-    projects_dir = Path(os.path.expanduser("~/.claude/projects")) / encoded
-    if not projects_dir.is_dir():
-        return None
+    for projects_dir in _candidate_project_dirs(cwd):
+        if not projects_dir.is_dir():
+            continue
+        jsonls = list(projects_dir.glob("*.jsonl"))
+        if jsonls:
+            return str(max(jsonls, key=lambda p: p.stat().st_mtime))
 
-    jsonls = list(projects_dir.glob("*.jsonl"))
-    if not jsonls:
-        return None
-
-    return str(max(jsonls, key=lambda p: p.stat().st_mtime))
+    # Final fallback: scan all projects, pick latest .jsonl if recent
+    base = Path(os.path.expanduser("~/.claude/projects"))
+    if base.is_dir():
+        all_jsonls = list(base.glob("*/*.jsonl"))
+        if all_jsonls:
+            latest = max(all_jsonls, key=lambda p: p.stat().st_mtime)
+            import time
+            if time.time() - latest.stat().st_mtime < 3600:
+                return str(latest)
+    return None
 
 
 def _extract_project_name(cwd):
@@ -98,8 +137,13 @@ def cmd_write(args):
 
     transcript_path = _find_latest_transcript(cwd)
     if not transcript_path:
+        encoded = _encode_cwd(os.path.abspath(cwd))
         print("[claude-diary write] No transcript found for current project.", file=sys.stderr)
-        print("  Searched: ~/.claude/projects/%s/" % _encode_cwd(os.path.abspath(cwd)), file=sys.stderr)
+        print("  cwd: %s" % cwd, file=sys.stderr)
+        print("  searched: ~/.claude/projects/%s/" % encoded, file=sys.stderr)
+        print("  hint: run /diary inside a Claude Code session that has at least", file=sys.stderr)
+        print("        one user message — transcripts are written by Claude Code,", file=sys.stderr)
+        print("        not by claude-diary.", file=sys.stderr)
         sys.exit(1)
 
     local_tz = timezone(timedelta(hours=tz_offset))
@@ -165,7 +209,14 @@ def cmd_write(args):
     target = Path(manual_dir) / date_str / project / ("%s.md" % date_str)
 
     existed = target.exists()
-    _append_or_create(target, date_str, entry_text, lang)
+    try:
+        _append_or_create(target, date_str, entry_text, lang)
+    except OSError as e:
+        print("[claude-diary write] Failed to write diary file.", file=sys.stderr)
+        print("  target: %s" % target, file=sys.stderr)
+        print("  error: %s" % e, file=sys.stderr)
+        print("  hint: check CLAUDE_DIARY_MANUAL_DIR or `claude-diary config --set manual_diary_dir=<path>`", file=sys.stderr)
+        sys.exit(1)
 
     action = "appended to" if existed else "created"
     print("[claude-diary write] %s %s" % (action, target))
