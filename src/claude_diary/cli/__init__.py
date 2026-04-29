@@ -19,6 +19,7 @@ from claude_diary.cli.config import cmd_config, cmd_init, cmd_migrate, _add_expo
 from claude_diary.cli.team import cmd_team
 from claude_diary.cli.maintenance import cmd_reindex, cmd_audit, cmd_delete, cmd_dashboard
 from claude_diary.cli.setup import cmd_install, cmd_uninstall
+from claude_diary.cli.write import cmd_write
 
 
 def main():
@@ -109,6 +110,9 @@ def main():
     sub.add_parser("install", help="Register claude-diary hook in Claude Code")
     sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
 
+    # write (manual diary — for /diary slash command)
+    sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -131,6 +135,7 @@ def main():
         "dashboard": cmd_dashboard,
         "install": cmd_install,
         "uninstall": cmd_uninstall,
+        "write": cmd_write,
     }
 
     fn = commands.get(args.command)
