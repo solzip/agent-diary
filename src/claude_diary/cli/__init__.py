@@ -21,16 +21,15 @@ from claude_diary.cli.maintenance import cmd_reindex, cmd_audit, cmd_delete, cmd
 from claude_diary.cli.setup import cmd_install, cmd_uninstall
 from claude_diary.cli.write import cmd_write
 from claude_diary.cli.notion_push import cmd_notion_push
+from claude_diary.cli.notion_init import cmd_notion_init
 
 
 def cmd_notion(args):
-    """Dispatch `notion <action>` to the right command (Phase 3 fills in init)."""
+    """Dispatch `notion <action>` to the right command."""
     if args.action == "push":
         cmd_notion_push(args)
     elif args.action == "init":
-        print("[claude-diary] `notion init` not yet implemented (Phase 3).",
-              file=sys.stderr)
-        sys.exit(2)
+        cmd_notion_init(args)
 
 
 def main():
