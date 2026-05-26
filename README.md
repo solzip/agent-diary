@@ -118,6 +118,68 @@ cd claude-code-hooks-diary/working-diary-system
 
 `claude-diary install` 시 `~/.claude/commands/diary.md`가 함께 설치되어 모든 프로젝트에서 `/diary` 사용 가능. 이미 설치한 적 있다면 한 번 더 실행해서 슬래시 커맨드만 추가하세요 (멱등). `claude-diary uninstall` 시 함께 제거됩니다 (사용자가 수정한 파일은 보존).
 
+## Notion 업무일지 — `/diary-notion` 슬래시 커맨드
+
+현재 세션을 **작업 단위로 분리**해 Notion DB에 push합니다. Claude Code 구독으로 동작하며 **별도 Anthropic API 키 필요 없음**, Notion 무료 플랜에서도 동작.
+
+```
+[Notion 루트 페이지: "Working Diary"]
+ └── 📄 2026 (자동 생성)
+     └── 🗄️ Entries (인라인 DB, 자동 생성)
+         ├── "Notion DB 컬럼 스키마 결정"   | Project: claude-diary | Branch: feat/notion
+         ├── "git_info.py 리팩토링"          | Project: claude-diary | Branch: feat/notion
+         └── ...
+```
+
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리.
+
+### 5분 셋업
+
+1. **Notion Integration 토큰 발급** — https://www.notion.so/my-integrations → "New integration" → 토큰 복사 (`secret_...`)
+2. **Notion에 루트 페이지 생성** — 이름 자유 (예: "Working Diary")
+3. **그 페이지를 Integration에 공유** — 페이지 우상단 ⋯ → "Connections" → 만든 Integration 추가
+4. **셋업 명령 실행**:
+   ```bash
+   claude-diary notion init
+   ```
+   대화형으로 token과 root page URL(또는 ID)을 입력하면 권한 검증 후 config에 저장됩니다.
+5. **세션에서 `/diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
+
+### 사용법
+
+```bash
+# 처음 한 번
+claude-diary notion init
+
+# 매 세션
+/diary-notion       # Claude Code 세션 안에서
+
+# 같은 세션 다시 push (실수 등):
+#   기본은 skip (Session ID + Task Index로 멱등성)
+#   --force 로 기존 행 archive 후 재push
+```
+
+### DB 컬럼
+
+| 컬럼 | 타입 | 비고 |
+|------|------|------|
+| Name | title | Claude가 뽑은 task 제목 (명사구) |
+| Date | date | |
+| Project | select | cwd 폴더명. group/filter용 |
+| Branch | select | task별 branch (group/filter용) |
+| Categories | multi_select | design/refactor/bugfix/... 자유 라벨 |
+| Files | number | 수정+생성 파일 수 |
+| Commits | number | task별 commit 수 |
+| Lines | number | 추가+삭제 합 |
+| Session ID, Task Index | (hidden 권장) | 멱등성 키 |
+
+자세한 설계는 [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md).
+
+### 주의
+
+- `config.json`은 절대 git에 커밋/공유하지 마세요 (token이 평문 저장됨)
+- 사용자 프로젝트 `.gitignore`에 `.diary-notion-*.json` 추가 권장 (임시 파일 보호망)
+
 ## 일지 예시
 
 ```markdown
