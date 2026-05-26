@@ -77,6 +77,7 @@
 | Name | title | ✅ | "DB 컬럼 스키마 의논" | Claude가 뽑은 task 제목 |
 | Date | date | ✅ | 2026-05-26 | 정렬/필터/캘린더 뷰 |
 | Project | select | ✅ | claude-diary | group/filter |
+| Branch | select | ✅ | feat/diary-notion | group/filter. CLI가 자동 채움 |
 | Categories | multi_select | ✅ | design, notion | 작업 성격 |
 | Files | number | ✅ | 7 | 수정+생성 파일 수 |
 | Commits | number | ✅ | 3 | 커밋 개수 |
@@ -84,7 +85,12 @@
 | Session ID | rich_text | 🔒 hidden | "abc-123-def" | 멱등성 키 |
 | Task Index | number | 🔒 hidden | 0, 1, 2 | 멱등성 키 |
 
-→ 표시 7개 + hidden 2개 = 총 9개. 의미 요약은 컬럼이 아닌 본문(`body_intro`)으로만 노출.
+→ 표시 8개 + hidden 2개 = 총 10개. 의미 요약은 컬럼이 아닌 본문(`body_intro`)으로만 노출.
+
+**Branch 컬럼 데이터 소스** (CLI 자동):
+- task의 `commit_hashes` 있으면 → 첫 commit의 branch (`git branch --contains`)
+- `commit_hashes` 없으면 → 현재 HEAD branch (`git rev-parse --abbrev-ref HEAD`)
+- HEAD detached면 → fallback으로 commit hash 단편 또는 빈 값
 
 ### 3.2 Layer 2 — Page Body (행 클릭 시 보이는 markdown)
 
@@ -154,6 +160,7 @@
 ### 4.2 CLI의 책임
 
 - `commit_hashes`로 git 메타 수집 (message, lines, branch) — `git_info.py` 재사용
+- task별 Branch 자동 결정 (commit 있으면 첫 commit의 branch, 없으면 HEAD branch)
 - Layer 2 body markdown 조립 (`body_intro` + raw 섹션) — `formatter.py` 확장
 - 연도 페이지/DB 자동 생성 (없으면)
 - 행 추가 (멱등성 처리 포함)
@@ -337,6 +344,11 @@ Saved to: <config_dir>/config.json
 | 12 | Body intro 톤 | 평어체, 1~3문장, 결과 중심, markdown 강조 OK, 추측 금지 | 글로벌 지침과 일관. 회고 시 빠른 회상 |
 | 13 | summary 컬럼 | 삭제 — `body_intro` 만 유지 | 사용자가 본문 위주로 보기 때문. 중복 제거 |
 | 14 | JSON 전달 방식 | 임시 파일 (cwd, `.diary-notion-<id>.json`) | PowerShell 호환. escape 문제 회피. 디버깅 쉬움 |
+| 15 | Branch 컬럼 추가 + 경계 룰 | Branch select 컬럼 + "branch 다르면 task 분리"를 최우선 분리 룰로 | 한 task = 한 branch 보장. select 컬럼이 의미 있어짐. 여러 branch 섞이는 케이스 자동 해결 |
+| 16 | Error 종류별 분기 | 401/403 fail fast, 400 skip, 429/5xx retry, 404 자동 재생성 | 의미 없는 retry 방지. 캐시 일관성 자동 복구 |
+| 17 | Retry 정책 | 인라인 retry 3회 (exponential backoff) + JSON 파일 보존 | 수동 명령에 동기적 보고. queue 안 씀 |
+| 18 | 캐시 무효화 | Lazy (404 응답 시) | 정상 path 빠름 |
+| 19 | 부분 실패 | Continue + 종합 보고 (`Pushed N, skipped M, failed K`) | 행 단위 독립 |
 
 ---
 
@@ -363,8 +375,9 @@ allowed-tools:
    - 이 세션의 user 메시지, 너의 응답, 호출한 도구 검토
    - `git log` 로 이 세션 중 만든 commit 조회 (시간 추정 OK)
 
-2. **작업 단위 분리 (Semantic-first)**
-   - **의미 단위로 분리**가 기본. transcript의 사고 흐름 = task
+2. **작업 단위 분리 (Branch 경계 → Semantic-first)**
+   - **branch 경계 최우선**: 세션 중 `git switch`로 branch가 바뀌면 무조건 새 task로 분리
+   - 같은 branch 안에서는 **의미 단위로 분리** (사고 흐름 = task)
    - 한 commit이 여러 의미 단위에 걸치면 양쪽 task에 같은 hash 매핑
    - 큰 commit("fix: 5건 개선" 같은) 한 번에 묶지 말고 의미별로 분리
    - 짧은 follow-up("ㅇㅇ", "맞아")은 직전 task에 흡수
@@ -404,9 +417,7 @@ CLI 결과를 그대로 보여주고 push/skip된 task 요약.
 
 ## 11. Open Questions (TBD)
 
-남은 결정:
-
-1. **캐싱 + 에러 처리** — 캐시 무효화 트리거, Notion API 실패 시 retry queue 재사용 여부
+모든 설계 결정 완료. 다음 단계 = 구현.
 
 ---
 
