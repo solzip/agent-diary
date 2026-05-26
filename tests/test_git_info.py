@@ -6,6 +6,10 @@ from unittest.mock import patch, MagicMock
 from claude_diary.lib.git_info import (
     collect_git_info,
     get_diff_stat,
+    get_branch_for_commit,
+    get_head_branch,
+    get_commit_info,
+    get_diff_stat_for_commits,
     _is_git_repo,
     _get_branch,
     _get_recent_commits,
@@ -218,3 +222,82 @@ class TestCollectGitInfo:
             result = collect_git_info("/repo", session_start="2026-03-17T09:00:00Z")
             assert result is not None
             assert result["branch"] == "dev"
+
+
+class TestGetBranchForCommit:
+    def test_returns_first_branch(self):
+        mock_result = MagicMock(stdout="feat/diary-notion\nmain\n")
+        with patch("claude_diary.lib.git_info.subprocess.run", return_value=mock_result):
+            assert get_branch_for_commit("/repo", "abc1234") == "feat/diary-notion"
+
+    def test_empty_falls_back_to_head(self):
+        # First call: branch --contains returns nothing
+        # Second call (from get_head_branch): rev-parse returns "main"
+        outputs = [MagicMock(stdout=""), MagicMock(stdout="main\n")]
+        with patch("claude_diary.lib.git_info.subprocess.run", side_effect=outputs):
+            assert get_branch_for_commit("/repo", "abc1234") == "main"
+
+    def test_no_commit_hash_returns_head(self):
+        with patch("claude_diary.lib.git_info.subprocess.run",
+                   return_value=MagicMock(stdout="main\n")):
+            assert get_branch_for_commit("/repo", None) == "main"
+
+
+class TestGetHeadBranch:
+    def test_returns_branch(self):
+        with patch("claude_diary.lib.git_info.subprocess.run",
+                   return_value=MagicMock(stdout="main\n")):
+            assert get_head_branch("/repo") == "main"
+
+    def test_detached_head_returns_empty(self):
+        with patch("claude_diary.lib.git_info.subprocess.run",
+                   return_value=MagicMock(stdout="HEAD\n")):
+            assert get_head_branch("/repo") == ""
+
+    def test_empty_cwd_returns_empty(self):
+        assert get_head_branch("") == ""
+
+    def test_exception_returns_empty(self):
+        with patch("claude_diary.lib.git_info.subprocess.run",
+                   side_effect=Exception("boom")):
+            assert get_head_branch("/repo") == ""
+
+
+class TestGetCommitInfo:
+    def test_returns_parsed_fields(self):
+        out = "abc1234deadbeef\tabc1234\tfeat: add login\n"
+        with patch("claude_diary.lib.git_info.subprocess.run",
+                   return_value=MagicMock(stdout=out)):
+            info = get_commit_info("/repo", "abc1234")
+        assert info["hash"] == "abc1234deadbeef"
+        assert info["short_hash"] == "abc1234"
+        assert info["message"] == "feat: add login"
+
+    def test_empty_returns_none(self):
+        with patch("claude_diary.lib.git_info.subprocess.run",
+                   return_value=MagicMock(stdout="")):
+            assert get_commit_info("/repo", "abc1234") is None
+
+    def test_no_inputs_returns_none(self):
+        assert get_commit_info(None, "abc1234") is None
+        assert get_commit_info("/repo", None) is None
+
+
+class TestGetDiffStatForCommits:
+    def test_sums_across_commits(self):
+        def fake_run(cmd, **kwargs):
+            if "abc1" in cmd:
+                return MagicMock(stdout="\n 2 files changed, 10 insertions(+), 3 deletions(-)\n")
+            if "def5" in cmd:
+                return MagicMock(stdout="\n 1 file changed, 5 insertions(+), 2 deletions(-)\n")
+            return MagicMock(stdout="")
+
+        with patch("claude_diary.lib.git_info.subprocess.run", side_effect=fake_run):
+            total = get_diff_stat_for_commits("/repo", ["abc1", "def5"])
+        assert total["files"] == 3
+        assert total["added"] == 15
+        assert total["deleted"] == 5
+
+    def test_empty_list_returns_zeros(self):
+        total = get_diff_stat_for_commits("/repo", [])
+        assert total == {"added": 0, "deleted": 0, "files": 0}
