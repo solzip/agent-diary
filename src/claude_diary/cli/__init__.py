@@ -20,6 +20,17 @@ from claude_diary.cli.team import cmd_team
 from claude_diary.cli.maintenance import cmd_reindex, cmd_audit, cmd_delete, cmd_dashboard
 from claude_diary.cli.setup import cmd_install, cmd_uninstall
 from claude_diary.cli.write import cmd_write
+from claude_diary.cli.notion_push import cmd_notion_push
+
+
+def cmd_notion(args):
+    """Dispatch `notion <action>` to the right command (Phase 3 fills in init)."""
+    if args.action == "push":
+        cmd_notion_push(args)
+    elif args.action == "init":
+        print("[claude-diary] `notion init` not yet implemented (Phase 3).",
+              file=sys.stderr)
+        sys.exit(2)
 
 
 def main():
@@ -113,6 +124,13 @@ def main():
     # write (manual diary — for /diary slash command)
     sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")
 
+    # notion (hierarchical Notion DB integration — for /diary-notion slash command)
+    p_notion = sub.add_parser("notion", help="Notion hierarchical DB integration")
+    p_notion.add_argument("action", choices=["init", "push"], help="Action to perform")
+    p_notion.add_argument("--input", help="JSON input file (push only)")
+    p_notion.add_argument("--force", action="store_true",
+                          help="Archive prior rows for the session before pushing (push only)")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -136,6 +154,7 @@ def main():
         "install": cmd_install,
         "uninstall": cmd_uninstall,
         "write": cmd_write,
+        "notion": cmd_notion,
     }
 
     fn = commands.get(args.command)
