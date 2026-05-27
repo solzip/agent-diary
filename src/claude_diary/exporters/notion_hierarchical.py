@@ -224,10 +224,14 @@ class NotionHierarchicalExporter:
     def _create_database(self, parent_page_id):
         """Create the Entries inline database with the agreed schema.
 
-        Schema (decision #3, #15):
-          Name (title), Date, Project (select), Branch (select),
+        Schema (decisions #3, #15, #20, #21, #22):
+          Name (title), Date, Project, Branch, Status, Task Group (select),
           Categories (multi_select), Files, Commits, Lines (number),
-          Session ID (rich_text — hidden), Task Index (number — hidden)
+          Session ID (rich_text — hidden), Task Index (number — hidden).
+
+        Depends On (self-relation) is added in a second PATCH call because
+        the relation needs the database_id, which isn't known until the
+        DB exists.
         """
         body = {
             "parent": {"type": "page_id", "page_id": parent_page_id},
@@ -238,6 +242,8 @@ class NotionHierarchicalExporter:
                 "Date":        {"date": {}},
                 "Project":     {"select": {}},
                 "Branch":      {"select": {}},
+                "Status":      {"select": {}},
+                "Task Group":  {"select": {}},
                 "Categories":  {"multi_select": {}},
                 "Files":       {"number": {}},
                 "Commits":     {"number": {}},
@@ -247,7 +253,28 @@ class NotionHierarchicalExporter:
             },
         }
         resp = self._request("POST", "/databases", body)
-        return resp["id"]
+        db_id = resp["id"]
+        self._add_depends_on_relation(db_id)
+        return db_id
+
+    def _add_depends_on_relation(self, db_id):
+        """PATCH the database to add a self-referential 'Depends On' relation.
+
+        Self-relation can't be declared at create time because the
+        database_id doesn't exist yet. Notion accepts the self-ref via
+        a follow-up PATCH /v1/databases/{id}.
+        """
+        self._request("PATCH", "/databases/%s" % db_id, {
+            "properties": {
+                "Depends On": {
+                    "relation": {
+                        "database_id": db_id,
+                        "type": "single_property",
+                        "single_property": {},
+                    }
+                }
+            }
+        })
 
     def find_existing_row(self, db_id, session_id, task_index):
         """Return row page ID if a row with the same Session ID + Task Index exists."""
