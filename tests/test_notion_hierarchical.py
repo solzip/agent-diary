@@ -212,19 +212,41 @@ class TestEnsureDatabase:
         exp._cache["years"]["2026"] = "year_page"  # year already cached
 
         mock_req = MagicMock()
-        mock_req.request.return_value = _make_response(200, {"id": "db_xyz"})
+        # Three calls:
+        #   1. GET /blocks/year_page (existence check from ensure_year_page cache hit)
+        #   2. POST /databases (create)
+        #   3. PATCH /databases/{id} (self-relation)
+        mock_req.request.side_effect = [
+            _make_response(200, {"id": "year_page"}),
+            _make_response(200, {"id": "db_xyz"}),
+            _make_response(200, {"id": "db_xyz"}),
+        ]
         with _patch_requests(mock_req):
             db_id = exp.ensure_database(2026)
 
         assert db_id == "db_xyz"
-        # Inspect the database-create POST body
-        create_body = mock_req.request.call_args.kwargs["json"]
+        # Second call: create POST
+        create_call = mock_req.request.call_args_list[1]
+        assert create_call.args[0] == "POST"
+        create_body = create_call.kwargs["json"]
         assert create_body["parent"]["page_id"] == "year_page"
         assert create_body["is_inline"] is True
         props = create_body["properties"]
-        for col in ["Name", "Date", "Project", "Branch", "Categories",
-                    "Files", "Commits", "Lines", "Session ID", "Task Index"]:
+        for col in ["Name", "Date", "Project", "Branch", "Status", "Task Group",
+                    "Categories", "Files", "Commits", "Lines",
+                    "Session ID", "Task Index"]:
             assert col in props
+        # Depends On NOT in create body (added by PATCH)
+        assert "Depends On" not in props
+
+        # Third call: PATCH to add self-relation
+        patch_call = mock_req.request.call_args_list[2]
+        assert patch_call.args[0] == "PATCH"
+        assert patch_call.args[1].endswith("/databases/db_xyz")
+        patch_body = patch_call.kwargs["json"]
+        assert "Depends On" in patch_body["properties"]
+        relation = patch_body["properties"]["Depends On"]["relation"]
+        assert relation["database_id"] == "db_xyz"  # self-reference
 
 
 class TestFindExistingRow:
