@@ -56,6 +56,16 @@ allowed-tools:
    - `body_intro`: 1~3문장, 200~500자, 평어체, 결과 중심
      - transcript에 없는 내용 추가 금지 (추측 X)
      - markdown 강조(`**굵게**`, `` `코드` ` ` ) 사용 OK
+   - `status`: 5단계 중 하나 — `Discussion` / `Design` / `Implementation` / `Testing` / `Deployed`
+     - 한 task에 여러 단계 섞이면 **가장 진행된 단계로** (Testing 통과까지 했으면 Testing)
+     - 결정만 했으면 Design, 코드 작성까지 했으면 Implementation, 테스트까지 했으면 Testing,
+       머지/배포까지 했으면 Deployed
+   - `task_group`: 며칠/여러 세션에 걸치는 큰 작업 단위 식별자 (예: `diary-notion-impl`, `auth-refactor`)
+     - 같은 큰 작업의 task들끼리 같은 그룹명 사용 → Notion에서 group view로 묶임
+     - 이전 작업의 연속이면 같은 그룹명, 새 작업이면 새 그룹명 (snake-case/kebab-case 권장)
+   - `depends_on_indices`: 이 task가 선행을 의존하는 다른 task의 **같은 push 내 인덱스 배열** (예: `[0, 1]`)
+     - 같은 JSON 안의 tasks 배열 순서 (0-base) 기준
+     - 없으면 빈 배열 `[]`
    - `categories`: 1~3개 (design/refactor/bugfix/test/docs/infra/discussion 등 자유 라벨)
    - `project`: 현재 cwd의 폴더명
    - `user_prompts`, `files_modified`, `files_created`, `commands_run`, `errors`
@@ -75,6 +85,9 @@ allowed-tools:
     {
       "title": "...",
       "body_intro": "...",
+      "status": "Implementation",
+      "task_group": "diary-notion-impl",
+      "depends_on_indices": [0, 1],
       "categories": ["..."],
       "project": "<cwd folder name>",
       "user_prompts": ["..."],
@@ -156,7 +169,11 @@ def _find_existing_hook(settings):
 
 
 def cmd_install(args):
-    """Register claude-diary Stop hook + all slash commands."""
+    """Register claude-diary Stop hook + all slash commands.
+
+    With --force, overwrite existing slash command files (useful after a
+    claude-diary upgrade that changed slash command instructions).
+    """
     settings_path = _get_claude_settings_path()
     settings = _load_claude_settings(settings_path)
 
@@ -171,9 +188,10 @@ def cmd_install(args):
         _save_claude_settings(settings_path, settings)
         hook_status = "installed"
 
+    force = bool(getattr(args, "force", False))
     # Slash command install runs unconditionally — fixes upgrade path for
     # users who installed before a given slash command was a feature.
-    slash_statuses = _install_all_slash_commands()
+    slash_statuses = _install_all_slash_commands(force=force)
 
     print("claude-diary install:")
     print("  Hook: %s (%s)" % (HOOK_COMMAND, hook_status))
@@ -185,27 +203,41 @@ def cmd_install(args):
     print("Type /diary to write a manual entry, or /diary-notion to push to Notion.")
 
 
-def _install_all_slash_commands():
+def _install_all_slash_commands(force=False):
     """Install every slash command in SLASH_COMMANDS. Returns {filename: (path, status)}."""
     results = {}
-    for filename, (content, _marker) in SLASH_COMMANDS.items():
+    for filename, (content, marker) in SLASH_COMMANDS.items():
         path = _get_slash_command_path(filename)
-        results[filename] = (path, _install_slash_command(path, content))
+        results[filename] = (path, _install_slash_command(path, content, marker, force))
     return results
 
 
-def _install_slash_command(path, content):
-    """Create the slash command file if missing.
+def _install_slash_command(path, content, marker=None, force=False):
+    """Create or refresh the slash command file.
 
-    Returns 'installed', 'already exists', or 'failed: <reason>'.
+    Without `force`: skip if the file already exists (preserves user customizations).
+    With `force`: overwrite only if the existing file looks like ours (contains
+    `marker`); files modified by the user are still preserved.
+
+    Returns 'installed', 'overwritten', 'already exists', 'skipped (modified by user)',
+    or 'failed: <reason>'.
     """
-    if os.path.exists(path):
+    exists = os.path.exists(path)
+    if exists and not force:
         return "already exists"
+    if exists and force:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                existing = f.read()
+        except OSError as e:
+            return "failed: %s" % e
+        if marker and marker not in existing:
+            return "skipped (modified by user)"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
-        return "installed"
+        return "overwritten" if exists else "installed"
     except OSError as e:
         return "failed: %s" % e
 
