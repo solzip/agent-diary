@@ -50,6 +50,7 @@ def load(root_page_id):
         "years": data.get("years") or {},
         "databases": data.get("databases") or {},
         "rows": data.get("rows") or {},
+        "schema_v": data.get("schema_v") or {},
     }
 
 
@@ -67,6 +68,7 @@ def _empty(root_page_id):
         "years": {},
         "databases": {},
         "rows": {},
+        "schema_v": {},
     }
 
 
