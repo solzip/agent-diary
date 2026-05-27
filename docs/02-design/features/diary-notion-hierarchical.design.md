@@ -78,14 +78,30 @@
 | Date | date | ✅ | 2026-05-26 | 정렬/필터/캘린더 뷰 |
 | Project | select | ✅ | claude-diary | group/filter |
 | Branch | select | ✅ | feat/diary-notion | group/filter. CLI가 자동 채움 |
+| Status | select | ✅ | Implementation | 5단계: Discussion/Design/Implementation/Testing/Deployed |
+| Task Group | select | ✅ | diary-notion-impl | 큰 작업 단위 묶음. Claude가 추출 |
 | Categories | multi_select | ✅ | design, notion | 작업 성격 |
 | Files | number | ✅ | 7 | 수정+생성 파일 수 |
 | Commits | number | ✅ | 3 | 커밋 개수 |
 | Lines | number | ✅ | 142 | 추가+삭제 합 |
+| Depends On | relation (self) | ✅ | → 다른 행 | 선행 작업 참조 (단방향) |
 | Session ID | rich_text | 🔒 hidden | "abc-123-def" | 멱등성 키 |
 | Task Index | number | 🔒 hidden | 0, 1, 2 | 멱등성 키 |
 
-→ 표시 8개 + hidden 2개 = 총 10개. 의미 요약은 컬럼이 아닌 본문(`body_intro`)으로만 노출.
+→ 표시 11개 + hidden 2개 = 총 13개. 의미 요약은 컬럼이 아닌 본문(`body_intro`)으로만 노출.
+
+**Status 5단계 (select)**:
+- `Discussion`: 의논만, 결정 미완 (드물게)
+- `Design`: 결정/문서화 완료
+- `Implementation`: 코드 작성 (commit 있음)
+- `Testing`: 테스트 작성/검증 완료
+- `Deployed`: 머지/배포까지 완료
+
+한 task에 여러 단계가 섞이면 **가장 진행된 단계로**. Claude가 transcript 보고 판단.
+
+**Task Group (select)**: 며칠/여러 세션에 걸치는 큰 작업 단위 묶음. Claude가 첫 task 시점에 새 그룹명 생성, 이전 작업의 연속이면 같은 그룹명 사용. 일관성 보장은 어렵지만 group view로 묶어 보는 편의가 핵심 가치.
+
+**Depends On (self-relation, 단방향)**: 같은 DB 안의 다른 행 참조. JSON 스키마의 `depends_on_indices` 가 같은 push의 task index를 가리킴. CLI가 push 순서대로 row_id 누적 → 인덱스를 실제 row ID로 변환해서 relation 채움. Notion이 자동 reverse view 제공해 단방향 정의로 양방향 효과.
 
 **Branch 컬럼 데이터 소스** (CLI 자동):
 - task의 `commit_hashes` 있으면 → 첫 commit의 branch (`git branch --contains`)
@@ -136,6 +152,9 @@
     {
       "title": "Notion DB 컬럼 스키마 결정",
       "body_intro": "DB 컬럼을 Layer 1/2로 분리. 단일 통합 DB + Project select 채택. summary 컬럼은 본문 첫 문단(body_intro)으로 통합.",
+      "status": "Design",
+      "task_group": "diary-notion-impl",
+      "depends_on_indices": [],
       "categories": ["design", "notion"],
       "project": "claude-code-hooks-diary",
       "user_prompts": ["DB 구조 의논하자", "name에는 날짜 말고..."],
@@ -344,6 +363,10 @@ Saved to: <config_dir>/config.json
 | 12 | Body intro 톤 | 평어체, 1~3문장, 결과 중심, markdown 강조 OK, 추측 금지 | 글로벌 지침과 일관. 회고 시 빠른 회상 |
 | 13 | summary 컬럼 | 삭제 — `body_intro` 만 유지 | 사용자가 본문 위주로 보기 때문. 중복 제거 |
 | 14 | JSON 전달 방식 | 임시 파일 (cwd, `.diary-notion-<id>.json`) | PowerShell 호환. escape 문제 회피. 디버깅 쉬움 |
+| 20 | Status 컬럼 | select, 5단계 (Discussion/Design/Implementation/Testing/Deployed) | 진행도 시각화. 한 task 안에 여러 단계 섞이면 가장 진행된 단계 |
+| 21 | Depends On 컬럼 | self-relation, 단방향 | 작업 순서 시각화. Notion이 reverse view 자동 제공 |
+| 22 | Task Group 컬럼 | select. Claude가 task별로 추출 | 며칠/여러 세션에 걸치는 큰 작업을 group view로 묶기 |
+| 23 | 멱등성 + 새 컬럼 마이그레이션 | 기존 행 archive(`--force`) 후 새 스키마로 재push | Status/Depends On/Task Group 소급 채움 |
 | 15 | Branch 컬럼 추가 + 경계 룰 | Branch select 컬럼 + "branch 다르면 task 분리"를 최우선 분리 룰로 | 한 task = 한 branch 보장. select 컬럼이 의미 있어짐. 여러 branch 섞이는 케이스 자동 해결 |
 | 16 | Error 종류별 분기 | 401/403 fail fast, 400 skip, 429/5xx retry, 404 자동 재생성 | 의미 없는 retry 방지. 캐시 일관성 자동 복구 |
 | 17 | Retry 정책 | 인라인 retry 3회 (exponential backoff) + JSON 파일 보존 | 수동 명령에 동기적 보고. queue 안 씀 |
