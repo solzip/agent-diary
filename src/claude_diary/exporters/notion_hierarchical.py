@@ -206,32 +206,62 @@ class NotionHierarchicalExporter:
         return resp["id"]
 
     def ensure_database(self, year):
-        """Get Entries database ID for a year, creating if missing."""
+        """Get Entries database ID for a year, creating if missing.
+
+        Also ensures the schema extensions (Status, Task Group, Depends On)
+        are present — needed for older DBs created before those columns
+        were part of the design. Tracked via cache so we only patch once.
+        """
         cached = notion_cache.get_database(self._cache, year)
+        db_id = None
         if cached:
             try:
                 self._request("GET", "/databases/%s" % cached)
-                return cached
+                db_id = cached
             except NotionNotFound:
                 logger.warning("Database for %s not found, recreating", year)
                 notion_cache.set_database(self._cache, year, None)
 
-        year_page_id = self.ensure_year_page(year)
-        db_id = self._create_database(year_page_id)
-        notion_cache.set_database(self._cache, year, db_id)
+        if db_id is None:
+            year_page_id = self.ensure_year_page(year)
+            db_id = self._create_database(year_page_id)
+            notion_cache.set_database(self._cache, year, db_id)
+
+        self._ensure_db_schema_extensions(db_id)
         return db_id
 
+    def _ensure_db_schema_extensions(self, db_id):
+        """Add Status/Task Group/Depends On if not yet recorded in cache.
+
+        Patching the same property twice is harmless (Notion treats existing
+        properties as no-ops), but we still gate by a cache flag to skip the
+        API call on the happy path.
+        """
+        schema_v = self._cache.setdefault("schema_v", {})
+        if schema_v.get(db_id) == "v2":
+            return
+        self._request("PATCH", "/databases/%s" % db_id, {
+            "properties": {
+                "Status": {"select": {}},
+                "Task Group": {"select": {}},
+                "Depends On": {
+                    "relation": {
+                        "database_id": db_id,
+                        "type": "single_property",
+                        "single_property": {},
+                    }
+                },
+            }
+        })
+        schema_v[db_id] = "v2"
+
     def _create_database(self, parent_page_id):
-        """Create the Entries inline database with the agreed schema.
+        """Create the Entries inline database with the base schema.
 
-        Schema (decisions #3, #15, #20, #21, #22):
-          Name (title), Date, Project, Branch, Status, Task Group (select),
-          Categories (multi_select), Files, Commits, Lines (number),
-          Session ID (rich_text — hidden), Task Index (number — hidden).
-
-        Depends On (self-relation) is added in a second PATCH call because
-        the relation needs the database_id, which isn't known until the
-        DB exists.
+        Status, Task Group, and the self-relation Depends On are added
+        afterwards by `_ensure_db_schema_extensions` — keeping them out
+        of this call means new and pre-existing DBs go through the same
+        upgrade path.
         """
         body = {
             "parent": {"type": "page_id", "page_id": parent_page_id},
@@ -242,8 +272,6 @@ class NotionHierarchicalExporter:
                 "Date":        {"date": {}},
                 "Project":     {"select": {}},
                 "Branch":      {"select": {}},
-                "Status":      {"select": {}},
-                "Task Group":  {"select": {}},
                 "Categories":  {"multi_select": {}},
                 "Files":       {"number": {}},
                 "Commits":     {"number": {}},
@@ -253,28 +281,7 @@ class NotionHierarchicalExporter:
             },
         }
         resp = self._request("POST", "/databases", body)
-        db_id = resp["id"]
-        self._add_depends_on_relation(db_id)
-        return db_id
-
-    def _add_depends_on_relation(self, db_id):
-        """PATCH the database to add a self-referential 'Depends On' relation.
-
-        Self-relation can't be declared at create time because the
-        database_id doesn't exist yet. Notion accepts the self-ref via
-        a follow-up PATCH /v1/databases/{id}.
-        """
-        self._request("PATCH", "/databases/%s" % db_id, {
-            "properties": {
-                "Depends On": {
-                    "relation": {
-                        "database_id": db_id,
-                        "type": "single_property",
-                        "single_property": {},
-                    }
-                }
-            }
-        })
+        return resp["id"]
 
     def find_existing_row(self, db_id, session_id, task_index):
         """Return row page ID if a row with the same Session ID + Task Index exists."""
