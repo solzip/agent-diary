@@ -79,6 +79,44 @@ class TestUninstallSlashCommandSingle:
         assert result == "not present"
 
 
+class TestInstallForce:
+    def test_force_overwrites_when_marker_present(self, tmp_path):
+        path = tmp_path / "x.md"
+        path.write_text("---\nold content with claude-diary write\n", encoding="utf-8")
+        result = _install_slash_command(str(path), "new content with claude-diary write",
+                                        marker="claude-diary write", force=True)
+        assert result == "overwritten"
+        assert "new content" in path.read_text(encoding="utf-8")
+
+    def test_force_preserves_user_modified(self, tmp_path):
+        path = tmp_path / "x.md"
+        path.write_text("totally custom — no marker", encoding="utf-8")
+        result = _install_slash_command(str(path), "new content",
+                                        marker="claude-diary write", force=True)
+        assert result == "skipped (modified by user)"
+        # Original content preserved
+        assert path.read_text(encoding="utf-8") == "totally custom — no marker"
+
+    def test_force_creates_when_missing(self, tmp_path):
+        path = tmp_path / "new.md"
+        result = _install_slash_command(str(path), "fresh", marker="marker", force=True)
+        assert result == "installed"
+
+    def test_cmd_install_with_force_refreshes_diary_notion(self, tmp_path):
+        commands_dir = tmp_path / ".claude" / "commands"
+        commands_dir.mkdir(parents=True)
+        (commands_dir / "diary-notion.md").write_text(
+            "---\nold instructions claude-diary notion push\n", encoding="utf-8"
+        )
+        args = MagicMock()
+        args.force = True
+        with _patch_home(tmp_path):
+            cmd_install(args)
+        # File overwritten with the new bundled DIARY_NOTION_SLASH_COMMAND
+        content = (commands_dir / "diary-notion.md").read_text(encoding="utf-8")
+        assert "depends_on_indices" in content
+
+
 class TestInstallAll:
     def test_installs_both_commands(self, tmp_path):
         with _patch_home(tmp_path):

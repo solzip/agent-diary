@@ -83,17 +83,21 @@ def cmd_notion_push(args):
             sys.exit(1)
 
     results = {"pushed": [], "skipped": [], "failed": []}
+    row_ids = {}  # task_index → Notion row_id (used by 2nd pass for relations)
     auth_failed = False
 
+    # Pass 1: create rows (or detect existing). Depends On left blank for now.
     for idx, task in enumerate(tasks):
         title = task.get("title") or "(untitled)"
         if auth_failed:
             results["failed"].append((idx, title, "skipped after earlier auth error"))
             continue
         try:
-            outcome = _push_task(
+            outcome, row_id = _push_task(
                 exporter, year, date_str, session_id, idx, task, cwd, lang
             )
+            if row_id:
+                row_ids[idx] = row_id
             if outcome == "pushed":
                 results["pushed"].append((idx, title))
             else:
@@ -106,6 +110,11 @@ def cmd_notion_push(args):
         except Exception as e:
             results["failed"].append((idx, title, str(e)))
 
+    # Pass 2: wire up Depends On relations now that all row_ids are known.
+    relation_failures = _wire_depends_on(exporter, tasks, row_ids)
+    for idx, title, reason in relation_failures:
+        results["failed"].append((idx, title, "depends_on: %s" % reason))
+
     exporter.save_cache()
 
     _print_report(results, input_path)
@@ -114,6 +123,30 @@ def cmd_notion_push(args):
         _cleanup(input_path)
 
     sys.exit(1 if auth_failed else 0)
+
+
+def _wire_depends_on(exporter, tasks, row_ids):
+    """Pass 2: set Depends On relations using the row_ids gathered in pass 1.
+
+    Returns a list of (idx, title, reason) for tasks whose relation update
+    failed. Tasks without depends_on are silently skipped.
+    """
+    failures = []
+    for idx, task in enumerate(tasks):
+        deps = task.get("depends_on_indices") or []
+        if not deps:
+            continue
+        my_row = row_ids.get(idx)
+        if not my_row:
+            continue  # task itself failed in pass 1
+        target_rows = [row_ids[d] for d in deps if d in row_ids]
+        if not target_rows:
+            continue
+        try:
+            exporter.update_row_relation(my_row, target_rows)
+        except Exception as e:
+            failures.append((idx, task.get("title") or "(untitled)", str(e)))
+    return failures
 
 
 def _resolve_credentials(config):
@@ -148,12 +181,16 @@ def _fallback_session_id():
 
 
 def _push_task(exporter, year, date_str, session_id, task_index, task, cwd, lang):
-    """Push one task to Notion. Returns 'pushed' or 'skipped'."""
+    """Push one task to Notion. Returns (outcome, row_id).
+
+    outcome ∈ {"pushed", "skipped"}.  row_id is the Notion page ID for
+    this task — either the newly created one or the existing match.
+    """
     db_id = exporter.ensure_database(year)
 
     existing = exporter.find_existing_row(db_id, session_id, task_index)
     if existing:
-        return "skipped"
+        return "skipped", existing
 
     git_info = _gather_git_info(cwd, task.get("commit_hashes") or [])
     branch = git_info.get("branch") or ""
@@ -165,7 +202,7 @@ def _push_task(exporter, year, date_str, session_id, task_index, task, cwd, lang
 
     row_id = exporter.create_row(db_id, properties, body_blocks)
     notion_cache.set_row(exporter._cache, session_id, task_index, row_id)
-    return "pushed"
+    return "pushed", row_id
 
 
 def _gather_git_info(cwd, commit_hashes):
@@ -183,8 +220,15 @@ def _gather_git_info(cwd, commit_hashes):
     return info
 
 
+VALID_STATUSES = {"Discussion", "Design", "Implementation", "Testing", "Deployed"}
+
+
 def _build_properties(task, date_str, branch, git_info, session_id, task_index):
-    """Build Notion DB row properties from task data."""
+    """Build Notion DB row properties from task data.
+
+    Note: `Depends On` relation is NOT set here — it's wired up in pass 2
+    via update_row_relation() once all row IDs are known.
+    """
     title = task.get("title") or "(untitled)"
     project = (task.get("project") or "unknown").strip() or "unknown"
     categories = [c for c in (task.get("categories") or []) if c]
@@ -211,6 +255,15 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index):
     }
     if branch:
         props["Branch"] = {"select": {"name": _safe_select(branch)}}
+
+    status = (task.get("status") or "").strip()
+    if status in VALID_STATUSES:
+        props["Status"] = {"select": {"name": status}}
+
+    task_group = (task.get("task_group") or "").strip()
+    if task_group:
+        props["Task Group"] = {"select": {"name": _safe_select(task_group)}}
+
     return props
 
 
