@@ -214,8 +214,8 @@ class TestEnsureDatabase:
         mock_req = MagicMock()
         # Three calls:
         #   1. GET /blocks/year_page (existence check from ensure_year_page cache hit)
-        #   2. POST /databases (create)
-        #   3. PATCH /databases/{id} (self-relation)
+        #   2. POST /databases (create base schema)
+        #   3. PATCH /databases/{id} (Status + Task Group + Depends On extension)
         mock_req.request.side_effect = [
             _make_response(200, {"id": "year_page"}),
             _make_response(200, {"id": "db_xyz"}),
@@ -225,28 +225,75 @@ class TestEnsureDatabase:
             db_id = exp.ensure_database(2026)
 
         assert db_id == "db_xyz"
-        # Second call: create POST
+        # Second call: create POST (base schema only)
         create_call = mock_req.request.call_args_list[1]
         assert create_call.args[0] == "POST"
         create_body = create_call.kwargs["json"]
         assert create_body["parent"]["page_id"] == "year_page"
         assert create_body["is_inline"] is True
         props = create_body["properties"]
-        for col in ["Name", "Date", "Project", "Branch", "Status", "Task Group",
+        for col in ["Name", "Date", "Project", "Branch",
                     "Categories", "Files", "Commits", "Lines",
                     "Session ID", "Task Index"]:
             assert col in props
-        # Depends On NOT in create body (added by PATCH)
+        # Status/Task Group/Depends On NOT in create body — added by schema extension PATCH
+        assert "Status" not in props
+        assert "Task Group" not in props
         assert "Depends On" not in props
 
-        # Third call: PATCH to add self-relation
+        # Third call: PATCH to add Status + Task Group + Depends On
         patch_call = mock_req.request.call_args_list[2]
         assert patch_call.args[0] == "PATCH"
         assert patch_call.args[1].endswith("/databases/db_xyz")
         patch_body = patch_call.kwargs["json"]
-        assert "Depends On" in patch_body["properties"]
+        for col in ["Status", "Task Group", "Depends On"]:
+            assert col in patch_body["properties"]
         relation = patch_body["properties"]["Depends On"]["relation"]
         assert relation["database_id"] == "db_xyz"  # self-reference
+        # Cache flag recorded so future calls skip the PATCH
+        assert exp._cache["schema_v"]["db_xyz"] == "v2"
+
+    def test_existing_database_gets_schema_extension(self, tmp_path):
+        """Cache-hit database (older schema) gets Status/Task Group/Depends On via PATCH."""
+        exp = _make_exporter()
+        with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
+            exp.load_cache()
+        # Pre-existing DB in cache (no schema_v flag — simulates upgrade path)
+        exp._cache["databases"]["2026"] = "old_db"
+
+        mock_req = MagicMock()
+        mock_req.request.side_effect = [
+            _make_response(200, {"id": "old_db"}),   # GET /databases/old_db (exists)
+            _make_response(200, {"id": "old_db"}),   # PATCH schema extension
+        ]
+        with _patch_requests(mock_req):
+            db_id = exp.ensure_database(2026)
+
+        assert db_id == "old_db"
+        # Second call: PATCH for schema extension on the existing DB
+        patch_call = mock_req.request.call_args_list[1]
+        assert patch_call.args[0] == "PATCH"
+        for col in ["Status", "Task Group", "Depends On"]:
+            assert col in patch_call.kwargs["json"]["properties"]
+        assert exp._cache["schema_v"]["old_db"] == "v2"
+
+    def test_schema_extension_skipped_when_already_flagged(self, tmp_path):
+        """Once schema_v records the DB at v2, no further PATCH is sent."""
+        exp = _make_exporter()
+        with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
+            exp.load_cache()
+        exp._cache["databases"]["2026"] = "db_known"
+        exp._cache["schema_v"]["db_known"] = "v2"
+
+        mock_req = MagicMock()
+        mock_req.request.return_value = _make_response(200, {"id": "db_known"})
+        with _patch_requests(mock_req):
+            db_id = exp.ensure_database(2026)
+
+        assert db_id == "db_known"
+        # Only the existence check — no PATCH
+        assert mock_req.request.call_count == 1
+        assert mock_req.request.call_args.args[0] == "GET"
 
 
 class TestFindExistingRow:
