@@ -117,7 +117,9 @@ def main():
     p_dashboard.add_argument("--months", type=int, default=3, help="Months of data (default: 3)")
 
     # install / uninstall
-    sub.add_parser("install", help="Register claude-diary hook in Claude Code")
+    p_install = sub.add_parser("install", help="Register claude-diary hook in Claude Code")
+    p_install.add_argument("--force", action="store_true",
+                           help="Overwrite slash command files (preserves user-modified ones)")
     sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
 
     # write (manual diary — for /diary slash command)

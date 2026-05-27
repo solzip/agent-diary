@@ -343,6 +343,20 @@ class NotionHierarchicalExporter:
         resp = self._request("POST", "/pages", body)
         return resp["id"]
 
+    def update_row_relation(self, row_id, depends_on_row_ids):
+        """PATCH a row to set its `Depends On` relation.
+
+        Used by the 2-pass push flow: rows are created first (so we have
+        their IDs), then dependency edges are wired up in a second pass.
+        """
+        self._request("PATCH", "/pages/%s" % row_id, {
+            "properties": {
+                "Depends On": {
+                    "relation": [{"id": rid} for rid in depends_on_row_ids]
+                }
+            }
+        })
+
 
 def _short_error(resp):
     """Extract a one-line error description from a Notion error response."""

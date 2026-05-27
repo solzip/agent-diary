@@ -120,6 +120,110 @@ class TestBuildProperties:
         assert props["Commits"]["number"] == 0
         assert props["Lines"]["number"] == 0
 
+    def test_valid_status_included(self):
+        task = dict(self._base_task(), status="Implementation")
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert props["Status"]["select"]["name"] == "Implementation"
+
+    def test_invalid_status_omitted(self):
+        task = dict(self._base_task(), status="MadeUpValue")
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert "Status" not in props
+
+    def test_task_group_included(self):
+        task = dict(self._base_task(), task_group="diary-notion-impl")
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert props["Task Group"]["select"]["name"] == "diary-notion-impl"
+
+    def test_empty_task_group_omitted(self):
+        task = dict(self._base_task(), task_group="")
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert "Task Group" not in props
+
+    def test_depends_on_not_in_properties(self):
+        """Depends On relation is wired up in pass 2, not in _build_properties."""
+        task = dict(self._base_task(), depends_on_indices=[0, 1])
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert "Depends On" not in props
+
+
+class TestDependsOnWiring:
+    def _make_args(self, input_path, force=False):
+        args = MagicMock()
+        args.input = input_path
+        args.force = force
+        return args
+
+    def _write_json(self, path, data):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+    def test_wire_depends_on_calls_update_for_each_task_with_deps(self, tmp_path):
+        input_path = tmp_path / "in.json"
+        self._write_json(str(input_path), {
+            "session_id": "s1",
+            "tasks": [
+                {"title": "A", "depends_on_indices": []},
+                {"title": "B", "depends_on_indices": [0]},          # depends on A
+                {"title": "C", "depends_on_indices": [0, 1]},       # depends on A and B
+            ],
+        })
+        config = {
+            "exporters": {
+                "notion_hierarchical": {"api_token": "t", "root_page_id": "p"}
+            }
+        }
+
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db_xyz"
+        mock_exp.find_existing_row.return_value = None
+        # Three create_row calls → three row IDs
+        mock_exp.create_row.side_effect = ["row_a", "row_b", "row_c"]
+        mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter",
+                   return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"), \
+             pytest.raises(SystemExit):
+            cmd_notion_push(self._make_args(str(input_path)))
+
+        # update_row_relation called for B (deps=[A]) and C (deps=[A, B]),
+        # not for A (no deps).
+        rel_calls = mock_exp.update_row_relation.call_args_list
+        assert len(rel_calls) == 2
+        # B → [A]
+        assert rel_calls[0].args == ("row_b", ["row_a"])
+        # C → [A, B]
+        assert rel_calls[1].args == ("row_c", ["row_a", "row_b"])
+
+    def test_wire_depends_on_skips_missing_targets(self, tmp_path):
+        """If a referenced task index has no row_id (failed), the missing target is dropped."""
+        from claude_diary.cli.notion_push import _wire_depends_on
+        mock_exp = MagicMock()
+        tasks = [
+            {"title": "A"},
+            {"title": "B", "depends_on_indices": [0, 99]},  # 99 doesn't exist
+        ]
+        row_ids = {0: "row_a", 1: "row_b"}
+        _wire_depends_on(mock_exp, tasks, row_ids)
+        # Only the valid target (0 → row_a) is passed
+        mock_exp.update_row_relation.assert_called_once_with("row_b", ["row_a"])
+
+    def test_wire_depends_on_skips_when_self_failed(self):
+        """If this task itself failed in pass 1, no relation update attempted."""
+        from claude_diary.cli.notion_push import _wire_depends_on
+        mock_exp = MagicMock()
+        tasks = [
+            {"title": "A"},
+            {"title": "B", "depends_on_indices": [0]},
+        ]
+        # Task 1 (B) has no row_id (failed in pass 1)
+        row_ids = {0: "row_a"}
+        _wire_depends_on(mock_exp, tasks, row_ids)
+        mock_exp.update_row_relation.assert_not_called()
+
 
 class TestGatherGitInfo:
     def test_with_commit_hashes(self):
