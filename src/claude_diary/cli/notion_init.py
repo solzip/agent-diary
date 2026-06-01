@@ -65,7 +65,7 @@ def cmd_notion_init(args):
     print("\nSaved to: %s" % get_config_path())
     print("  exporters.notion_hierarchical.api_token = secret_***")
     print("  exporters.notion_hierarchical.root_page_id = %s" % page_id)
-    print("\nTry it: type /diary-notion in any Claude Code session.")
+    print("\nTry it: type /diary-notion in Claude Code or $diary-notion in Codex.")
 
 
 def parse_page_id(input_str):

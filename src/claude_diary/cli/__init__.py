@@ -120,10 +120,15 @@ def main():
     p_install = sub.add_parser("install", help="Register claude-diary hook in Claude Code")
     p_install.add_argument("--force", action="store_true",
                            help="Overwrite slash command files (preserves user-modified ones)")
-    sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
+    p_install.add_argument("--codex", action="store_true",
+                           help="Also install Codex skills under ~/.codex/skills")
+    p_uninstall = sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
+    p_uninstall.add_argument("--codex", action="store_true",
+                             help="Also remove Codex skills installed by claude-diary")
 
     # write (manual diary — for /diary slash command)
-    sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")
+    p_write = sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")
+    p_write.add_argument("--input", help="JSON input file for agent-authored diary entries")
 
     # notion (hierarchical Notion DB integration — for /diary-notion slash command)
     p_notion = sub.add_parser("notion", help="Notion hierarchical DB integration")

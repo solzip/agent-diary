@@ -12,6 +12,7 @@ from claude_diary.cli.notion_push import (
     _safe_select,
     _build_properties,
     _gather_git_info,
+    _normalize_purpose,
     _read_json,
 )
 from claude_diary.exporters.notion_hierarchical import (
@@ -71,6 +72,20 @@ class TestSafeSelect:
         assert _safe_select(None) == "unknown"
 
 
+class TestNormalizePurpose:
+    def test_valid_purpose_passes_through(self):
+        assert _normalize_purpose("Feature") == "Feature"
+
+    def test_aliases_normalized(self):
+        assert _normalize_purpose("documentation") == "Docs"
+        assert _normalize_purpose("testing") == "Test"
+
+    def test_missing_or_unknown_returns_general(self):
+        assert _normalize_purpose("") == "General"
+        assert _normalize_purpose(None) == "General"
+        assert _normalize_purpose("unexpected") == "General"
+
+
 class TestBuildProperties:
     def _base_task(self):
         return {
@@ -88,10 +103,12 @@ class TestBuildProperties:
             "commits": [{"hash": "abc", "short_hash": "abc", "message": "m"}],
             "diff_stat": {"added": 10, "deleted": 5, "files": 2},
         }
+        task["purpose"] = "Feature"
         props = _build_properties(task, "2026-05-26", "feat/x", git_info, "sess1", 0)
         assert props["Name"]["title"][0]["text"]["content"] == "DB 결정"
         assert props["Date"]["date"]["start"] == "2026-05-26"
         assert props["Project"]["select"]["name"] == "diary"
+        assert props["Purpose"]["select"]["name"] == "Feature"
         assert props["Branch"]["select"]["name"] == "feat/x"
         assert props["Categories"]["multi_select"][0]["name"] == "design"
         assert props["Files"]["number"] == 2
@@ -120,6 +137,11 @@ class TestBuildProperties:
         assert props["Commits"]["number"] == 0
         assert props["Lines"]["number"] == 0
 
+    def test_missing_purpose_defaults_to_general(self):
+        task = self._base_task()
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert props["Purpose"]["select"]["name"] == "General"
+
     def test_valid_status_included(self):
         task = dict(self._base_task(), status="Implementation")
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
@@ -145,6 +167,7 @@ class TestBuildProperties:
         task = dict(self._base_task(), depends_on_indices=[0, 1])
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
         assert "Depends On" not in props
+        assert "Parent Task" not in props
 
 
 class TestDependsOnWiring:
@@ -223,6 +246,52 @@ class TestDependsOnWiring:
         row_ids = {0: "row_a"}
         _wire_depends_on(mock_exp, tasks, row_ids)
         mock_exp.update_row_relation.assert_not_called()
+
+    def test_wire_parent_tasks_calls_update_for_children(self, tmp_path):
+        input_path = tmp_path / "in.json"
+        self._write_json(str(input_path), {
+            "session_id": "s1",
+            "tasks": [
+                {"title": "A"},
+                {"title": "B", "parent_index": 0},
+                {"title": "C", "parent_task_index": 1},
+            ],
+        })
+        config = {
+            "exporters": {
+                "notion_hierarchical": {"api_token": "t", "root_page_id": "p"}
+            }
+        }
+
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db_xyz"
+        mock_exp.find_existing_row.return_value = None
+        mock_exp.create_row.side_effect = ["row_a", "row_b", "row_c"]
+        mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter",
+                   return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"), \
+             pytest.raises(SystemExit):
+            cmd_notion_push(self._make_args(str(input_path)))
+
+        parent_calls = mock_exp.update_row_parent.call_args_list
+        assert len(parent_calls) == 2
+        assert parent_calls[0].args == ("row_b", "row_a")
+        assert parent_calls[1].args == ("row_c", "row_b")
+
+    def test_wire_parent_tasks_skips_missing_parent(self):
+        from claude_diary.cli.notion_push import _wire_parent_tasks
+        mock_exp = MagicMock()
+        tasks = [
+            {"title": "A"},
+            {"title": "B", "parent_index": 99},
+        ]
+        row_ids = {0: "row_a", 1: "row_b"}
+        _wire_parent_tasks(mock_exp, tasks, row_ids)
+        mock_exp.update_row_parent.assert_not_called()
 
 
 class TestGatherGitInfo:
@@ -343,6 +412,38 @@ class TestCmdNotionPush:
         assert exc.value.code == 0
         mock_exp.create_row.assert_called_once()
         assert not input_path.exists()
+
+    def test_notion_body_uses_korean_labels_even_when_config_lang_en(self, tmp_path):
+        input_path = tmp_path / "in.json"
+        _write_json(str(input_path), {
+            "session_id": "s1",
+            "tasks": [{"title": "작업 제목", "summary_hints": ["요약"], "project": "diary"}],
+        })
+        config = {
+            "lang": "en",
+            "exporters": {
+                "notion_hierarchical": {"api_token": "t", "root_page_id": "p"}
+            }
+        }
+
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db_xyz"
+        mock_exp.find_existing_row.return_value = None
+        mock_exp.create_row.return_value = "row_abc"
+        mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter",
+                   return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"), \
+             patch("claude_diary.cli.notion_push.build_notion_blocks", return_value=[]) as mock_blocks, \
+             pytest.raises(SystemExit) as exc:
+            cmd_notion_push(_make_args(str(input_path)))
+
+        assert exc.value.code == 0
+        mock_blocks.assert_called_once()
+        assert mock_blocks.call_args.args[2] == "ko"
 
     def test_skip_existing_row(self, tmp_path):
         input_path = tmp_path / "in.json"

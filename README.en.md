@@ -114,9 +114,36 @@ For when you want to record an entry mid-session without waiting for the Stop Ho
 
 **Usage:**
 - Inside a Claude Code session: type `/diary` — reads the current cwd's transcript and writes the entry
+- Inside a Codex session: type `$diary` — writes the current conversation/tool context through the same manual diary path
 - Or from the terminal: `claude-diary write`
 
 `claude-diary install` installs `~/.claude/commands/diary.md` so `/diary` works in every project. Re-run it once if you installed before this feature shipped (it's idempotent). `claude-diary uninstall` removes it (preserves user-modified files).
+Codex skills can be installed from the Codex plugin in this repo or with `claude-diary install --codex`.
+
+## Notion Work Diary — `/diary-notion` / `$diary-notion`
+
+Push the current session to a hierarchical Notion database as task-sized rows. Use `/diary-notion` in Claude Code and `$diary-notion` in Codex.
+
+```
+[Notion root page: "Working Diary"]
+ └── 2026 (auto-created)
+     └── Entries (inline DB, auto-created)
+         ├── "Decide Notion DB schema" | Project: claude-diary | Purpose: Planning
+         ├── "Refactor git_info.py"    | Project: claude-diary | Purpose: Refactor
+         └── ...
+```
+
+Rows include filterable/groupable/relational columns for `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Branch`, `Status`, and `Categories`. Automatic Notion view creation is intentionally left as a later step.
+`Parent Task` represents containment, while `Depends On` represents prerequisite order. Each Notion page body stays compact with callouts/checklists, and developer evidence such as code changes, files, commands, Git, and original prompts is hidden in appendix toggles. Code changes are high-signal summaries, not full diffs; include only behavior, schema, CLI, user workflow, or verification-scope changes.
+Titles and narrative body content are written in Korean. File paths, commands, branches, commit hashes, code identifiers, and `Purpose`/`Status` enum values remain literal or English.
+
+```bash
+claude-diary notion init
+/diary-notion       # Claude Code
+$diary-notion       # Codex
+```
+
+Purpose values use stable English labels: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, `General`.
 
 ## Diary Example
 
@@ -177,6 +204,7 @@ export CLAUDE_DIARY_TZ_OFFSET="-5"  # EST (UTC-5)
 
 ```bash
 claude-diary write                        # Write current session diary on demand (also via `/diary` slash command)
+working-diary write                       # Neutral alias for the same CLI
 claude-diary search "keyword"             # Keyword search
 claude-diary filter --project my-app      # Filter by project
 claude-diary trace src/main.py            # File change history

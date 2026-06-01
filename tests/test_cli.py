@@ -894,10 +894,11 @@ class TestCmdInit:
     @patch("claude_diary.cli.ensure_diary_dir")
     @patch("claude_diary.cli.load_config")
     def test_init_basic(self, mock_config, mock_ensure, mock_save, mock_path,
-                        base_config, capsys):
+                        base_config, tmp_path, capsys):
         mock_config.return_value = base_config
         # settings.json doesn't exist
-        with patch("os.path.exists", return_value=False):
+        with patch("os.path.exists", return_value=False), \
+             patch("os.path.expanduser", return_value=str(tmp_path)):
             args = Namespace(team_repo=None)
             cmd_init(args)
         captured = capsys.readouterr()

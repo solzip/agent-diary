@@ -219,3 +219,80 @@ class TestCmdWriteIntegration:
         assert exc.value.code == 1
         err = capsys.readouterr().err
         assert "No transcript found" in err
+
+    def test_input_json_creates_entry_without_claude_transcript(self, tmp_path, monkeypatch, capsys):
+        cwd = tmp_path / "codex-project"
+        cwd.mkdir()
+        input_path = cwd / ".diary-abc12345.json"
+        input_path.write_text(json.dumps({
+            "session_id": "codex-session",
+            "project": "codex-project",
+            "user_prompts": ["record this session"],
+            "files_modified": ["src/app.py"],
+            "commands_run": ["pytest"],
+            "summary_hints": ["Added Codex diary input support"],
+            "categories": ["feature"],
+        }), encoding="utf-8")
+
+        monkeypatch.setenv("CLAUDE_DIARY_MANUAL_DIR", str(tmp_path / "manual"))
+        monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+        monkeypatch.chdir(cwd)
+        args = types.SimpleNamespace(input=str(input_path))
+
+        write_mod.cmd_write(args)
+
+        out = capsys.readouterr().out
+        assert "created" in out
+        assert not input_path.exists()
+        files = list((tmp_path / "manual").glob("*/*/*.md"))
+        assert len(files) == 1
+        content = files[0].read_text(encoding="utf-8")
+        assert "record this session" in content
+        assert "Added Codex diary input support" in content
+
+    def test_input_json_without_content_exits_nonzero(self, tmp_path, monkeypatch, capsys):
+        cwd = tmp_path / "codex-empty"
+        cwd.mkdir()
+        input_path = cwd / ".diary-empty.json"
+        input_path.write_text(json.dumps({"session_id": "codex-empty"}), encoding="utf-8")
+
+        monkeypatch.setenv("CLAUDE_DIARY_MANUAL_DIR", str(tmp_path / "manual"))
+        monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+        monkeypatch.chdir(cwd)
+        args = types.SimpleNamespace(input=str(input_path))
+
+        with pytest.raises(SystemExit) as exc:
+            write_mod.cmd_write(args)
+        assert exc.value.code == 1
+        assert input_path.exists()
+        assert "no diary-worthy content" in capsys.readouterr().err
+
+    def test_input_json_normalizes_scalar_fields(self, tmp_path, monkeypatch, capsys):
+        cwd = tmp_path / "codex-scalar"
+        cwd.mkdir()
+        input_path = cwd / ".diary-scalar.json"
+        input_path.write_text(json.dumps({
+            "session_id": "codex-scalar",
+            "project": "codex-scalar",
+            "user_prompts": "record scalar fields",
+            "files_modified": "src/scalar.py",
+            "commands_run": "pytest tests/test_write.py",
+            "summary": "Scalar fields were normalized",
+            "errors": "none",
+            "categories": "feature",
+        }), encoding="utf-8")
+
+        monkeypatch.setenv("CLAUDE_DIARY_MANUAL_DIR", str(tmp_path / "manual"))
+        monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+        monkeypatch.chdir(cwd)
+
+        write_mod.cmd_write(types.SimpleNamespace(input=str(input_path)))
+
+        assert not input_path.exists()
+        content = next((tmp_path / "manual").glob("*/*/*.md")).read_text(encoding="utf-8")
+        assert "record scalar fields" in content
+        assert "src/scalar.py" in content
+        assert "Scalar fields were normalized" in content

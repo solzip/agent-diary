@@ -16,14 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - 에러 분기: 401/403 fail fast, 400 skip, 429/5xx retry, 404 자동 재생성
 - **`claude-diary notion init`**: 대화형 셋업 (token + 페이지 URL/ID + 권한 검증)
 - **`claude-diary notion push --input <file>` `--force`**: 임시 JSON 파일 받아 Notion에 push
-- **DB 자동 생성 스키마**: Name, Date, Project, Branch, Categories, Files, Commits, Lines, Session ID, Task Index
+- **Codex 표준 지원**: `$diary`, `$diary-notion` skills + `.codex-plugin/plugin.json`
+- **중립 CLI alias**: `working-diary` 명령을 `claude-diary`와 동일하게 제공
+- **DB 자동 생성 스키마**: Name, Date, Project, Purpose, Branch, Status, Task Group, Parent Task, Categories, Files, Commits, Lines, Depends On, Session ID, Task Index
+- **Notion 작업 DB 관계 구조**: `Parent Task` self-relation을 추가해 포함 관계를 DB 컬럼에 기록하고, 기존 `Depends On`은 선행 관계로 유지
+- **접힌 근거 중심 Notion 본문**: page body를 callout/checklist/toggle 기반으로 압축해 상단은 요약과 상태, 부록은 코드·파일·명령어·Git·원문 요청 근거로 분리
+- **`claude-diary write --input <file>`**: Codex skill이 생성한 JSON으로 수동 Markdown 일지 작성
 - **`lib/notion_cache.py`**: 연도 페이지/DB/행 ID 캐시 (root_page_id 변경 시 자동 무효화)
 - **`lib/git_info.py` 확장**: `get_branch_for_commit`, `get_head_branch`, `get_commit_info`, `get_diff_stat_for_commits`
-- **새 테스트 90개** (전체 553 통과)
+- **테스트 보강**: Notion Purpose, Codex plugin/skills, Codex JSON input 경로 검증 (전체 583 통과)
 
 ### Changed
 - `cli/setup.py` 일반화: `SLASH_COMMANDS` dict로 다중 슬래시 커맨드 관리
-- `formatter.py`: Notion API blocks 빌더 (`build_notion_blocks`) 추가
+- `formatter.py`: Notion API blocks 빌더 (`build_notion_blocks`) 추가 및 의미 섹션 렌더링 보강
 - 설계 문서: [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md)
 
 ## [4.1.0] - 2026-03-17 (Phase D)
