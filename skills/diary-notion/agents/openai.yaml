@@ -1,0 +1,7 @@
+interface:
+  display_name: "Diary Notion"
+  short_description: "Push session tasks to Notion"
+  default_prompt: "Use $diary-notion to push this session to Notion."
+
+policy:
+  allow_implicit_invocation: true

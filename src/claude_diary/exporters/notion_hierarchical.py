@@ -3,13 +3,13 @@
 Structure (on Notion):
     [Root page (user-specified)]
      ├─ 2026 (page, auto-created)
-     │   └─ Entries (database, auto-created, 10 columns)
+     │   └─ Entries (database, auto-created, shared schema)
      │       ├─ row 1
      │       └─ row 2
      ├─ 2027
      └─ ...
 
-Used by `/diary-notion` slash command via `claude-diary notion-push`.
+Used by `/diary-notion` and `$diary-notion` via `claude-diary notion push`.
 Separate from the flat-mode NotionExporter (Stop Hook auto-push).
 
 Error handling policy:
@@ -32,6 +32,7 @@ NOTION_API_VERSION = "2022-06-28"
 NOTION_API_BASE = "https://api.notion.com/v1"
 MAX_RETRIES = 3
 RICH_TEXT_LIMIT = 2000
+SCHEMA_VERSION = "v4"
 
 
 class NotionAuthError(Exception):
@@ -50,7 +51,7 @@ class NotionHierarchicalExporter:
     """Pushes tasks to the year/database/row hierarchy.
 
     Unlike BaseExporter subclasses, this is invoked directly by the
-    `notion-push` CLI with a list of tasks, not a single entry_data.
+        `notion push` CLI with a list of tasks, not a single entry_data.
     """
 
     def __init__(self, config):
@@ -208,7 +209,8 @@ class NotionHierarchicalExporter:
     def ensure_database(self, year):
         """Get Entries database ID for a year, creating if missing.
 
-        Also ensures the schema extensions (Status, Task Group, Depends On)
+        Also ensures the schema extensions (Purpose, Status, Task Group, Depends On,
+        Parent Task)
         are present — needed for older DBs created before those columns
         were part of the design. Tracked via cache so we only patch once.
         """
@@ -231,35 +233,49 @@ class NotionHierarchicalExporter:
         return db_id
 
     def _ensure_db_schema_extensions(self, db_id):
-        """Add Status/Task Group/Depends On if not yet recorded in cache.
+        """Add current schema extensions if not yet recorded in cache.
 
         Patching the same property twice is harmless (Notion treats existing
         properties as no-ops), but we still gate by a cache flag to skip the
         API call on the happy path.
         """
         schema_v = self._cache.setdefault("schema_v", {})
-        if schema_v.get(db_id) == "v2":
+        current = schema_v.get(db_id)
+        if current == SCHEMA_VERSION:
+            return
+        if current == "v3":
+            self._request("PATCH", "/databases/%s" % db_id, {
+                "properties": {
+                    "Parent Task": _self_relation(db_id),
+                }
+            })
+            schema_v[db_id] = SCHEMA_VERSION
+            return
+        if current == "v2":
+            self._request("PATCH", "/databases/%s" % db_id, {
+                "properties": {
+                    "Purpose": {"select": {}},
+                    "Parent Task": _self_relation(db_id),
+                }
+            })
+            schema_v[db_id] = SCHEMA_VERSION
             return
         self._request("PATCH", "/databases/%s" % db_id, {
             "properties": {
+                "Purpose": {"select": {}},
                 "Status": {"select": {}},
                 "Task Group": {"select": {}},
-                "Depends On": {
-                    "relation": {
-                        "database_id": db_id,
-                        "type": "single_property",
-                        "single_property": {},
-                    }
-                },
+                "Depends On": _self_relation(db_id),
+                "Parent Task": _self_relation(db_id),
             }
         })
-        schema_v[db_id] = "v2"
+        schema_v[db_id] = SCHEMA_VERSION
 
     def _create_database(self, parent_page_id):
         """Create the Entries inline database with the base schema.
 
-        Status, Task Group, and the self-relation Depends On are added
-        afterwards by `_ensure_db_schema_extensions` — keeping them out
+        Purpose, Status, Task Group, and self-relations are added afterwards
+        by `_ensure_db_schema_extensions` — keeping them out
         of this call means new and pre-existing DBs go through the same
         upgrade path.
         """
@@ -364,6 +380,16 @@ class NotionHierarchicalExporter:
             }
         })
 
+    def update_row_parent(self, row_id, parent_row_id):
+        """PATCH a row to set its `Parent Task` containment relation."""
+        self._request("PATCH", "/pages/%s" % row_id, {
+            "properties": {
+                "Parent Task": {
+                    "relation": [{"id": parent_row_id}]
+                }
+            }
+        })
+
 
 def _short_error(resp):
     """Extract a one-line error description from a Notion error response."""
@@ -372,3 +398,14 @@ def _short_error(resp):
         return data.get("message") or data.get("code") or resp.text[:200]
     except Exception:
         return resp.text[:200]
+
+
+def _self_relation(db_id):
+    """Return a self-relation schema object for the current database API version."""
+    return {
+        "relation": {
+            "database_id": db_id,
+            "type": "single_property",
+            "single_property": {},
+        }
+    }

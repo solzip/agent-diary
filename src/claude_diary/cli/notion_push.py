@@ -1,7 +1,7 @@
-"""`claude-diary notion-push` — push tasks JSON to the Notion hierarchical DB.
+"""`claude-diary notion push` — push tasks JSON to the Notion hierarchical DB.
 
-Driven by the `/diary-notion` slash command:
-  1. Claude writes `.diary-notion-<id>.json` in cwd
+Driven by the `/diary-notion` slash command or `$diary-notion` Codex skill:
+  1. The agent writes `.diary-notion-<id>.json` in cwd
   2. This CLI reads it, resolves git info, and pushes each task as a DB row
   3. On success the temp file is deleted; on partial failure it is preserved
      so the user can re-push with `--force`
@@ -54,12 +54,16 @@ def cmd_notion_push(args):
     session_id = data.get("session_id") or _fallback_session_id()
     tasks = data.get("tasks") or []
     if not tasks:
-        print("[claude-diary notion-push] No tasks to push.")
+        print("[claude-diary notion push] No tasks to push.")
         _cleanup(input_path)
         return
 
     cwd = os.getcwd()
-    lang = config.get("lang", "ko")
+    # Hierarchical Notion diary pages are developer work records for this
+    # workflow: titles and narrative body sections are Korean by policy. Raw
+    # artifacts such as file paths, commands, branches, commits, and enum
+    # values remain unchanged.
+    lang = "ko"
     tz_offset = config.get("timezone_offset", 9)
     local_tz = timezone(timedelta(hours=tz_offset))
     today = datetime.now(local_tz)
@@ -76,9 +80,9 @@ def cmd_notion_push(args):
         try:
             db_id = exporter.ensure_database(year)
             archived = exporter.archive_rows_for_session(db_id, session_id)
-            print("[claude-diary notion-push] --force: archived %d existing row(s)" % archived)
+            print("[claude-diary notion push] --force: archived %d existing row(s)" % archived)
         except NotionAuthError as e:
-            print("[claude-diary notion-push] Auth error: %s" % e, file=sys.stderr)
+            print("[claude-diary notion push] Auth error: %s" % e, file=sys.stderr)
             print("  Check: claude-diary config or run `claude-diary notion init`", file=sys.stderr)
             sys.exit(1)
 
@@ -110,10 +114,11 @@ def cmd_notion_push(args):
         except Exception as e:
             results["failed"].append((idx, title, str(e)))
 
-    # Pass 2: wire up Depends On relations now that all row_ids are known.
+    # Pass 2: wire up relation fields now that all row_ids are known.
     relation_failures = _wire_depends_on(exporter, tasks, row_ids)
+    relation_failures += _wire_parent_tasks(exporter, tasks, row_ids)
     for idx, title, reason in relation_failures:
-        results["failed"].append((idx, title, "depends_on: %s" % reason))
+        results["failed"].append((idx, title, "relation: %s" % reason))
 
     exporter.save_cache()
 
@@ -145,8 +150,50 @@ def _wire_depends_on(exporter, tasks, row_ids):
         try:
             exporter.update_row_relation(my_row, target_rows)
         except Exception as e:
-            failures.append((idx, task.get("title") or "(untitled)", str(e)))
+            failures.append((idx, task.get("title") or "(untitled)", "depends_on: %s" % e))
     return failures
+
+
+def _wire_parent_tasks(exporter, tasks, row_ids):
+    """Pass 2: set Parent Task relations for task containment.
+
+    `parent_index` is a single zero-based task index in the same push. It is
+    deliberately separate from `depends_on_indices`: parent means containment,
+    depends-on means execution order.
+    """
+    failures = []
+    for idx, task in enumerate(tasks):
+        parent_idx = _get_parent_index(task)
+        if parent_idx is None:
+            continue
+        my_row = row_ids.get(idx)
+        parent_row = row_ids.get(parent_idx)
+        if not my_row or not parent_row:
+            continue
+        try:
+            exporter.update_row_parent(my_row, parent_row)
+        except Exception as e:
+            failures.append((idx, task.get("title") or "(untitled)", "parent_task: %s" % e))
+    return failures
+
+
+def _get_parent_index(task):
+    """Return the optional parent task index, accepting the old/new field name."""
+    if "parent_index" in task:
+        value = task.get("parent_index")
+    else:
+        value = task.get("parent_task_index")
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
 
 
 def _resolve_credentials(config):
@@ -165,13 +212,13 @@ def _resolve_credentials(config):
 
 def _read_json(path):
     if not path or not os.path.exists(path):
-        print("[claude-diary notion-push] Input file not found: %s" % path, file=sys.stderr)
+        print("[claude-diary notion push] Input file not found: %s" % path, file=sys.stderr)
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError) as e:
-        print("[claude-diary notion-push] Failed to read JSON: %s" % e, file=sys.stderr)
+        print("[claude-diary notion push] Failed to read JSON: %s" % e, file=sys.stderr)
         return None
 
 
@@ -222,12 +269,48 @@ def _gather_git_info(cwd, commit_hashes):
 
 VALID_STATUSES = {"Discussion", "Design", "Implementation", "Testing", "Deployed"}
 
+VALID_PURPOSES = {
+    "Feature",
+    "Bugfix",
+    "Refactor",
+    "Docs",
+    "Test",
+    "Infra",
+    "Planning",
+    "Research",
+    "Review",
+    "Release",
+    "Support",
+    "Maintenance",
+    "General",
+}
+
+PURPOSE_ALIASES = {
+    "bug": "Bugfix",
+    "bugfix": "Bugfix",
+    "doc": "Docs",
+    "docs": "Docs",
+    "documentation": "Docs",
+    "feature": "Feature",
+    "infra": "Infra",
+    "infrastructure": "Infra",
+    "maintenance": "Maintenance",
+    "planning": "Planning",
+    "refactor": "Refactor",
+    "release": "Release",
+    "research": "Research",
+    "review": "Review",
+    "support": "Support",
+    "test": "Test",
+    "testing": "Test",
+}
+
 
 def _build_properties(task, date_str, branch, git_info, session_id, task_index):
     """Build Notion DB row properties from task data.
 
-    Note: `Depends On` relation is NOT set here — it's wired up in pass 2
-    via update_row_relation() once all row IDs are known.
+    Note: relation properties are NOT set here — `Depends On` and
+    `Parent Task` are wired up in pass 2 once all row IDs are known.
     """
     title = task.get("title") or "(untitled)"
     project = (task.get("project") or "unknown").strip() or "unknown"
@@ -244,6 +327,7 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index):
         "Name": {"title": [{"text": {"content": title[:2000]}}]},
         "Date": {"date": {"start": date_str}},
         "Project": {"select": {"name": _safe_select(project)}},
+        "Purpose": {"select": {"name": _normalize_purpose(task.get("purpose"))}},
         "Categories": {
             "multi_select": [{"name": _safe_select(c)} for c in categories[:10]]
         },
@@ -272,11 +356,21 @@ def _safe_select(name):
     return (name or "").replace(",", "-")[:100] or "unknown"
 
 
+def _normalize_purpose(value):
+    """Normalize task purpose to a stable Notion select value."""
+    if not value:
+        return "General"
+    raw = str(value).strip()
+    if raw in VALID_PURPOSES:
+        return raw
+    return PURPOSE_ALIASES.get(raw.lower(), "General")
+
+
 def _print_report(results, input_path):
     pushed = len(results["pushed"])
     skipped = len(results["skipped"])
     failed = len(results["failed"])
-    print("[claude-diary notion-push] Pushed %d, skipped %d, failed %d" %
+    print("[claude-diary notion push] Pushed %d, skipped %d, failed %d" %
           (pushed, skipped, failed))
     for _, title in results["pushed"]:
         print("  + %s" % title)
@@ -287,7 +381,7 @@ def _print_report(results, input_path):
     if failed > 0:
         print()
         print("Failed tasks preserved in: %s" % input_path)
-        print("Retry: claude-diary notion-push --input %s --force" % input_path)
+        print("Retry: claude-diary notion push --input %s --force" % input_path)
 
 
 def _cleanup(input_path):
@@ -300,7 +394,7 @@ def _cleanup(input_path):
 
 
 def _print_setup_hint():
-    print("[claude-diary notion-push] Notion hierarchical exporter not configured.",
+    print("[claude-diary notion push] Notion hierarchical exporter not configured.",
           file=sys.stderr)
     print("  Run: claude-diary notion init", file=sys.stderr)
     print("  Or set CLAUDE_DIARY_NOTION_TOKEN and CLAUDE_DIARY_NOTION_ROOT_PAGE_ID",

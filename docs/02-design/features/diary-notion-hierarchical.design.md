@@ -11,8 +11,8 @@
 | 관점 | 내용 |
 |------|------|
 | **Problem** | 기존 NotionExporter는 단순 flat DB push만 가능. 세션 1개 = 행 1개. 업무일지로 보기에 부적합 |
-| **Solution** | `/diary-notion` 슬래시 커맨드 — Claude가 세션을 작업 단위로 분리 → 연도별 페이지/단일 DB로 push |
-| **Core Value** | 별도 API 키 없이 (Claude Code 구독만으로) 업무일지 자동화 |
+| **Solution** | `/diary-notion`(Claude) / `$diary-notion`(Codex) — 에이전트가 세션을 작업 단위로 분리 → 연도별 페이지/단일 DB로 push |
+| **Core Value** | 별도 LLM API 키 없이 현재 에이전트 세션 컨텍스트로 업무일지 자동화 |
 
 ---
 
@@ -22,13 +22,13 @@
 
 - 한 세션의 작업을 **의미 단위로 N개 행**으로 분리
 - **연도별 페이지 → 단일 통합 DB** 구조 (단순)
-- Claude Code 구독만으로 동작 (별도 Anthropic API 키 불필요)
+- Claude Code/Codex 세션 컨텍스트만으로 동작 (별도 LLM API 키 불필요)
 - Notion 무료 플랜에서도 동작
 - 기존 `exporters.notion` config 재사용
 
 ### 1.2 Design Principles
 
-- **Claude는 의미 분석만, CLI는 기계 처리만** — 역할 분리
+- **에이전트는 의미 분석만, CLI는 기계 처리만** — 역할 분리
 - **무료 path 우선** — 외부 의존성 최소화
 - **소프트 멱등** — 실수로 두 번 눌러도 데이터 깨지지 않음
 
@@ -74,21 +74,27 @@
 
 | 컬럼 | 타입 | 표시 | 값 예시 | 용도 |
 |------|------|------|---------|------|
-| Name | title | ✅ | "DB 컬럼 스키마 의논" | Claude가 뽑은 task 제목 |
+| Name | title | ✅ | "DB 컬럼 스키마 의논" | 에이전트가 뽑은 task 제목 |
 | Date | date | ✅ | 2026-05-26 | 정렬/필터/캘린더 뷰 |
 | Project | select | ✅ | claude-diary | group/filter |
+| Purpose | select | ✅ | Feature | 목적별 group/filter |
 | Branch | select | ✅ | feat/diary-notion | group/filter. CLI가 자동 채움 |
 | Status | select | ✅ | Implementation | 5단계: Discussion/Design/Implementation/Testing/Deployed |
-| Task Group | select | ✅ | diary-notion-impl | 큰 작업 단위 묶음. Claude가 추출 |
+| Task Group | select | ✅ | diary-notion-impl | 큰 작업 단위 묶음. 에이전트가 추출 |
 | Categories | multi_select | ✅ | design, notion | 작업 성격 |
 | Files | number | ✅ | 7 | 수정+생성 파일 수 |
 | Commits | number | ✅ | 3 | 커밋 개수 |
 | Lines | number | ✅ | 142 | 추가+삭제 합 |
-| Depends On | relation (self) | ✅ | → 다른 행 | 선행 작업 참조 (단방향) |
+| Parent Task | relation (self) | ✅ | → 상위 행 | 포함 관계. 하위항목/sub-item view 자동화의 기반 |
+| Depends On | relation (self) | ✅ | → 선행 행 | 선행 작업 참조 (단방향) |
 | Session ID | rich_text | 🔒 hidden | "abc-123-def" | 멱등성 키 |
 | Task Index | number | 🔒 hidden | 0, 1, 2 | 멱등성 키 |
 
-→ 표시 11개 + hidden 2개 = 총 13개. 의미 요약은 컬럼이 아닌 본문(`body_intro`)으로만 노출.
+→ 표시 13개 + hidden 2개 = 총 15개. 의미 요약은 컬럼이 아닌 compact body(`body_intro` + callout/checklist/toggle 부록)로 노출.
+
+**Purpose (select)**:
+- 영어 enum 사용: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, `General`
+- Notion에서 목적별 필터/그룹을 보장하는 1차 분류. 자동 view 생성은 후속 단계로 분리.
 
 **Status 5단계 (select)**:
 - `Discussion`: 의논만, 결정 미완 (드물게)
@@ -97,9 +103,11 @@
 - `Testing`: 테스트 작성/검증 완료
 - `Deployed`: 머지/배포까지 완료
 
-한 task에 여러 단계가 섞이면 **가장 진행된 단계로**. Claude가 transcript 보고 판단.
+한 task에 여러 단계가 섞이면 **가장 진행된 단계로**. 에이전트가 세션 컨텍스트를 보고 판단.
 
-**Task Group (select)**: 며칠/여러 세션에 걸치는 큰 작업 단위 묶음. Claude가 첫 task 시점에 새 그룹명 생성, 이전 작업의 연속이면 같은 그룹명 사용. 일관성 보장은 어렵지만 group view로 묶어 보는 편의가 핵심 가치.
+**Task Group (select)**: 며칠/여러 세션에 걸치는 큰 작업 단위 묶음. 에이전트가 첫 task 시점에 새 그룹명 생성, 이전 작업의 연속이면 같은 그룹명 사용. 일관성 보장은 어렵지만 group view로 묶어 보는 편의가 핵심 가치.
+
+**Parent Task (self-relation)**: 포함 관계. 예: `상품 목록 포커싱`의 Parent Task는 `로컬 테스트 진행`. 같은 push 안에서는 JSON의 `parent_index`를 row ID로 변환해 연결한다. 너무 작은 확인 항목은 별도 row가 아니라 본문 checklist로 남긴다.
 
 **Depends On (self-relation, 단방향)**: 같은 DB 안의 다른 행 참조. JSON 스키마의 `depends_on_indices` 가 같은 push의 task index를 가리킴. CLI가 push 순서대로 row_id 누적 → 인덱스를 실제 row ID로 변환해서 relation 채움. Notion이 자동 reverse view 제공해 단방향 정의로 양방향 효과.
 
@@ -111,35 +119,38 @@
 ### 3.2 Layer 2 — Page Body (행 클릭 시 보이는 markdown)
 
 ```markdown
-[body_intro - Claude가 작성한 1~3문장 의미 요약]
+[callout] body_intro - 에이전트가 작성한 1~3문장 의미 요약
 
-## 사용자 요청
-- "..."
-- "..."
+## 요약
+[callout] 결과/의미 요약
 
-## 작업 요약
-- ...
-- ...
+## 작업 한눈에
+[callout] 배경/범위/접근/결과
 
-## 수정/생성 파일
-- src/...
-- src/...
+## 영향
+[callout] 사용자/운영/제품/개발 품질 영향
 
-## 실행한 명령
-- git log --oneline
-- ...
+## 검증 및 상태
+[checked todo] 실행한 검증
+[callout] 남은 리스크
 
-## Git 변경사항
-**Branch**: main
-- `abc1234` feat: ...
-- `def5678` test: ...
-- (lines: +142 / -38)
+## 다음 액션
+[unchecked todo] 후속 작업
 
-## 발생한 에러
-(있을 때만 표시)
+## 부록
+[toggle] 개발 근거: 주요 변경, 주요 코드 변경, 파일, 명령어, Git, 이슈
+[toggle] 원문 요청: user_prompts 원문
 ```
 
-**조립**: Claude가 만든 `body_intro` 1~3문장 + CLI가 raw 데이터로 조립한 기계 섹션들.
+**조립**: 에이전트가 만든 `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed` + CLI가 코드/파일/명령/Git raw 데이터를 접힌 부록(toggle)으로 조립한다. 코드 변경은 full diff가 아니라 주요 변경만 기록한다.
+
+**언어 정책**: `title`과 설명형 본문 필드(`body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`)는 한국어로 작성한다. 파일 경로, 명령어, branch, commit hash, 코드 식별자, 함수/클래스명, `Purpose`/`Status` enum 값은 원문 또는 영어 값을 유지한다.
+
+**본문 보고 원칙**:
+- DB relation이 구조를 담당하고, page body는 짧은 상태와 근거를 담당한다.
+- `요약`, `작업 한눈에`, `영향`, `검증 및 상태`, `다음 액션`, `부록` 순서로 배치한다.
+- 주요 코드 변경과 파일/명령/Git/오류는 핵심 메시지가 아니라 근거이므로 접힌 `부록`에 둔다.
+- Notion API child block 100개 제한을 넘지 않도록 렌더링 한도를 보수적으로 둔다.
 
 ---
 
@@ -152,8 +163,24 @@
     {
       "title": "Notion DB 컬럼 스키마 결정",
       "body_intro": "DB 컬럼을 Layer 1/2로 분리. 단일 통합 DB + Project select 채택. summary 컬럼은 본문 첫 문단(body_intro)으로 통합.",
+      "summary_hints": ["Project/Purpose/Task Group 기준으로 필터 가능한 DB 구조를 확정"],
+      "key_changes": ["Project/Purpose/Task Group 기준 필터와 그룹을 컬럼으로 보장"],
+      "work_context": ["프로젝트/목적별로 작업을 찾기 어렵던 기존 flat DB 구조를 개선하기 위해 시작"],
+      "work_scope": ["Notion DB 컬럼과 본문 렌더링 정책을 함께 정리"],
+      "approach": ["컬럼은 필터/그룹/관계 구조를 담당하고 본문은 compact body로 읽히게 분리"],
+      "outcome": ["행 하나만 열어도 작업 배경, 영향, 검증, 후속 조치를 파악할 수 있게 됨"],
+      "impact": ["상사 보고와 개발자 회고에 모두 쓸 수 있는 단일 작업 문서가 됨"],
+      "code_change_highlights": ["`formatter.py`: Notion page body에 주요 변경/검증/리스크 섹션을 선택 렌더링"],
+      "decisions": ["view 자동화는 후속 단계로 분리"],
+      "implementation_notes": ["단순 파일 목록보다 개발자가 이어서 볼 수 있는 작업 기록을 우선"],
+      "verification": ["formatter 단위 테스트로 섹션 렌더링 검증"],
+      "risks": ["기존 설치된 slash command/skill은 force refresh 전까지 예전 지시문을 사용할 수 있음"],
+      "next_steps": ["사용자 환경에 최신 Codex skill 설치"],
+      "support_needed": [],
       "status": "Design",
       "task_group": "diary-notion-impl",
+      "purpose": "Planning",
+      "parent_index": null,
       "depends_on_indices": [],
       "categories": ["design", "notion"],
       "project": "claude-code-hooks-diary",
@@ -168,10 +195,10 @@
 }
 ```
 
-### 4.1 Claude의 책임 (슬래시 커맨드 instructions)
+### 4.1 에이전트의 책임 (Claude slash command / Codex skill instructions)
 
 - transcript를 작업 단위로 분리
-- 각 task의 `title` (30~50자 명사구), `body_intro` (1~3문장 평어체, 결과 중심)
+- 각 task의 `title` (30~50자 명사구), `body_intro` (1~3문장 평어체, 결과 중심), `summary_hints`/`key_changes`/`code_change_highlights`/`decisions`/`implementation_notes`/`verification`/`risks`/`next_steps`, `parent_index`/`depends_on_indices`
 - `categories` 추출
 - `user_prompts`, `files_modified`, `files_created`, `commands_run`, `errors` 추출
 - `commit_hashes`를 task에 매핑
@@ -180,18 +207,18 @@
 
 - `commit_hashes`로 git 메타 수집 (message, lines, branch) — `git_info.py` 재사용
 - task별 Branch 자동 결정 (commit 있으면 첫 commit의 branch, 없으면 HEAD branch)
-- Layer 2 body markdown 조립 (`body_intro` + raw 섹션) — `formatter.py` 확장
+- Layer 2 body 조립 (`body_intro` + callout/checklist/toggle 부록) — `formatter.py` 확장
 - 연도 페이지/DB 자동 생성 (없으면)
 - 행 추가 (멱등성 처리 포함)
 - 캐시 갱신
 
 ### 4.3 JSON 전달 방식 — 임시 파일 via cwd
 
-**선택**: Claude가 cwd에 임시 JSON 파일을 작성 → CLI에 `--input` 으로 경로 전달.
+**선택**: 에이전트가 cwd에 임시 JSON 파일을 작성 → CLI에 `--input` 으로 경로 전달.
 
 ```
-1. Claude: Write 도구로 cwd에 `.diary-notion-<short-id>.json` 작성
-2. !`claude-diary notion-push --input .diary-notion-<short-id>.json`
+1. 에이전트: cwd에 `.diary-notion-<short-id>.json` 작성
+2. !`claude-diary notion push --input .diary-notion-<short-id>.json`
 3. CLI: 파일 read → push → try/finally로 파일 삭제 (성공/실패 무관)
 4. (보험) 슬래시 커맨드 마지막에서 한 번 더 삭제 시도
 ```
@@ -213,14 +240,14 @@
   /diary-notion 입력
        │
        ▼
-[Claude (현재 세션)]                              ── Claude Code 구독으로 동작
+[Agent (현재 세션)]                               ── Claude Code/Codex 세션 컨텍스트로 동작
   ├─ transcript 분석
   ├─ 작업 단위 N개 분리
-  ├─ 각 task: title / body_intro / summary / categories / prompts / files / commands / commit_hashes
+  ├─ 각 task: title / body_intro / summary_hints / key_changes / work_context / work_scope / approach / outcome / impact / code_change_highlights / decisions / implementation_notes / verification / risks / next_steps / support_needed / parent_index / depends_on_indices / categories / prompts / files / commands / commit_hashes
   └─ JSON 생성
        │
-       ▼  !`claude-diary notion-push --stdin`
-[CLI: notion-push 명령]
+       ▼  !`claude-diary notion push --input .diary-notion-<id>.json`
+[CLI: notion push 명령]
   ├─ JSON 파싱
   ├─ commit_hashes → git_info.py로 메타+lines 수집
   ├─ Notion API 호출:
@@ -352,21 +379,22 @@ Saved to: <config_dir>/config.json
 | 1 | 계층 구조 | A: 연도 → Entries DB → 행 | 연말 회고 자료로 한 페이지에 다 보임 |
 | 2 | DB 분리 | 단일 DB + Project select | 새 프로젝트마다 DB 생성 X. Notion view로 분류 |
 | 3 | DB 컬럼 | 8개 표시 + 2개 hidden | 답답하지 않으면서 멱등성 키 확보 |
-| 4 | 작업 분리 | LLM (옵션 3: 슬래시 커맨드 안의 Claude) | API 키 X, 의미 단위 분리 가능 |
-| 5 | LLM 호출 위치 | 슬래시 커맨드 = 현재 세션의 Claude | Claude Code 구독으로 무료. SDK 의존성 X |
-| 6 | 본문 markdown | C: Claude의 intro + CLI의 raw 섹션 | 의미 정리 + 일관성 동시 확보 |
+| 4 | 작업 분리 | 현재 에이전트 세션의 LLM | API 키 X, 의미 단위 분리 가능 |
+| 5 | LLM 호출 위치 | Claude slash command 또는 Codex skill | 별도 SDK 의존성 X |
+| 6 | 본문 markdown | C: 에이전트의 intro + CLI의 raw 섹션 | 의미 정리 + 일관성 동시 확보 |
 | 7 | git 정보 수집 | A: CLI가 자체 수집 | 정확도 ↑, `git_info.py` 재사용 |
 | 8 | 멱등성 | B + `--force`: skip 기본, force는 archive&recreate | 실수 방지 + 강제 갱신 옵션 |
 | 9 | 셋업 흐름 | B: `notion init` 대화형 명령 + URL 파싱 + token/read 검증 | 첫 인상 비용 ↓, page_id 헷갈림 해결, 권한 디버깅 비용 ↓ |
-| 10 | 작업 분리 우선순위 | B: Semantic-first (의미 단위) | 의논 세션도 풍부, 큰 commit 안 묶임, Claude 정리 능력 활용 |
+| 10 | 작업 분리 우선순위 | B: Semantic-first (의미 단위) | 의논 세션도 풍부, 큰 commit 안 묶임, 에이전트 정리 능력 활용 |
 | 11 | Title 형식 | 명사구, 30~50자, 시제/주어/prefix/마침표 없음 | DB 뷰 한 줄에 들어감. 일관성 |
 | 12 | Body intro 톤 | 평어체, 1~3문장, 결과 중심, markdown 강조 OK, 추측 금지 | 글로벌 지침과 일관. 회고 시 빠른 회상 |
-| 13 | summary 컬럼 | 삭제 — `body_intro` 만 유지 | 사용자가 본문 위주로 보기 때문. 중복 제거 |
+| 13 | summary 컬럼 | 삭제 — 의미 요약은 compact body 섹션으로 유지 | 컬럼 중복 없이 요약/상태/검증/근거를 page body에 남김 |
 | 14 | JSON 전달 방식 | 임시 파일 (cwd, `.diary-notion-<id>.json`) | PowerShell 호환. escape 문제 회피. 디버깅 쉬움 |
 | 20 | Status 컬럼 | select, 5단계 (Discussion/Design/Implementation/Testing/Deployed) | 진행도 시각화. 한 task 안에 여러 단계 섞이면 가장 진행된 단계 |
 | 21 | Depends On 컬럼 | self-relation, 단방향 | 작업 순서 시각화. Notion이 reverse view 자동 제공 |
-| 22 | Task Group 컬럼 | select. Claude가 task별로 추출 | 며칠/여러 세션에 걸치는 큰 작업을 group view로 묶기 |
-| 23 | 멱등성 + 새 컬럼 마이그레이션 | 기존 행 archive(`--force`) 후 새 스키마로 재push | Status/Depends On/Task Group 소급 채움 |
+| 22 | Parent Task 컬럼 | self-relation, 단방향 | 포함 관계를 DB에 보존하고 후속 sub-item view 자동화의 기반으로 사용 |
+| 22 | Task Group 컬럼 | select. 에이전트가 task별로 추출 | 며칠/여러 세션에 걸치는 큰 작업을 group view로 묶기 |
+| 23 | 멱등성 + 새 컬럼 마이그레이션 | 기존 행 archive(`--force`) 후 새 스키마로 재push | Status/Depends On/Parent Task/Task Group 소급 채움 |
 | 15 | Branch 컬럼 추가 + 경계 룰 | Branch select 컬럼 + "branch 다르면 task 분리"를 최우선 분리 룰로 | 한 task = 한 branch 보장. select 컬럼이 의미 있어짐. 여러 branch 섞이는 케이스 자동 해결 |
 | 16 | Error 종류별 분기 | 401/403 fail fast, 400 skip, 429/5xx retry, 404 자동 재생성 | 의미 없는 retry 방지. 캐시 일관성 자동 복구 |
 | 17 | Retry 정책 | 인라인 retry 3회 (exponential backoff) + JSON 파일 보존 | 수동 명령에 동기적 보고. queue 안 씀 |
@@ -407,12 +435,39 @@ allowed-tools:
    - **commit이 0개인 의논 세션도 정상** — 의미 단위로 task N개 생성
 
 3. **각 task별 추출**
+   - 언어 정책:
+     - `title`, `body_intro`, `summary_hints`, `key_changes`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps` 같은 설명형 필드는 반드시 한국어로 작성
+     - `status`, `purpose` enum 값은 지정된 영어 값을 그대로 사용
+     - 파일 경로, 명령어, branch, commit hash, 코드 식별자, 함수/클래스명은 원문 그대로 유지
+     - `user_prompts`는 사용자가 말한 원문을 증거로 보존
    - `title`: 30~50자 명사구. 시제/주어/prefix/마침표 없음
      - ✅ "Notion DB 컬럼 스키마 결정", "git_info.py 리팩토링"
      - ❌ "오늘 DB 의논했다", "[설계] DB 컬럼"
    - `body_intro`: 1~3문장, 200~500자, 평어체, 결과 중심
      - transcript에 없는 내용 추가 금지 (추측 X)
      - markdown 강조(`**굵게**`, `` `코드` `` ) 사용 OK
+   - Notion 작업 DB 기록처럼 작성. 구조는 DB relation으로 남기고, 본문은 중복 없이 간결하게 쓸 것
+   - `summary_hints`: 작업 결과/의미 요약 최대 4개. 단순 파일 나열이 아니라 무엇이 달라졌는지 기록
+   - `key_changes`: 개발자가 이 일지만 봐도 흐름을 이해할 수 있는 주요 변경사항 최대 4개
+   - `work_context`: 왜 이 작업을 시작했는지 0~1개
+   - `work_scope`: 무엇을 바꿨는지 0~1개
+   - `approach`: 어떻게 해결했는지 0~1개
+   - `outcome`: 결과가 무엇인지 0~1개
+   - `impact`: 사용자/운영/제품/개발 품질 영향 0~4개
+   - `code_change_highlights`: 실제 코드 변화 중 중요한 것만 0~5개
+     - 파일/함수/명령 단위 + 동작상 의미를 함께 기록
+     - full diff, 단순 포맷팅, import 정리, 문구 수정, fixture 보정은 제외
+     - 동작/스키마/CLI/사용자 흐름/검증 범위가 바뀐 코드는 포함
+   - `decisions`: 사용자가 결정했거나 구현 중 확정한 선택지/트레이드오프 0~3개
+   - `implementation_notes`: 코드 변경 요약에 넣기 애매한 제약/호환성/마이그레이션 메모 0~4개
+   - `verification`: 실행한 테스트, 검증 결과, 검증하지 못한 이유 0~4개
+   - `risks`: 주의사항, 남은 리스크, 운영/사용 시 헷갈릴 수 있는 점 0~3개
+   - `next_steps`: 남은 작업이나 후속 단계 0~3개
+   - `support_needed`: 필요한 결정/지원이 있으면 0~2개
+   - `status`: `Discussion` / `Design` / `Implementation` / `Testing` / `Deployed`
+   - `purpose`: `Feature` / `Bugfix` / `Refactor` / `Docs` / `Test` / `Infra` / `Planning` / `Research` / `Review` / `Release` / `Support` / `Maintenance` / `General`
+   - `task_group`: 며칠/여러 세션에 걸치는 큰 작업 단위 식별자
+   - `depends_on_indices`: 같은 push 안에서 의존하는 선행 task 인덱스 배열
    - `categories`: 1~3개. design/refactor/bugfix/test/docs/infra/discussion 같은 자유 라벨
    - `project`: 현재 cwd의 폴더명
    - `user_prompts`, `files_modified`, `files_created`, `commands_run`, `errors`
@@ -420,7 +475,7 @@ allowed-tools:
 
 4. **JSON 출력 및 CLI 호출**
    - cwd에 `.diary-notion-<8자리>.json` 작성 (Write 도구)
-   - `!claude-diary notion-push --input .diary-notion-<8자리>.json` 실행
+   - `!claude-diary notion push --input .diary-notion-<8자리>.json` 실행
    - 종료 후 파일 삭제
 
 ## JSON 형식
@@ -457,7 +512,7 @@ CLI 결과를 그대로 보여주고 push/skip된 task 요약.
 
 ### 11.2 신규
 
-- `cli/notion_push.py` — `claude-diary notion-push --stdin` 명령
+- `cli/notion_push.py` — `claude-diary notion push --input` 명령
 - `exporters/notion.py` 안에 `_hierarchical_export()` 추가 (또는 `NotionHierarchicalExporter` 클래스 분리)
 - `lib/notion_cache.py` — 캐시 read/write
 - `~/.claude/commands/diary-notion.md` — 슬래시 커맨드 instructions

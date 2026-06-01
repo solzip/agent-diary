@@ -114,24 +114,28 @@ cd claude-code-hooks-diary/working-diary-system
 
 **사용법:**
 - Claude Code 세션에서 `/diary` 입력 → 현재 cwd의 transcript를 읽고 기록
+- Codex 세션에서 `$diary` 입력 → 현재 대화/도구 사용 내역을 JSON으로 정리해 같은 경로에 기록
 - 또는 터미널에서 `claude-diary write`
 
 `claude-diary install` 시 `~/.claude/commands/diary.md`가 함께 설치되어 모든 프로젝트에서 `/diary` 사용 가능. 이미 설치한 적 있다면 한 번 더 실행해서 슬래시 커맨드만 추가하세요 (멱등). `claude-diary uninstall` 시 함께 제거됩니다 (사용자가 수정한 파일은 보존).
+Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install --codex`로 `~/.codex/skills`에 설치할 수 있습니다.
 
-## Notion 업무일지 — `/diary-notion` 슬래시 커맨드
+## Notion 업무일지 — `/diary-notion` / `$diary-notion`
 
-현재 세션을 **작업 단위로 분리**해 Notion DB에 push합니다. Claude Code 구독으로 동작하며 **별도 Anthropic API 키 필요 없음**, Notion 무료 플랜에서도 동작.
+현재 세션을 **작업 단위로 분리**해 Notion DB에 push합니다. Claude Code에서는 `/diary-notion`, Codex에서는 `$diary-notion`을 사용합니다. 별도 LLM API 키 없이 현재 에이전트 세션 컨텍스트로 동작하며, Notion 무료 플랜에서도 동작.
 
 ```
 [Notion 루트 페이지: "Working Diary"]
  └── 📄 2026 (자동 생성)
      └── 🗄️ Entries (인라인 DB, 자동 생성)
          ├── "Notion DB 컬럼 스키마 결정"   | Project: claude-diary | Branch: feat/notion
-         ├── "git_info.py 리팩토링"          | Project: claude-diary | Branch: feat/notion
+         ├── "git_info.py 리팩토링"          | Project: claude-diary | Purpose: Refactor
          └── ...
 ```
 
-한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리.
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On` 컬럼으로 Notion에서 필터/그룹/관계 조회가 가능하며, view 자동 생성은 후속 단계로 분리합니다.
+`Parent Task`는 포함 관계, `Depends On`은 선행 관계를 나타냅니다. 각 Notion 페이지 본문은 짧은 callout/checklist 중심으로 정리하고, 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
+제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status` enum 값은 원문 또는 영어 값을 유지합니다.
 
 ### 5분 셋업
 
@@ -143,7 +147,7 @@ cd claude-code-hooks-diary/working-diary-system
    claude-diary notion init
    ```
    대화형으로 token과 root page URL(또는 ID)을 입력하면 권한 검증 후 config에 저장됩니다.
-5. **세션에서 `/diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
+5. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
 
 ### 사용법
 
@@ -153,6 +157,7 @@ claude-diary notion init
 
 # 매 세션
 /diary-notion       # Claude Code 세션 안에서
+$diary-notion       # Codex 세션 안에서
 
 # 같은 세션 다시 push (실수 등):
 #   기본은 skip (Session ID + Task Index로 멱등성)
@@ -166,7 +171,12 @@ claude-diary notion init
 | Name | title | Claude가 뽑은 task 제목 (명사구) |
 | Date | date | |
 | Project | select | cwd 폴더명. group/filter용 |
+| Purpose | select | Feature/Bugfix/Refactor/Docs/Test/Infra/Planning/Research/Review/Release/Support/Maintenance/General |
 | Branch | select | task별 branch (group/filter용) |
+| Status | select | Discussion/Design/Implementation/Testing/Deployed |
+| Task Group | select | 며칠/여러 세션에 걸치는 큰 작업 묶음 |
+| Parent Task | relation | 같은 DB의 상위 작업. 하위항목/sub-item view 자동화의 기반 |
+| Depends On | relation | 같은 DB의 선행 작업 |
 | Categories | multi_select | design/refactor/bugfix/... 자유 라벨 |
 | Files | number | 수정+생성 파일 수 |
 | Commits | number | task별 commit 수 |
@@ -239,6 +249,7 @@ export CLAUDE_DIARY_TZ_OFFSET="9"
 
 ```bash
 claude-diary write                        # 현재 세션 작업일지를 즉시 기록 (`/diary` 슬래시 커맨드로도 호출)
+working-diary write                       # 동일한 CLI의 중립 alias
 claude-diary search "키워드"              # 키워드 검색
 claude-diary filter --project my-app      # 프로젝트 필터
 claude-diary trace src/main.py            # 파일 변경 이력
