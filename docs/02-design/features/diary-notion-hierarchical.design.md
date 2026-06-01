@@ -6,6 +6,8 @@
 > **Date**: 2026-05-26
 > **Status**: Draft (설계 의논 중)
 
+> 상위 비전: [`working-diary-os.vision.md`](working-diary-os.vision.md)
+
 ## Executive Summary
 
 | 관점 | 내용 |
