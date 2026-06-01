@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **DB 자동 생성 스키마**: Name, Date, Project, Purpose, Branch, Status, Task Group, Parent Task, Categories, Files, Commits, Lines, Depends On, Session ID, Task Index
 - **Notion 작업 DB 관계 구조**: `Parent Task` self-relation을 추가해 포함 관계를 DB 컬럼에 기록하고, 기존 `Depends On`은 선행 관계로 유지
 - **접힌 근거 중심 Notion 본문**: page body를 callout/checklist/toggle 기반으로 압축해 상단은 요약과 상태, 부록은 코드·파일·명령어·Git·원문 요청 근거로 분리
+- **Working Diary OS 비전 문서**: Structure → Views → Operations → Intelligence → Multi-project OS로 확장하는 최고모델 설계와 전날 todo 기반 `today-plan` 방향 추가
 - **`claude-diary write --input <file>`**: Codex skill이 생성한 JSON으로 수동 Markdown 일지 작성
 - **`lib/notion_cache.py`**: 연도 페이지/DB/행 ID 캐시 (root_page_id 변경 시 자동 무효화)
 - **`lib/git_info.py` 확장**: `get_branch_for_commit`, `get_head_branch`, `get_commit_info`, `get_diff_stat_for_commits`
