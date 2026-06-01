@@ -215,7 +215,7 @@ class TestEnsureDatabase:
         # Three calls:
         #   1. GET /blocks/year_page (existence check from ensure_year_page cache hit)
         #   2. POST /databases (create base schema)
-        #   3. PATCH /databases/{id} (Status + Task Group + Depends On extension)
+        #   3. PATCH /databases/{id} (Purpose + Status + Task Group + relation extensions)
         mock_req.request.side_effect = [
             _make_response(200, {"id": "year_page"}),
             _make_response(200, {"id": "db_xyz"}),
@@ -236,25 +236,29 @@ class TestEnsureDatabase:
                     "Categories", "Files", "Commits", "Lines",
                     "Session ID", "Task Index"]:
             assert col in props
-        # Status/Task Group/Depends On NOT in create body — added by schema extension PATCH
+        # Purpose/Status/Task Group/relation columns NOT in create body — added by schema extension PATCH
+        assert "Purpose" not in props
         assert "Status" not in props
         assert "Task Group" not in props
         assert "Depends On" not in props
+        assert "Parent Task" not in props
 
-        # Third call: PATCH to add Status + Task Group + Depends On
+        # Third call: PATCH to add Purpose + Status + Task Group + relation columns
         patch_call = mock_req.request.call_args_list[2]
         assert patch_call.args[0] == "PATCH"
         assert patch_call.args[1].endswith("/databases/db_xyz")
         patch_body = patch_call.kwargs["json"]
-        for col in ["Status", "Task Group", "Depends On"]:
+        for col in ["Purpose", "Status", "Task Group", "Depends On", "Parent Task"]:
             assert col in patch_body["properties"]
         relation = patch_body["properties"]["Depends On"]["relation"]
         assert relation["database_id"] == "db_xyz"  # self-reference
+        parent_relation = patch_body["properties"]["Parent Task"]["relation"]
+        assert parent_relation["database_id"] == "db_xyz"
         # Cache flag recorded so future calls skip the PATCH
-        assert exp._cache["schema_v"]["db_xyz"] == "v2"
+        assert exp._cache["schema_v"]["db_xyz"] == "v4"
 
     def test_existing_database_gets_schema_extension(self, tmp_path):
-        """Cache-hit database (older schema) gets Status/Task Group/Depends On via PATCH."""
+        """Cache-hit database (older schema) gets current schema columns via PATCH."""
         exp = _make_exporter()
         with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
             exp.load_cache()
@@ -273,17 +277,17 @@ class TestEnsureDatabase:
         # Second call: PATCH for schema extension on the existing DB
         patch_call = mock_req.request.call_args_list[1]
         assert patch_call.args[0] == "PATCH"
-        for col in ["Status", "Task Group", "Depends On"]:
+        for col in ["Purpose", "Status", "Task Group", "Depends On", "Parent Task"]:
             assert col in patch_call.kwargs["json"]["properties"]
-        assert exp._cache["schema_v"]["old_db"] == "v2"
+        assert exp._cache["schema_v"]["old_db"] == "v4"
 
     def test_schema_extension_skipped_when_already_flagged(self, tmp_path):
-        """Once schema_v records the DB at v2, no further PATCH is sent."""
+        """Once schema_v records the DB at v4, no further PATCH is sent."""
         exp = _make_exporter()
         with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
             exp.load_cache()
         exp._cache["databases"]["2026"] = "db_known"
-        exp._cache["schema_v"]["db_known"] = "v2"
+        exp._cache["schema_v"]["db_known"] = "v4"
 
         mock_req = MagicMock()
         mock_req.request.return_value = _make_response(200, {"id": "db_known"})
@@ -294,6 +298,51 @@ class TestEnsureDatabase:
         # Only the existence check — no PATCH
         assert mock_req.request.call_count == 1
         assert mock_req.request.call_args.args[0] == "GET"
+
+    def test_v3_database_gets_parent_task_upgrade(self, tmp_path):
+        """A DB already marked v3 still gets the v4 Parent Task schema patch."""
+        exp = _make_exporter()
+        with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
+            exp.load_cache()
+        exp._cache["databases"]["2026"] = "db_v3"
+        exp._cache["schema_v"]["db_v3"] = "v3"
+
+        mock_req = MagicMock()
+        mock_req.request.side_effect = [
+            _make_response(200, {"id": "db_v3"}),
+            _make_response(200, {"id": "db_v3"}),
+        ]
+        with _patch_requests(mock_req):
+            db_id = exp.ensure_database(2026)
+
+        assert db_id == "db_v3"
+        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        assert list(patch_body["properties"].keys()) == ["Parent Task"]
+        relation = patch_body["properties"]["Parent Task"]["relation"]
+        assert relation["database_id"] == "db_v3"
+        assert exp._cache["schema_v"]["db_v3"] == "v4"
+
+    def test_v2_database_gets_purpose_and_parent_task_upgrade(self, tmp_path):
+        """A DB already marked v2 still gets Purpose and Parent Task schema patches."""
+        exp = _make_exporter()
+        with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
+            exp.load_cache()
+        exp._cache["databases"]["2026"] = "db_v2"
+        exp._cache["schema_v"]["db_v2"] = "v2"
+
+        mock_req = MagicMock()
+        mock_req.request.side_effect = [
+            _make_response(200, {"id": "db_v2"}),
+            _make_response(200, {"id": "db_v2"}),
+        ]
+        with _patch_requests(mock_req):
+            db_id = exp.ensure_database(2026)
+
+        assert db_id == "db_v2"
+        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        assert "Purpose" in patch_body["properties"]
+        assert "Parent Task" in patch_body["properties"]
+        assert exp._cache["schema_v"]["db_v2"] == "v4"
 
 
 class TestFindExistingRow:
@@ -386,6 +435,35 @@ class TestCreateRow:
         assert body["parent"]["database_id"] == "db_xyz"
         assert body["properties"] == properties
         assert body["children"] == body_blocks
+
+
+class TestUpdateRelations:
+    def test_update_row_relation_sets_depends_on(self):
+        exp = _make_exporter()
+        mock_req = MagicMock()
+        mock_req.request.return_value = _make_response(200, {"id": "row_b"})
+
+        with _patch_requests(mock_req):
+            exp.update_row_relation("row_b", ["row_a", "row_c"])
+
+        body = mock_req.request.call_args.kwargs["json"]
+        assert body["properties"]["Depends On"]["relation"] == [
+            {"id": "row_a"},
+            {"id": "row_c"},
+        ]
+
+    def test_update_row_parent_sets_parent_task(self):
+        exp = _make_exporter()
+        mock_req = MagicMock()
+        mock_req.request.return_value = _make_response(200, {"id": "row_child"})
+
+        with _patch_requests(mock_req):
+            exp.update_row_parent("row_child", "row_parent")
+
+        body = mock_req.request.call_args.kwargs["json"]
+        assert body["properties"]["Parent Task"]["relation"] == [
+            {"id": "row_parent"},
+        ]
 
 
 class TestRequestsMissing:

@@ -119,12 +119,13 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
     """Build Notion API block list for a task page body.
 
     Body layout:
-      [body_intro paragraph]
-      ## 사용자 요청   - prompts
-      ## 수정/생성 파일 - files (modified + created)
-      ## 실행한 명령    - commands (trivial filtered out)
-      ## Git 변경사항   - branch, commits, lines
-      ## 발생한 에러    - errors (only if any)
+      [body_intro callout]
+      ## 요약                 - up to 3 outcome-focused callouts
+      ## 작업 한눈에          - context/scope/approach/outcome callouts
+      ## 영향                 - impact callouts
+      ## 검증 및 상태         - checked verification items + risk callouts
+      ## 다음 액션            - unchecked next-step/support items
+      ## 부록                 - collapsed developer/raw evidence toggles
 
     Skipped sections render no heading (page doesn't get noisy with empty heads).
     Long strings are truncated to RICH_TEXT_LIMIT (Notion rich_text caps at 2000).
@@ -134,62 +135,192 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
 
     intro = (task.get("body_intro") or "").strip()
     if intro:
-        blocks.append(_paragraph(intro))
+        blocks.append(_callout(intro, "📌"))
 
-    prompts = task.get("user_prompts") or []
-    if prompts:
-        blocks.append(_heading(L("task_requests")))
-        for p in prompts[:5]:
-            short = _truncate(p.replace("\n", " ").strip(), 500)
-            if short:
-                blocks.append(_bullet(short))
+    _add_callout_section(
+        blocks,
+        L("brief_summary"),
+        task.get("summary_hints") or task.get("summary"),
+        3,
+        "✅",
+    )
 
-    modified = task.get("files_modified") or []
-    created = task.get("files_created") or []
-    if modified or created:
-        blocks.append(_heading("%s / %s" % (L("files_modified"), L("files_created"))))
-        for f in modified[:15]:
-            blocks.append(_bullet(_truncate(f, 500)))
-        for f in created[:15]:
-            blocks.append(_bullet(_truncate("%s (+)" % f, 500)))
+    _add_snapshot_section(blocks, task, L)
 
-    commands = task.get("commands_run") or []
-    trivial = {"ls", "pwd", "cat", "echo", "cd", "which", "type", "clear"}
-    sig = []
-    for c in commands:
-        first = c.strip().split()[0] if c.strip() else ""
-        if first and first not in trivial:
-            sig.append(c)
-    sig = sig[:10]
-    if sig:
-        blocks.append(_heading(L("commands")))
-        for c in sig:
-            blocks.append(_bullet(_truncate(c, 500)))
+    _add_callout_section(blocks, L("impact"), task.get("impact"), 3, "📈")
+
+    _add_validation_section(blocks, task, L)
+    _add_next_actions_section(blocks, task, L)
+
+    appendix = _build_appendix_blocks(task, git_info, L)
+    if appendix:
+        blocks.append(_heading(L("appendix")))
+        blocks.extend(appendix)
+
+    return blocks
+
+
+def _add_snapshot_section(blocks, task, L):
+    pairs = [
+        (L("context"), task.get("work_context") or task.get("context"), "🧭"),
+        (L("scope"), task.get("work_scope") or task.get("scope"), "🧩"),
+        (L("approach"), task.get("approach"), "🛠️"),
+        (L("outcome"), task.get("outcome"), "🎯"),
+    ]
+    section_blocks = []
+    for label, value, icon in pairs:
+        texts = _limited_texts(value, 1)
+        if texts:
+            section_blocks.append(_callout("%s: %s" % (label, texts[0]), icon))
+    if section_blocks:
+        blocks.append(_heading(L("work_snapshot")))
+        blocks.extend(section_blocks)
+
+
+def _add_validation_section(blocks, task, L):
+    section_blocks = []
+    for v in _limited_texts(task.get("verification"), 3):
+        section_blocks.append(_to_do(v, checked=True))
+    for r in _limited_texts(task.get("risks") or task.get("cautions"), 2):
+        section_blocks.append(_callout("%s: %s" % (L("risks"), r), "⚠️"))
+    if section_blocks:
+        blocks.append(_heading(L("validation_status")))
+        blocks.extend(section_blocks)
+
+
+def _add_next_actions_section(blocks, task, L):
+    section_blocks = []
+    for n in _limited_texts(task.get("next_steps"), 2):
+        section_blocks.append(_to_do("%s: %s" % (L("next_steps"), n), checked=False))
+    for s in _limited_texts(task.get("support_needed"), 1):
+        section_blocks.append(_to_do("%s: %s" % (L("support_needed"), s), checked=False))
+    if section_blocks:
+        blocks.append(_heading(L("next_actions")))
+        blocks.extend(section_blocks)
+
+
+def _build_appendix_blocks(task, git_info, L):
+    blocks = []
+    developer = _build_developer_evidence_items(task, git_info, L)
+    raw = _build_raw_evidence_items(task, L)
+
+    if developer:
+        blocks.append(_toggle(L("developer_evidence"), [_bullet(item) for item in developer]))
+    if raw:
+        blocks.append(_toggle(L("raw_evidence"), [_bullet(item) for item in raw]))
+    return blocks
+
+
+def _build_developer_evidence_items(task, git_info, L):
+    evidence = []
+
+    for c in _limited_texts(task.get("key_changes"), 3):
+        evidence.append("%s: %s" % (L("key_changes"), c))
+
+    for c in _limited_texts(task.get("code_change_highlights") or task.get("code_changes"), 3):
+        evidence.append("%s: %s" % (L("code_change_highlights"), c))
+
+    for d in _limited_texts(task.get("decisions"), 2):
+        evidence.append("%s: %s" % (L("decisions"), d))
+
+    for n in _limited_texts(task.get("implementation_notes"), 2):
+        evidence.append("%s: %s" % (L("implementation_notes"), n))
+
+    modified = _as_text_list(task.get("files_modified"))
+    created = _as_text_list(task.get("files_created"))
+    if modified:
+        evidence.append("%s: %s" % (L("files_modified"), _join_limited(modified, 6)))
+    if created:
+        evidence.append("%s: %s" % (L("files_created"), _join_limited(created, 6)))
+
+    commands = _significant_commands(task.get("commands_run"))
+    for c in commands[:3]:
+        evidence.append("%s: %s" % (L("commands"), _truncate(c, 500)))
 
     if git_info:
         branch = git_info.get("branch", "")
         commits = git_info.get("commits", [])
         stat = git_info.get("diff_stat") or {}
-        if branch or commits or stat.get("added") or stat.get("deleted"):
-            blocks.append(_heading(L("git")))
-            if branch:
-                blocks.append(_paragraph("%s: %s" % (L("branch"), branch)))
-            for c in commits[:10]:
-                short_hash = c.get("short_hash") or (c.get("hash") or "")[:7]
-                msg = c.get("message", "")
-                blocks.append(_bullet(_truncate("%s  %s" % (short_hash, msg), 500)))
-            if stat.get("added") or stat.get("deleted"):
-                blocks.append(_paragraph("+%d / -%d (%d files)" % (
-                    stat.get("added", 0), stat.get("deleted", 0), stat.get("files", 0)
-                )))
+        if branch:
+            evidence.append("%s: %s" % (L("branch"), branch))
+        for c in commits[:3]:
+            short_hash = c.get("short_hash") or (c.get("hash") or "")[:7]
+            msg = c.get("message", "")
+            evidence.append("%s: %s" % (L("commit"), _truncate("%s  %s" % (short_hash, msg), 500)))
+        if stat.get("added") or stat.get("deleted"):
+            evidence.append("%s: +%d / -%d (%d files)" % (
+                L("code_stats"), stat.get("added", 0), stat.get("deleted", 0), stat.get("files", 0)
+            ))
 
-    errors = task.get("errors") or []
-    if errors:
-        blocks.append(_heading(L("issues")))
-        for e in errors[:5]:
-            blocks.append(_bullet(_truncate(e, 500)))
+    errors = _as_text_list(task.get("errors") or task.get("errors_encountered"))
+    for e in errors[:2]:
+        evidence.append("%s: %s" % (L("issues"), _truncate(e, 500)))
 
-    return blocks
+    return evidence
+
+
+def _build_raw_evidence_items(task, L):
+    raw = []
+    for p in _limited_texts(task.get("user_prompts"), 3):
+        raw.append("%s: %s" % (L("task_requests"), p))
+    return raw
+
+
+def _significant_commands(commands):
+    trivial = {"ls", "pwd", "cat", "echo", "cd", "which", "type", "clear"}
+    sig = []
+    for c in _as_text_list(commands):
+        first = c.strip().split()[0] if c.strip() else ""
+        if first and first not in trivial:
+            sig.append(c)
+    return sig
+
+
+def _labeled_texts(label, items, max_items, limit=500):
+    return ["%s: %s" % (label, item) for item in _limited_texts(items, max_items, limit)]
+
+
+def _limited_texts(items, max_items, limit=500):
+    texts = [_truncate(item.replace("\n", " ").strip(), limit) for item in _as_text_list(items)]
+    return [item for item in texts if item][:max_items]
+
+
+def _join_limited(items, max_items, limit=500):
+    texts = _limited_texts(items, max_items, limit)
+    extra = len(_as_text_list(items)) - len(texts)
+    suffix = " (+%d more)" % extra if extra > 0 else ""
+    return _truncate(", ".join(texts) + suffix, limit)
+
+
+def _add_bullet_section(blocks, title, items, max_items, limit=500):
+    """Append a heading and bullet list if items contain usable text."""
+    texts = _limited_texts(items, max_items, limit)
+    if not texts:
+        return
+    blocks.append(_heading(title))
+    for item in texts:
+        blocks.append(_bullet(item))
+
+
+def _add_callout_section(blocks, title, items, max_items, icon, limit=500):
+    """Append a heading and compact callouts if items contain usable text."""
+    texts = _limited_texts(items, max_items, limit)
+    if not texts:
+        return
+    blocks.append(_heading(title))
+    for item in texts:
+        blocks.append(_callout(item, icon))
+
+
+def _as_text_list(value):
+    """Normalize scalar or list-like task fields into strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value if item is not None]
+    return [str(value)]
 
 
 def _paragraph(text):
@@ -213,6 +344,39 @@ def _bullet(text):
         "object": "block",
         "type": "bulleted_list_item",
         "bulleted_list_item": {"rich_text": _rich_text(text)},
+    }
+
+
+def _callout(text, emoji):
+    return {
+        "object": "block",
+        "type": "callout",
+        "callout": {
+            "rich_text": _rich_text(text),
+            "icon": {"type": "emoji", "emoji": emoji},
+        },
+    }
+
+
+def _to_do(text, checked=False):
+    return {
+        "object": "block",
+        "type": "to_do",
+        "to_do": {
+            "rich_text": _rich_text(text),
+            "checked": checked,
+        },
+    }
+
+
+def _toggle(text, children):
+    return {
+        "object": "block",
+        "type": "toggle",
+        "toggle": {
+            "rich_text": _rich_text(text),
+            "children": children,
+        },
     }
 
 

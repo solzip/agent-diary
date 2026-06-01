@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 
 from claude_diary.cli.setup import (
     SLASH_COMMANDS,
+    CODEX_SKILLS,
     DIARY_SLASH_COMMAND,
     DIARY_NOTION_SLASH_COMMAND,
     cmd_install,
@@ -14,6 +15,8 @@ from claude_diary.cli.setup import (
     _uninstall_slash_command,
     _install_all_slash_commands,
     _uninstall_all_slash_commands,
+    _install_all_codex_skills,
+    _uninstall_all_codex_skills,
 )
 
 
@@ -35,6 +38,51 @@ class TestSlashCommandRegistry:
             content, marker = entry
             assert content
             assert marker in content, "Marker %r must be findable in %s" % (marker, filename)
+
+
+class TestCodexSkillRegistry:
+    def test_codex_skills_registered(self):
+        assert "diary" in CODEX_SKILLS
+        assert "diary-notion" in CODEX_SKILLS
+
+    def test_each_skill_has_content_and_marker(self):
+        for skill_name, entry in CODEX_SKILLS.items():
+            content, marker = entry
+            assert content
+            assert marker in content, "Marker %r must be findable in %s" % (marker, skill_name)
+
+
+class TestDiaryNotionInstructions:
+    def test_slash_and_codex_skill_request_rich_body_fields(self):
+        fields = [
+            "summary_hints",
+            "key_changes",
+            "work_context",
+            "work_scope",
+            "approach",
+            "outcome",
+            "impact",
+            "code_change_highlights",
+            "decisions",
+            "implementation_notes",
+            "verification",
+            "risks",
+            "next_steps",
+            "support_needed",
+            "parent_index",
+            "depends_on_indices",
+        ]
+        codex_content = CODEX_SKILLS["diary-notion"][0]
+
+        for field in fields:
+            assert field in DIARY_NOTION_SLASH_COMMAND
+            assert field in codex_content
+        assert "full diff" in DIARY_NOTION_SLASH_COMMAND
+        assert "formatting-only" in codex_content
+        assert "반드시 한국어로 작성" in DIARY_NOTION_SLASH_COMMAND
+        assert "Write `title`, `body_intro`" in codex_content
+        assert "in Korean" in codex_content
+        assert "Notion task database record" in codex_content
 
 
 class TestInstallSlashCommandSingle:
@@ -146,6 +194,20 @@ class TestInstallAll:
         assert existing_diary.read_text(encoding="utf-8") == "user-customized content"
 
 
+class TestInstallAllCodexSkills:
+    def test_installs_codex_skills(self, tmp_path):
+        with _patch_home(tmp_path):
+            results = _install_all_codex_skills()
+        assert "diary" in results
+        assert "diary-notion" in results
+        diary = tmp_path / ".codex" / "skills" / "diary" / "SKILL.md"
+        notion = tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md"
+        assert diary.exists()
+        assert notion.exists()
+        assert "working-diary write --input" in diary.read_text(encoding="utf-8")
+        assert "working-diary notion push" in notion.read_text(encoding="utf-8")
+
+
 class TestUninstallAll:
     def test_removes_only_unmodified_files(self, tmp_path):
         commands_dir = tmp_path / ".claude" / "commands"
@@ -162,6 +224,15 @@ class TestUninstallAll:
         assert results["diary-notion.md"][1] == "skipped (modified by user)"
         assert not ours.exists()
         assert notion_modified.exists()
+
+    def test_uninstalls_codex_skills(self, tmp_path):
+        with _patch_home(tmp_path):
+            _install_all_codex_skills()
+            results = _uninstall_all_codex_skills()
+
+        assert results["diary"][1] == "removed"
+        assert results["diary-notion"][1] == "removed"
+        assert not (tmp_path / ".codex" / "skills" / "diary" / "SKILL.md").exists()
 
 
 class TestCmdInstall:
@@ -181,6 +252,16 @@ class TestCmdInstall:
         # Both slash commands present
         assert (tmp_path / ".claude" / "commands" / "diary.md").exists()
         assert (tmp_path / ".claude" / "commands" / "diary-notion.md").exists()
+
+    def test_install_with_codex_writes_skills(self, tmp_path):
+        args = MagicMock()
+        args.force = False
+        args.codex = True
+        with _patch_home(tmp_path):
+            cmd_install(args)
+
+        assert (tmp_path / ".codex" / "skills" / "diary" / "SKILL.md").exists()
+        assert (tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md").exists()
 
     def test_idempotent_when_hook_already_present(self, tmp_path):
         settings_path = tmp_path / ".claude" / "settings.json"
@@ -228,3 +309,14 @@ class TestCmdUninstall:
             cmd_uninstall(MagicMock())
         # Still gets cleaned up
         assert not (commands_dir / "diary.md").exists()
+
+    def test_uninstall_with_codex_removes_skills(self, tmp_path):
+        args = MagicMock()
+        args.force = False
+        args.codex = True
+        with _patch_home(tmp_path):
+            cmd_install(args)
+            cmd_uninstall(args)
+
+        assert not (tmp_path / ".codex" / "skills" / "diary" / "SKILL.md").exists()
+        assert not (tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md").exists()
