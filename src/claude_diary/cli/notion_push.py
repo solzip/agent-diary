@@ -243,7 +243,7 @@ def _push_task(exporter, year, date_str, session_id, task_index, task, cwd, lang
     branch = git_info.get("branch") or ""
 
     properties = _build_properties(
-        task, date_str, branch, git_info, session_id, task_index
+        task, date_str, branch, git_info, session_id, task_index, cwd
     )
     body_blocks = build_notion_blocks(task, git_info, lang)
 
@@ -306,14 +306,14 @@ PURPOSE_ALIASES = {
 }
 
 
-def _build_properties(task, date_str, branch, git_info, session_id, task_index):
+def _build_properties(task, date_str, branch, git_info, session_id, task_index, cwd=None):
     """Build Notion DB row properties from task data.
 
     Note: relation properties are NOT set here — `Depends On` and
     `Parent Task` are wired up in pass 2 once all row IDs are known.
     """
     title = task.get("title") or "(untitled)"
-    project = (task.get("project") or "unknown").strip() or "unknown"
+    project = _resolve_project_name(task.get("project"), cwd)
     categories = [c for c in (task.get("categories") or []) if c]
     stat = git_info.get("diff_stat") or {}
     commits = git_info.get("commits") or []
@@ -350,6 +350,25 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index):
         props["Task Group"] = {"select": {"name": _safe_select(task_group)}}
 
     return props
+
+
+def _resolve_project_name(value, cwd=None):
+    """Use the task project unless it is missing/placeholder, then fall back to cwd."""
+    raw = str(value or "").strip()
+    if raw and raw.lower() not in {"unknown", "<cwd folder name>", "cwd folder name"}:
+        return raw
+    return _project_name_from_cwd(cwd)
+
+
+def _project_name_from_cwd(cwd):
+    """Extract a stable project name from the command working directory."""
+    if not cwd:
+        return "unknown"
+    normalized = str(cwd).replace("\\", "/").rstrip("/")
+    name = normalized.rsplit("/", 1)[-1].strip()
+    if not name or name in {".", ".."}:
+        return "unknown"
+    return name
 
 
 def _normalize_work_period(value, fallback_date):

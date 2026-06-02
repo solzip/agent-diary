@@ -172,7 +172,7 @@ $diary-notion       # Codex 세션 안에서
 | Name | title | Claude가 뽑은 task 제목 (명사구) |
 | Date | date | |
 | Work Period | date | 실제 작업 기간. 프로젝트/작업 그룹 기간 계산 재료 |
-| Project | select | cwd 폴더명. group/filter용 |
+| Project | select | cwd 폴더명. group/filter용. task JSON에서 누락되거나 `unknown`이면 CLI가 명령 실행 cwd로 보정 |
 | Purpose | select | Feature/Bugfix/Refactor/Docs/Test/Infra/Planning/Research/Review/Release/Support/Maintenance/General |
 | Branch | select | task별 branch (group/filter용) |
 | Status | select | Discussion/Design/Implementation/Testing/Deployed |

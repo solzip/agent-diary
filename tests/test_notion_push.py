@@ -179,6 +179,23 @@ class TestBuildProperties:
             "end": "2026-05-26",
         }
 
+    def test_missing_project_falls_back_to_cwd_folder(self):
+        task = dict(self._base_task())
+        task.pop("project")
+        props = _build_properties(
+            task, "2026-05-26", "main", {}, "sess1", 0,
+            "C:\\Users\\sol\\work\\actual-project",
+        )
+        assert props["Project"]["select"]["name"] == "actual-project"
+
+    def test_unknown_project_falls_back_to_cwd_folder(self):
+        task = dict(self._base_task(), project="unknown")
+        props = _build_properties(
+            task, "2026-05-26", "main", {}, "sess1", 0,
+            "/home/sol/work/actual-project",
+        )
+        assert props["Project"]["select"]["name"] == "actual-project"
+
 
 class TestNormalizeWorkPeriod:
     def test_missing_falls_back_to_date(self):
@@ -439,6 +456,39 @@ class TestCmdNotionPush:
         assert exc.value.code == 0
         mock_exp.create_row.assert_called_once()
         assert not input_path.exists()
+
+    def test_missing_project_uses_command_cwd(self, tmp_path, monkeypatch):
+        input_path = tmp_path / "in.json"
+        _write_json(str(input_path), {
+            "session_id": "s1",
+            "tasks": [{"title": "task A"}],
+        })
+        workdir = tmp_path / "real-project"
+        workdir.mkdir()
+        monkeypatch.chdir(workdir)
+        config = {
+            "exporters": {
+                "notion_hierarchical": {"api_token": "t", "root_page_id": "p"}
+            }
+        }
+
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db_xyz"
+        mock_exp.find_existing_row.return_value = None
+        mock_exp.create_row.return_value = "row_abc"
+        mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter",
+                   return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"), \
+             pytest.raises(SystemExit) as exc:
+            cmd_notion_push(_make_args(str(input_path)))
+
+        assert exc.value.code == 0
+        props = mock_exp.create_row.call_args.args[1]
+        assert props["Project"]["select"]["name"] == "real-project"
 
     def test_notion_body_uses_korean_labels_even_when_config_lang_en(self, tmp_path):
         input_path = tmp_path / "in.json"

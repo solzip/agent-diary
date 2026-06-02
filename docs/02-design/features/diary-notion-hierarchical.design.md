@@ -78,7 +78,7 @@
 |------|------|------|---------|------|
 | Name | title | ✅ | "DB 컬럼 스키마 의논" | 에이전트가 뽑은 task 제목 |
 | Date | date | ✅ | 2026-05-26 | 정렬/필터/캘린더 뷰 |
-| Project | select | ✅ | claude-diary | group/filter |
+| Project | select | ✅ | claude-diary | group/filter. task JSON 누락/unknown 시 CLI가 cwd 폴더명으로 보정 |
 | Purpose | select | ✅ | Feature | 목적별 group/filter |
 | Branch | select | ✅ | feat/diary-notion | group/filter. CLI가 자동 채움 |
 | Status | select | ✅ | Implementation | 5단계: Discussion/Design/Implementation/Testing/Deployed |
@@ -123,27 +123,45 @@
 ### 3.2 Layer 2 — Page Body (행 클릭 시 보이는 markdown)
 
 ```markdown
-[callout] body_intro - 에이전트가 작성한 1~3문장 의미 요약
+[callout] body_intro - 핵심 결과 1개. callout은 여기와 경고성 리스크에만 제한한다.
 
-## 요약
-[callout] 결과/의미 요약
+## 결과
+- [x] 최종 결과
+- [x] 검증 완료 항목
+- [x] 커밋/푸시/배포 등 완료 상태
 
 ## 작업 한눈에
-[callout] 배경/범위/접근/결과
+| 항목 | 내용 |
+| --- | --- |
+| 배경 | 왜 시작했는가 |
+| 범위 | 무엇을 바꿨는가 |
+| 접근 | 어떻게 풀었는가 |
+| 결과 | 어떤 상태가 되었는가 |
 
 ## 영향
-[callout] 사용자/운영/제품/개발 품질 영향
+- 사용자/운영/제품/개발 품질 영향
 
-## 검증 및 상태
-[checked todo] 실행한 검증
-[callout] 남은 리스크
+## 검증
+- [x] 최종 검증 결과
 
-## 다음 액션
-[unchecked todo] 후속 작업
+## 리스크 / 다음 액션
+[callout] 필요한 경우에만 남은 리스크
+- [ ] 후속 작업
 
 ## 부록
 [toggle] 개발 근거: 주요 변경, 주요 코드 변경, 파일, 명령어, Git, 이슈
 [toggle] 원문 요청: user_prompts 원문
+```
+
+문제 해결형 작업은 `결과` 섹션을 다음 형태로 우선 렌더링할 수 있다.
+
+```markdown
+## 결과
+
+- 문제: 정상 생성된 view가 required property 누락 conflict로 오인됨
+- 원인: data source schema와 view retrieve 응답의 property id encoding 기준이 다름
+- 조치: property id를 decode해 비교 기준을 통일
+- 결과: core view 5개 verified
 ```
 
 **조립**: 에이전트가 만든 `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed` + CLI가 코드/파일/명령/Git raw 데이터를 접힌 부록(toggle)으로 조립한다. 코드 변경은 full diff가 아니라 주요 변경만 기록한다.
@@ -152,7 +170,12 @@
 
 **본문 보고 원칙**:
 - DB relation이 구조를 담당하고, page body는 짧은 상태와 근거를 담당한다.
-- `요약`, `작업 한눈에`, `영향`, `검증 및 상태`, `다음 액션`, `부록` 순서로 배치한다.
+- `결과`, `작업 한눈에`, `영향`, `검증`, `리스크 / 다음 액션`, `부록` 순서로 배치한다.
+- callout을 과하게 쓰지 않는다. 최상단 핵심 요약 1개와 경고성 리스크 정도로 제한한다.
+- `작업 한눈에`는 callout 여러 개가 아니라 표로 렌더링한다.
+- 검증은 최종 상태를 우선 노출하고, 중간 실행 결과는 부록으로 내린다.
+- 사용자-facing 명령은 `$diary-notion` 또는 `working-diary diary-notion ...` 기준으로 노출한다.
+- 과거 명령이나 내부 명령은 발생 근거가 필요할 때만 부록에 둔다.
 - 주요 코드 변경과 파일/명령/Git/오류는 핵심 메시지가 아니라 근거이므로 접힌 `부록`에 둔다.
 - Notion API child block 100개 제한을 넘지 않도록 렌더링 한도를 보수적으로 둔다.
 
@@ -210,6 +233,7 @@
 ### 4.2 CLI의 책임
 
 - `commit_hashes`로 git 메타 수집 (message, lines, branch) — `git_info.py` 재사용
+- task별 Project 자동 보정 (task `project`가 없거나 `unknown`/placeholder이면 명령 실행 cwd 폴더명 사용)
 - task별 Branch 자동 결정 (commit 있으면 첫 commit의 branch, 없으면 HEAD branch)
 - Layer 2 body 조립 (`body_intro` + callout/checklist/toggle 부록) — `formatter.py` 확장
 - 연도 페이지/DB 자동 생성 (없으면)

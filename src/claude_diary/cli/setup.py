@@ -100,7 +100,7 @@ allowed-tools:
      - 같은 JSON 안의 tasks 배열 순서 (0-base) 기준
      - 선행 순서에만 사용. 없으면 빈 배열 `[]`
    - `categories`: 1~3개 (design/refactor/bugfix/test/docs/infra/discussion 등 자유 라벨)
-   - `project`: 현재 cwd의 폴더명
+   - `project`: 현재 명령 실행 cwd의 폴더명. `"unknown"`을 쓰지 말 것. 확실하지 않으면 생략하거나 빈 값으로 두면 CLI가 cwd에서 보정함
    - `user_prompts`, `files_modified`, `files_created`, `commands_run`, `errors`
    - `commit_hashes`: 이 task에 해당하는 commit (0개도 OK)
 
@@ -249,7 +249,8 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy
    - `depends_on_indices`: zero-based indices in this push, or `[]`
      - Use this only when the current task cannot proceed before another task is done
-   - `categories`, `project`, `user_prompts`, `files_modified`, `files_created`, `commands_run`, `commit_hashes`, `errors`
+   - `project`: current command cwd folder/repository name. Never write `"unknown"`; if you are not sure, omit the field or leave it empty so the CLI falls back to cwd.
+   - `categories`, `user_prompts`, `files_modified`, `files_created`, `commands_run`, `commit_hashes`, `errors`
 4. Create `.diary-notion-<8-random>.json` in cwd:
 
 ```json

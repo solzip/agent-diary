@@ -194,6 +194,56 @@ NotionViewsClient
 - `tests/test_setup.py`
 - `tests/test_codex_plugin.py`
 
+### Step 8. 생성 본문 품질 피드백
+
+실제 `$diary-notion`으로 생성된 Notion page body를 검토한 결과, 정보량은 충분하지만 읽기 UX가 아직 최종 형태에 미치지 못한다.
+
+확인된 문제:
+
+- `body_intro`, `summary_hints`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `risks`가 대부분 callout으로 렌더링되어 `<aside>`가 과도하게 많다.
+- callout이 많아지면서 중요한 결과와 보조 설명의 시각적 위계가 흐려진다.
+- “2단계 통합 결과물”처럼 범위가 큰 작업은 핵심 작업 단위가 상단에서 바로 보이지 않는다.
+- “false conflict 보정”처럼 문제 해결형 작업은 문제, 원인, 조치, 결과가 한 화면에 먼저 보여야 한다.
+- 중간 검증 기록과 최종 검증 기록이 함께 노출되면 최종 상태가 흐려진다. 최종 보고서 본문에는 최종 결과를 우선하고, 중간 과정은 부록으로 내려야 한다.
+- 사용자-facing 명령과 과거/internal 명령이 섞이면 사용자가 실제로 어떤 명령을 써야 하는지 혼동할 수 있다.
+
+다음 구현에서 적용할 본문 기준:
+
+- callout은 최상단 핵심 요약 1개와 정말 경고가 필요한 리스크에만 제한한다.
+- `요약` 섹션은 callout 여러 개가 아니라 결과 체크리스트 또는 짧은 bullet로 렌더링한다.
+- `작업 한눈에`는 `배경 / 범위 / 접근 / 결과`를 표 형태로 렌더링한다.
+- 문제 해결형 작업은 `문제 / 원인 / 조치 / 결과` 요약을 상단에 우선 배치한다.
+- 검증은 최종 상태만 본문에 노출하고, 중간 실행 결과는 부록에 둔다.
+- 주요 코드 변경, 파일, 명령어, Git, 발생 이슈, 원문 요청은 접힌 `부록`으로 유지한다.
+- 사용자-facing 명령은 `working-diary diary-notion ...` 또는 `$diary-notion` 기준으로 노출하고, 과거/internal 명령은 발생 근거가 필요할 때만 부록에 둔다.
+
+다음 구현 대상:
+
+- `src/claude_diary/formatter.py`의 `build_notion_blocks()` 렌더링 구조를 `compact executive body` 기준으로 조정한다.
+- `tests/test_formatter.py`에 callout 수 제한, 결과 체크리스트, 작업 상세 표, 접힌 부록 유지 테스트를 추가한다.
+- `skills/diary-notion/SKILL.md`와 설치용 embedded skill 지시문에 “callout 과다 사용 금지”와 “최종 상태 우선” 원칙을 반영한다.
+
+### Step 9. Project unknown 회귀 보정
+
+다른 Codex 세션에서 업데이트된 `$diary-notion`을 실행했을 때 Notion `Project` 값이 `unknown`으로 들어가는 문제가 확인됐다.
+
+원인:
+
+- skill 지시문은 `project`를 현재 cwd 폴더명으로 작성하라고 요구하지만, 에이전트가 다른 세션에서 이를 누락하거나 `"unknown"`으로 채울 수 있다.
+- `diary-notion push` CLI는 task JSON의 `project` 값을 그대로 사용했고, 누락/placeholder 값에 대해 cwd 기반 fallback을 수행하지 않았다.
+
+보정:
+
+- task JSON의 `project`가 없거나 `"unknown"` 또는 `"<cwd folder name>"` placeholder이면 CLI가 명령 실행 cwd의 마지막 폴더명을 `Project`로 사용한다.
+- skill 지시문에는 `"unknown"`을 쓰지 말고, 확실하지 않으면 필드를 생략하거나 빈 값으로 두라는 규칙을 추가한다.
+- README에는 `Project` 누락/unknown 시 cwd fallback이 적용된다는 운영 기준을 기록한다.
+
+회귀 테스트:
+
+- `_build_properties()`에서 `project` 누락 시 cwd 폴더명으로 보정되는지 검증한다.
+- `_build_properties()`에서 `"unknown"` 입력 시 cwd 폴더명으로 보정되는지 검증한다.
+- `cmd_notion_push()` 통합 경로에서 task JSON에 `project`가 없어도 Notion row property가 실제 cwd 폴더명으로 생성되는지 검증한다.
+
 ## 검증
 
 실행한 검증:
