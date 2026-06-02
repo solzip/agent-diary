@@ -9,7 +9,7 @@ Structure (on Notion):
      ├─ 2027
      └─ ...
 
-Used by `/diary-notion` and `$diary-notion` via `claude-diary notion push`.
+Used by `/diary-notion` and `$diary-notion` via `claude-diary diary-notion push`.
 Separate from the flat-mode NotionExporter (Stop Hook auto-push).
 
 Error handling policy:
@@ -32,7 +32,8 @@ NOTION_API_VERSION = "2022-06-28"
 NOTION_API_BASE = "https://api.notion.com/v1"
 MAX_RETRIES = 3
 RICH_TEXT_LIMIT = 2000
-SCHEMA_VERSION = "v4"
+SCHEMA_VERSION = "v5"
+DATABASE_TITLE = "Entries"
 
 
 class NotionAuthError(Exception):
@@ -51,7 +52,7 @@ class NotionHierarchicalExporter:
     """Pushes tasks to the year/database/row hierarchy.
 
     Unlike BaseExporter subclasses, this is invoked directly by the
-        `notion push` CLI with a list of tasks, not a single entry_data.
+        `diary-notion push` CLI with a list of tasks, not a single entry_data.
     """
 
     def __init__(self, config):
@@ -206,11 +207,11 @@ class NotionHierarchicalExporter:
         resp = self._request("POST", "/pages", body)
         return resp["id"]
 
-    def ensure_database(self, year):
+    def ensure_database(self, year, force_schema=False):
         """Get Entries database ID for a year, creating if missing.
 
         Also ensures the schema extensions (Purpose, Status, Task Group, Depends On,
-        Parent Task)
+        Parent Task, Work Period)
         are present — needed for older DBs created before those columns
         were part of the design. Tracked via cache so we only patch once.
         """
@@ -226,13 +227,58 @@ class NotionHierarchicalExporter:
 
         if db_id is None:
             year_page_id = self.ensure_year_page(year)
-            db_id = self._create_database(year_page_id)
+            db_id = self._find_child_database(year_page_id, DATABASE_TITLE)
+            if db_id is None:
+                db_id = self._create_database(year_page_id)
             notion_cache.set_database(self._cache, year, db_id)
 
-        self._ensure_db_schema_extensions(db_id)
+        self._ensure_db_schema_extensions(db_id, force=force_schema)
         return db_id
 
-    def _ensure_db_schema_extensions(self, db_id):
+    def resolve_existing_database(self, year):
+        """Return an existing Entries DB ID without creating or patching anything."""
+        cached = notion_cache.get_database(self._cache, year)
+        if cached:
+            try:
+                self._request("GET", "/databases/%s" % cached)
+                return cached
+            except NotionNotFound:
+                notion_cache.set_database(self._cache, year, None)
+
+        year_page_id = notion_cache.get_year_page(self._cache, year)
+        if year_page_id:
+            try:
+                self._request("GET", "/blocks/%s" % year_page_id)
+            except NotionNotFound:
+                notion_cache.invalidate_year(self._cache, year)
+                year_page_id = None
+
+        if not year_page_id:
+            year_page_id = self._find_child_page(self.root_page_id, str(year))
+        if not year_page_id:
+            return None
+
+        return self._find_child_database(year_page_id, DATABASE_TITLE)
+
+    def _find_child_database(self, parent_id, title):
+        """Scan parent's children for a child_database with matching title."""
+        cursor = None
+        while True:
+            path = "/blocks/%s/children?page_size=100" % parent_id
+            if cursor:
+                path += "&start_cursor=%s" % cursor
+            data = self._request("GET", path)
+            for block in data.get("results", []):
+                if block.get("type") != "child_database":
+                    continue
+                block_title = block.get("child_database", {}).get("title", "")
+                if block_title == title:
+                    return block["id"]
+            if not data.get("has_more"):
+                return None
+            cursor = data.get("next_cursor")
+
+    def _ensure_db_schema_extensions(self, db_id, force=False):
         """Add current schema extensions if not yet recorded in cache.
 
         Patching the same property twice is harmless (Notion treats existing
@@ -241,12 +287,27 @@ class NotionHierarchicalExporter:
         """
         schema_v = self._cache.setdefault("schema_v", {})
         current = schema_v.get(db_id)
-        if current == SCHEMA_VERSION:
+        if current == SCHEMA_VERSION and not force:
+            return
+        if current == SCHEMA_VERSION and force:
+            self._request("PATCH", "/databases/%s" % db_id, {
+                "properties": _current_schema_extensions(db_id)
+            })
+            schema_v[db_id] = SCHEMA_VERSION
+            return
+        if current == "v4":
+            self._request("PATCH", "/databases/%s" % db_id, {
+                "properties": {
+                    "Work Period": {"date": {}},
+                }
+            })
+            schema_v[db_id] = SCHEMA_VERSION
             return
         if current == "v3":
             self._request("PATCH", "/databases/%s" % db_id, {
                 "properties": {
                     "Parent Task": _self_relation(db_id),
+                    "Work Period": {"date": {}},
                 }
             })
             schema_v[db_id] = SCHEMA_VERSION
@@ -256,18 +317,13 @@ class NotionHierarchicalExporter:
                 "properties": {
                     "Purpose": {"select": {}},
                     "Parent Task": _self_relation(db_id),
+                    "Work Period": {"date": {}},
                 }
             })
             schema_v[db_id] = SCHEMA_VERSION
             return
         self._request("PATCH", "/databases/%s" % db_id, {
-            "properties": {
-                "Purpose": {"select": {}},
-                "Status": {"select": {}},
-                "Task Group": {"select": {}},
-                "Depends On": _self_relation(db_id),
-                "Parent Task": _self_relation(db_id),
-            }
+            "properties": _current_schema_extensions(db_id)
         })
         schema_v[db_id] = SCHEMA_VERSION
 
@@ -282,7 +338,7 @@ class NotionHierarchicalExporter:
         body = {
             "parent": {"type": "page_id", "page_id": parent_page_id},
             "is_inline": True,
-            "title": [{"text": {"content": "Entries"}}],
+            "title": [{"text": {"content": DATABASE_TITLE}}],
             "properties": {
                 "Name":        {"title": {}},
                 "Date":        {"date": {}},
@@ -408,4 +464,16 @@ def _self_relation(db_id):
             "type": "single_property",
             "single_property": {},
         }
+    }
+
+
+def _current_schema_extensions(db_id):
+    """Return the full current extension schema beyond the base DB columns."""
+    return {
+        "Purpose": {"select": {}},
+        "Status": {"select": {}},
+        "Task Group": {"select": {}},
+        "Depends On": _self_relation(db_id),
+        "Parent Task": _self_relation(db_id),
+        "Work Period": {"date": {}},
     }

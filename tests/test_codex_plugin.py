@@ -26,7 +26,7 @@ def test_codex_skills_exist_and_cover_diary_workflows():
 
     assert "working-diary write --input" in diary_text
     assert "claude-diary write --input" in diary_text
-    assert "working-diary notion push" in notion_text
+    assert "working-diary diary-notion push" in notion_text
     assert '"purpose": "Feature"' in notion_text
     assert '"summary_hints": ["..."]' in notion_text
     assert '"key_changes": ["..."]' in notion_text
@@ -37,6 +37,7 @@ def test_codex_skills_exist_and_cover_diary_workflows():
     assert '"verification": ["..."]' in notion_text
     assert '"risks": ["..."]' in notion_text
     assert '"support_needed": ["..."]' in notion_text
+    assert '"work_period": "2026-06-02"' in notion_text
     assert '"parent_index": null' in notion_text
     assert "Exclude full diffs" in notion_text
     assert "in Korean" in notion_text

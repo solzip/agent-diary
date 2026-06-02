@@ -499,6 +499,25 @@ class TestMain:
             main()
         mock_cmd.assert_called_once()
 
+    @patch("claude_diary.cli.cmd_notion_ensure")
+    def test_main_dispatches_diary_notion_ensure(self, mock_cmd, capsys):
+        with patch("sys.argv", ["claude-diary", "diary-notion", "ensure", "--year", "2026", "--dry-run"]):
+            main()
+        mock_cmd.assert_called_once()
+        args = mock_cmd.call_args.args[0]
+        assert args.action == "ensure"
+        assert args.year == 2026
+        assert args.dry_run is True
+
+    @patch("claude_diary.cli.cmd_notion_ensure")
+    def test_main_keeps_notion_ensure_alias(self, mock_cmd, capsys):
+        with patch("sys.argv", ["claude-diary", "notion", "ensure", "--dry-run"]):
+            main()
+        mock_cmd.assert_called_once()
+        args = mock_cmd.call_args.args[0]
+        assert args.action == "ensure"
+        assert args.dry_run is True
+
 
 # ── cmd_trace tests ──
 

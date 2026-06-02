@@ -1,4 +1,4 @@
-"""Tests for `claude-diary notion push` CLI."""
+"""Tests for `claude-diary diary-notion push` CLI."""
 
 import json
 import os
@@ -13,6 +13,7 @@ from claude_diary.cli.notion_push import (
     _build_properties,
     _gather_git_info,
     _normalize_purpose,
+    _normalize_work_period,
     _read_json,
 )
 from claude_diary.exporters.notion_hierarchical import (
@@ -107,6 +108,7 @@ class TestBuildProperties:
         props = _build_properties(task, "2026-05-26", "feat/x", git_info, "sess1", 0)
         assert props["Name"]["title"][0]["text"]["content"] == "DB 결정"
         assert props["Date"]["date"]["start"] == "2026-05-26"
+        assert props["Work Period"]["date"]["start"] == "2026-05-26"
         assert props["Project"]["select"]["name"] == "diary"
         assert props["Purpose"]["select"]["name"] == "Feature"
         assert props["Branch"]["select"]["name"] == "feat/x"
@@ -168,6 +170,31 @@ class TestBuildProperties:
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
         assert "Depends On" not in props
         assert "Parent Task" not in props
+
+    def test_work_period_range_included(self):
+        task = dict(self._base_task(), work_period={"start": "2026-05-25", "end": "2026-05-26"})
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert props["Work Period"]["date"] == {
+            "start": "2026-05-25",
+            "end": "2026-05-26",
+        }
+
+
+class TestNormalizeWorkPeriod:
+    def test_missing_falls_back_to_date(self):
+        assert _normalize_work_period(None, "2026-05-26") == {"start": "2026-05-26"}
+
+    def test_string_date(self):
+        assert _normalize_work_period("2026-05-25", "2026-05-26") == {"start": "2026-05-25"}
+
+    def test_string_range(self):
+        assert _normalize_work_period("2026-05-25..2026-05-26", "2026-05-26") == {
+            "start": "2026-05-25",
+            "end": "2026-05-26",
+        }
+
+    def test_invalid_falls_back(self):
+        assert _normalize_work_period("not-a-date", "2026-05-26") == {"start": "2026-05-26"}
 
 
 class TestDependsOnWiring:

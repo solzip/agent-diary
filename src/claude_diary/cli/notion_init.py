@@ -1,4 +1,4 @@
-"""`claude-diary notion init` — interactive Notion setup.
+"""`claude-diary diary-notion init` — interactive Notion setup.
 
 Walks the user through:
   1. Pasting their integration token (https://www.notion.so/my-integrations)
