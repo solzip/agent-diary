@@ -42,11 +42,13 @@ $diary-notion
 추가 명령은 필요할 때만 실행한다.
 
 ```bash
-working-diary notion views ensure
-working-diary notion sync-status --dry-run
+working-diary notion ensure
 working-diary notion today-plan
 working-diary notion review
+working-diary notion weekly-brief
 ```
+
+최종 모델에서도 사용자-facing 명령은 최소화한다. Notion 기반 정비는 `working-diary notion ensure` 하나를 기본 진입점으로 두고, schema/view/status/drift 관련 세부 작업은 내부 단계와 옵션으로 확장한다.
 
 최종적으로 사용자는 Notion DB를 열어 다음을 확인할 수 있어야 한다.
 
@@ -219,13 +221,63 @@ Task Group = diary-notion-view-design
 
 - 오래 방치된 작업을 찾는다.
 - 반복되는 리스크를 요약한다.
+- schema/view conflict를 drift 관리 대상으로 분류하고 해결 계획을 제안한다.
 - `Project` 또는 `Task Group`별 `Work Period`의 최소 시작일과 최대 종료일을 계산해 실제 작업 기간을 제안한다.
 - 전날/최근 N일의 미완료 todo와 `next_steps`를 수집한다.
 - `Depends On`, `Blocked`, `Status`, `Task Group` 연속성을 반영해 오늘 우선순위를 제안한다.
 - 다음 액션 후보를 제안한다.
 - 상사 보고용 daily/weekly brief를 생성한다.
 
-리뷰 엔진은 기본적으로 제안만 한다. 실제 Status/Priority 변경은 별도 apply 단계가 필요하다.
+리뷰 엔진은 기본적으로 제안만 한다. 실제 Status/Priority/schema/view 변경은 별도 apply 단계가 필요하다.
+
+### 5.4 Conflict / Drift 관리
+
+최종 모델에서 conflict는 단순 실패 메시지가 아니라 시스템 drift 관리 대상이다.
+
+기본 흐름:
+
+```text
+Conflict 감지
+→ 원인 분류
+→ 해결 계획 제안
+→ dry-run 출력
+→ 사용자 승인 시 apply
+→ 변경 내역 기록
+```
+
+명령 방향:
+
+```bash
+working-diary notion ensure
+working-diary notion ensure --plan
+working-diary notion ensure --apply
+working-diary notion ensure --force
+```
+
+동작:
+
+- `notion ensure`: conflict를 감지하고 이유와 수동 해결 안내를 출력한다.
+- `notion ensure --plan`: 어떤 view/schema를 어떻게 고칠지 변경 계획만 출력한다.
+- `notion ensure --apply`: 사용자가 승인한 변경만 적용한다.
+- `notion ensure --force`: 시스템이 관리하는 view만 재생성하거나 업데이트한다.
+
+conflict 유형:
+
+| 유형 | 예시 | 기본 처리 |
+|------|------|-----------|
+| Name conflict | 같은 이름 view가 있지만 type/filter/group이 다름 | conflict, exit 1 |
+| Required setting conflict | `오늘 작업`에 today filter 없음 | conflict, exit 1 |
+| Presentation drift | column width, group order, wrap 차이 | warning |
+| Unsupported capability | `subtasks` API 실패 | fallback + warning |
+| Schema conflict | `Work Period` 누락 | schema ensure로 보강, 실패 시 exit 1 |
+
+원칙:
+
+- 자동화는 감지와 제안까지 기본값이다.
+- 수정은 `--apply` 또는 `--force`가 있어야 한다.
+- 사용자 수동 view는 기본적으로 보호한다.
+- conflict 해결을 위해 `오늘 작업 (Generated)` 같은 대체 view를 자동 생성하지 않는다.
+- 반복 conflict는 review/weekly brief에서 내부 운영 리스크로 요약할 수 있지만, 상사 보고용 핵심 성과와는 분리한다.
 
 ## 6. Phase Roadmap
 
@@ -246,7 +298,7 @@ Task Group = diary-notion-view-design
 예상 명령:
 
 ```bash
-working-diary notion views ensure
+working-diary notion ensure
 ```
 
 Core Views:
@@ -284,14 +336,17 @@ View 자동화는 push 실패와 분리한다. view 생성/갱신 실패가 작�
 예상 명령:
 
 ```bash
-working-diary notion sync-status --dry-run
-working-diary notion sync-status
+working-diary notion ensure --dry-run
+working-diary notion ensure --apply
 ```
 
 기능 후보:
 
 - 하위 작업 기반 진행률 계산
 - 선행 작업 기반 blocked 탐지
+- schema/view conflict 유형 분류
+- conflict dry-run plan 출력
+- 반복 conflict 추적
 - `Project`/`Task Group`별 실제 작업 기간 계산
 - `Work Period` 기반 work days 계산
 - 오래 방치된 작업 탐지
@@ -318,6 +373,7 @@ working-diary notion weekly-brief
 - 프로젝트별 이번 주 요약과 실제 작업 기간 요약
 - 다음 작업 우선순위 추천
 - 반복 이슈 탐지
+- weekly review에 view/schema drift 요약
 - 상사 보고용 brief 생성
 - 다음 세션 시작용 handoff 생성
 
@@ -347,6 +403,9 @@ working-diary notion weekly-brief
 - commit/PR 기준 작업 회고
 - 여러 프로젝트의 오늘 우선순위 통합
 - 로컬 Markdown diary와 Notion DB 양방향 참조
+- 여러 Notion DB/프로젝트의 schema/view drift 관리
+- 시스템 관리 view와 사용자 view 분리
+- 승인 기반 apply/force 운영
 
 ## 7. Non-goals
 
