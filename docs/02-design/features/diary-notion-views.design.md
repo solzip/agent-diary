@@ -166,19 +166,26 @@ Working Diary OS
 
 정렬/그룹:
 
-- 가능하면 `Parent Task` 기반 sub-item 표시를 활성화한다.
-- sub-item UI 자동화가 API 제약으로 어렵다면, MVP에서는 `Parent Task` 컬럼 표시와 `Task Group` 정렬/그룹으로 대체한다.
+- `Parent Task` 컬럼 표시는 required다.
+- `Work Period` 컬럼 표시는 required다.
+- `subtasks` configuration 적용은 시도하되, Notion UI의 접기/펼치기 렌더링 성공은 best-effort다.
+- sub-item UI 자동화가 API 제약으로 실패하면 `subtasks`를 제거한 base table view로 fallback한다.
 
 필수 성공 기준:
 
 - `작업 계층` view가 생성된다.
 - `Parent Task` 컬럼이 표시된다.
+- `Work Period` 컬럼이 표시된다.
 - 메인 작업과 하위 작업의 포함 관계를 view에서 확인할 수 있다.
 
 Best-effort 기준:
 
 - Notion table의 접기/펼치기 sub-item UI를 활성화한다.
-- sub-item UI 설정 실패는 전체 `views ensure` 실패로 보지 않고 warning으로 보고한다.
+- sub-item UI 설정 실패 후 base table fallback이 성공하면 전체 `views ensure` 실패로 보지 않고 warning으로 보고한다.
+
+실패 기준:
+
+- fallback base table view까지 생성에 실패하면 core view 생성 실패로 보고 exit 1을 반환한다.
 
 ### 3.2 오늘 작업
 
@@ -455,7 +462,7 @@ Required:
 - hidden property 숨김
 - view별 최소 filter/sort/group
 - `Work Period` 컬럼 표시
-- `작업 계층` view의 `Parent Task` 기반 subtask configuration payload 구성
+- `작업 계층` view의 `Parent Task` 컬럼 표시
 
 Required mismatch:
 
@@ -470,6 +477,7 @@ Required mismatch:
 
 Best-effort:
 
+- `작업 계층` view의 `Parent Task` 기반 subtask configuration payload 구성
 - Notion UI의 접기/펼치기 sub-item 렌더링이 실제 workspace에서 기대대로 활성화되는지
 - group order 세부 순서
 - column width, frozen column, wrap, vertical line 같은 presentation detail
@@ -477,17 +485,27 @@ Best-effort:
 
 Best-effort mismatch는 warning만 남기고 실패로 보지 않는다.
 
-`subtasks`는 API상 table configuration의 일부로 지원되므로 생성 payload에는 포함한다. 다만 workspace/API 버전/권한/Notion 동작 차이로 sub-item UI 설정이 거절되거나 기대와 다르게 보일 수 있으므로, 이 실패는 2차 MVP의 전체 실패가 아니라 warning으로 처리한다.
+`subtasks`는 API상 table configuration의 일부로 지원되므로 생성 payload에는 우선 포함한다. 다만 workspace/API 버전/권한/Notion 동작 차이로 sub-item UI 설정이 거절되거나 기대와 다르게 보일 수 있으므로, 이 실패는 2차 MVP의 전체 실패가 아니라 warning으로 처리한다.
+
+`subtasks` 포함 create/update가 실패하면 CLI는 `subtasks`를 제거한 base table view 생성으로 fallback한다. fallback view가 생성되면 전체 명령은 성공으로 처리하되 warning을 출력한다. base table view 생성까지 실패하면 core view 생성 실패로 보고 exit 1을 반환한다.
 
 Core view별 required 설정:
 
 | View | Required 설정 |
 |------|---------------|
-| 작업 계층 | `table`, 핵심 properties 표시, `Parent Task` 표시, `Work Period` 표시, `subtasks.property_id = Parent Task`, `display_mode = show`, `filter_scope = parents_and_subitems` |
+| 작업 계층 | `table`, 핵심 properties 표시, `Parent Task` 표시, `Work Period` 표시 |
 | 오늘 작업 | `table`, `Date = today` filter, `Date desc` sort, `Work Period` 표시, 핵심 properties 표시 |
 | 상태별 | `table`, `Status` group_by, `Work Period` 표시, 핵심 properties 표시 |
 | 목적별 | `table`, `Purpose` group_by, `Work Period` 표시, 핵심 properties 표시 |
 | 프로젝트별 | `table`, `Project` group_by, `Work Period` 표시, 핵심 properties 표시 |
+
+작업 계층 view의 best-effort 설정:
+
+| 설정 | 기준 |
+|------|------|
+| `subtasks.property_id` | `Parent Task` relation property id |
+| `display_mode` | `show` |
+| `filter_scope` | `parents_and_subitems` |
 
 모든 core view에서 기본적으로 숨긴다:
 
@@ -611,7 +629,8 @@ Partial failure → 성공/실패 view를 나눠 보고
 | 일부 core view 실패 | 1 | 없음 | partial failure |
 | 인증/권한 실패 | 1 | 없음 | 전제 실패 |
 | DB/schema 보장 실패 | 1 | 없음 | 전제 실패 |
-| sub-item UI 설정 실패 | 0 | 없음 | best-effort warning |
+| `subtasks` 설정 실패 후 base table fallback 성공 | 0 | 없음 | best-effort warning |
+| `subtasks` 설정 실패 후 base table fallback 실패 | 1 | 없음 | core view 생성 실패 |
 
 정책:
 
@@ -619,7 +638,8 @@ Partial failure → 성공/실패 view를 나눠 보고
 - 기존 view가 required 설정을 충족하지 못하면 conflict로 보고 exit 1을 반환한다.
 - 이미 생성된 view는 rollback하지 않는다.
 - rollback이 기존 사용자 view나 새로 생성된 정상 view를 건드릴 수 있으므로 더 위험하다.
-- sub-item UI 설정 실패는 best-effort warning이며 exit code에 영향을 주지 않는다.
+- `subtasks` 설정 실패 후 base table fallback이 성공하면 best-effort warning이며 exit code에 영향을 주지 않는다.
+- base table fallback까지 실패하면 core view 생성 실패이므로 exit 1을 반환한다.
 - warning은 CLI 출력에 남겨 사용자가 추후 수동 설정하거나 후속 개선을 요청할 수 있게 한다.
 
 내부 결과 모델 후보:
@@ -630,7 +650,7 @@ Partial failure → 성공/실패 view를 나눠 보고
     "verified": ["상태별"],
     "conflicts": [("목적별", "missing Purpose group_by")],
     "failed": [("프로젝트별", "Notion API 400 ...")],
-    "warnings": [("작업 계층", "sub-item UI unsupported")]
+    "warnings": [("작업 계층", "subtasks fallback: base table created")]
 }
 ```
 
@@ -647,7 +667,7 @@ Views:
   x 목적별 -- conflict: missing Purpose group_by
   = 프로젝트별 (verified)
 Warnings:
-  ! 작업 계층 sub-item UI not enabled: unsupported by current API
+  ! 작업 계층 subtasks not enabled: base table fallback created
 ```
 
 ---
@@ -705,6 +725,7 @@ src/claude_diary/exporters/notion_views.py
 - existing views 조회
 - existing views required 설정 검증
 - missing views 생성
+- `subtasks` 포함 작업 계층 view 생성 실패 시 base table fallback
 
 ### Step 5. 테스트
 
@@ -719,7 +740,8 @@ src/claude_diary/exporters/notion_views.py
 - partial failure를 report
 - conflict가 있으면 exit 1
 - 일부 core view 실패 시 exit 1
-- sub-item UI best-effort 실패는 warning만 남기고 exit 0
+- `subtasks` 설정 실패 후 base table fallback 성공 시 warning만 남기고 exit 0
+- `subtasks` 설정 실패 후 base table fallback 실패 시 exit 1
 - credential missing 시 안내
 - 기존 row를 수정하지 않음
 - push 경로와 view 경로가 분리되어 있음
