@@ -43,6 +43,7 @@ $diary-notion
 
 ```bash
 working-diary notion ensure
+working-diary notion ensure --dry-run
 working-diary notion today-plan
 working-diary notion review
 working-diary notion weekly-brief
@@ -249,6 +250,7 @@ Conflict 감지
 
 ```bash
 working-diary notion ensure
+working-diary notion ensure --dry-run
 working-diary notion ensure --plan
 working-diary notion ensure --apply
 working-diary notion ensure --force
@@ -257,6 +259,7 @@ working-diary notion ensure --force
 동작:
 
 - `notion ensure`: conflict를 감지하고 이유와 수동 해결 안내를 출력한다.
+- `notion ensure --dry-run`: 생성/수정 없이 현재 상태 기준 계획만 출력한다.
 - `notion ensure --plan`: 어떤 view/schema를 어떻게 고칠지 변경 계획만 출력한다.
 - `notion ensure --apply`: 사용자가 승인한 변경만 적용한다.
 - `notion ensure --force`: 시스템이 관리하는 view만 재생성하거나 업데이트한다.
