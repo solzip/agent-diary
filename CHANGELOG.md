@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **중립 CLI alias**: `working-diary` 명령을 `claude-diary`와 동일하게 제공
 - **DB 자동 생성 스키마**: Name, Date, Project, Purpose, Branch, Status, Task Group, Parent Task, Categories, Files, Commits, Lines, Depends On, Session ID, Task Index
 - **Notion 작업 DB 관계 구조**: `Parent Task` self-relation을 추가해 포함 관계를 DB 컬럼에 기록하고, 기존 `Depends On`은 선행 관계로 유지
-- **접힌 근거 중심 Notion 본문**: page body를 callout/checklist/toggle 기반으로 압축해 상단은 요약과 상태, 부록은 코드·파일·명령어·Git·원문 요청 근거로 분리
+- **접힌 근거 중심 Notion 본문**: page body를 핵심 callout 1개, 결과 체크리스트, 작업 한눈에 표, 영향 bullet, 검증 checklist, 리스크/다음 액션, 접힌 부록 구조로 압축
 - **Working Diary OS 비전 문서**: Structure → Views → Operations → Intelligence → Multi-project OS로 확장하는 최고모델 설계, 최소 명령 원칙, 전날 todo 기반 `today-plan`, schema/view conflict drift 관리 방향 추가
 - **2차 View 설계 문서**: `working-diary diary-notion ensure`, `--year`, `--dry-run`과 Core Views 5개, `Work Period` 기반 schema v5 방향, `작업 그룹별` follow-up, 운영/지능화 view 분리 기준, 하위 항목 데이터 구조, sub-item UI best-effort/fallback, partial failure/exit code 정책 정리
 - **`working-diary diary-notion ensure` 구현**: schema v5 `Work Period` 보장, Core Views 5개 생성/검증, `--year`, `--dry-run`, non-destructive conflict reporting 지원
@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - `cli/setup.py` 일반화: `SLASH_COMMANDS` dict로 다중 슬래시 커맨드 관리
-- `formatter.py`: Notion API blocks 빌더 (`build_notion_blocks`) 추가 및 의미 섹션 렌더링 보강
+- `formatter.py`: Notion API blocks 빌더 (`build_notion_blocks`) 추가 및 compact executive body 렌더링 보강
 - 설계 문서: [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md)
 
 ## [4.1.0] - 2026-03-17 (Phase D)

@@ -65,6 +65,12 @@ allowed-tools:
      - transcript에 없는 내용 추가 금지 (추측 X)
      - markdown 강조(`**굵게**`, `` `코드` ` ` ) 사용 OK
    - Notion 작업 DB 기록처럼 작성. 상단은 짧게, 구조는 DB relation으로, 원자료는 본문 부록에 접어두는 기준
+   - 본문 렌더링 기준:
+     - `body_intro`는 최상단 핵심 요약 callout 1개로만 사용
+     - `summary_hints`는 여러 callout이 아니라 checked 결과 항목으로 렌더링되므로 최종 결과만 작성
+     - `work_context`, `work_scope`, `approach`, `outcome`은 `작업 한눈에` 표로 렌더링되므로 각각 짧게 작성
+     - `verification`에는 최종 검증 상태를 우선 작성하고, 중간 명령 이력은 부록 근거로 이동
+     - `risks`는 하나의 warning callout으로 합쳐지므로 간결하게 작성
    - `summary_hints`: 작업 결과/의미 요약 최대 3개. 단순 파일 나열이 아니라 무엇이 달라졌는지 기록
    - `key_changes`: 개발자가 이 일지만 봐도 흐름을 이해할 수 있는 주요 변경사항 최대 3개
    - `work_context`: 왜 이 작업을 시작했는지 0~1개
@@ -225,7 +231,13 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `title`: concise Korean noun phrase, no prefix or period
    - `body_intro`: 1-3 factual Korean sentences based only on observed work
    - Write it like a Notion task database record: compact top summary, structured relations in DB properties, and raw evidence hidden in the page body appendix
-   - `summary_hints`: up to 3 outcome-focused bullets that explain what changed and why it matters
+   - Body rendering policy:
+     - Use `body_intro` as the only top summary callout
+     - Treat `summary_hints` as checked result items, not repeated callouts
+     - Keep `work_context`, `work_scope`, `approach`, and `outcome` short because they render as a compact "work at a glance" table
+     - Put final verification state in `verification`; move intermediate command history to appendix evidence
+     - Keep risks concise; multiple risks are combined into one warning callout
+   - `summary_hints`: up to 3 outcome-focused result items that explain what changed and why it matters
    - `key_changes`: up to 3 major behavior/schema/workflow changes a developer can understand without opening the diff
    - `work_context`: 0-1 bullet explaining why this work started
    - `work_scope`: 0-1 bullet explaining what changed

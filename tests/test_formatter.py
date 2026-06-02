@@ -100,6 +100,12 @@ class TestFormatDailyHeader:
 def _block_text(block):
     """Helper: extract content string from a Notion block."""
     btype = block["type"]
+    if btype == "table_row":
+        cells = block["table_row"]["cells"]
+        return " | ".join(
+            "".join(r["text"]["content"] for r in cell)
+            for cell in cells
+        )
     if "rich_text" not in block[btype]:
         return ""
     rt = block[btype]["rich_text"]
@@ -158,33 +164,66 @@ class TestBuildNotionBlocks:
         headings = [_block_text(b) for b in blocks if b["type"] == "heading_2"]
 
         assert texts[0] == "Implemented richer Notion body content."
-        assert "Summary" in headings
+        assert "Results" in headings
         assert "Work Snapshot" in headings
         assert "Impact" in headings
-        assert "Validation and Status" in headings
-        assert "Next Actions" in headings
+        assert "Verification" in headings
+        assert "Risks / Next Actions" in headings
         assert "Appendix" in headings
         assert "Added structured body sections" in texts
         assert "Key Changes: Notion entries now read as developer work records" in texts
-        assert "Context: The previous body looked like a raw log." in texts
+        assert "Context | The previous body looked like a raw log." in texts
         assert "Impact" in headings
         assert "Managers can scan the result quickly" in texts
         assert "Code Change Highlights: `formatter.py`: renders high-signal code change bullets without full diff" in texts
         assert "pytest passed" in texts
-        assert "Notes / Risks: Existing sessions need refreshed installed commands" in texts
+        assert "Existing sessions need refreshed installed commands" in texts
         assert "Next Steps: Install refreshed Codex skills" in texts
         assert "Developer Evidence" in texts
         assert "Original Requests" in texts
-        assert texts.index("Summary") < texts.index("Appendix")
+        assert texts.index("Results") < texts.index("Appendix")
 
     def test_rich_notion_body_limits_summary_bullets(self):
         blocks = build_notion_blocks({
             "summary_hints": ["summary-%d" % i for i in range(9)],
         }, lang="en")
-        texts = [_block_text(b) for b in blocks]
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
 
         assert "summary-2" in texts
         assert "summary-3" not in texts
+        assert [b["type"] for b in blocks[:4]] == ["heading_2", "to_do", "to_do", "to_do"]
+
+    def test_work_snapshot_uses_table_not_callouts(self):
+        blocks = build_notion_blocks({
+            "work_context": "Started from UX feedback.",
+            "work_scope": "Changed the Notion body renderer.",
+            "approach": "Use a compact table.",
+            "outcome": "The page scans faster.",
+        }, lang="en")
+        flat = list(_flatten_blocks(blocks))
+        texts = [_block_text(b) for b in flat]
+
+        assert "Work Snapshot" in texts
+        assert any(b["type"] == "table" for b in blocks)
+        assert "Item | Content" in texts
+        assert "Context | Started from UX feedback." in texts
+        assert not any(b["type"] == "callout" for b in blocks)
+
+    def test_callout_count_is_limited_to_intro_and_combined_risks(self):
+        blocks = build_notion_blocks({
+            "body_intro": "핵심 요약.",
+            "summary_hints": ["결과 1", "결과 2"],
+            "work_context": "배경.",
+            "impact": ["영향 1", "영향 2"],
+            "verification": ["검증 1"],
+            "risks": ["리스크 1", "리스크 2"],
+            "next_steps": ["다음 작업"],
+        })
+        callouts = [b for b in _flatten_blocks(blocks) if b["type"] == "callout"]
+
+        assert len(callouts) == 2
+        assert _block_text(callouts[0]) == "핵심 요약."
+        assert _block_text(callouts[1]) == "리스크 1\n리스크 2"
 
     def test_code_changes_alias_limits_to_three_bullets(self):
         blocks = build_notion_blocks({
