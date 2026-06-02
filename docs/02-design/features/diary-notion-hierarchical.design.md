@@ -94,6 +94,8 @@
 
 → 표시 13개 + hidden 2개 = 총 15개. 의미 요약은 컬럼이 아닌 compact body(`body_intro` + callout/checklist/toggle 부록)로 노출.
 
+2차 View 설계에서는 이 v4 모델을 확장해 `Work Period` date range 컬럼을 추가하는 schema v5를 사용한다. `Date`는 기록일로 유지하고, `Work Period`는 프로젝트/작업 그룹의 실제 작업 기간 계산 재료로 사용한다.
+
 **Purpose (select)**:
 - 영어 enum 사용: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, `General`
 - Notion에서 목적별 필터/그룹을 보장하는 1차 분류. 자동 view 생성은 후속 단계로 분리.
