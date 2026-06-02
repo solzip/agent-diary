@@ -47,7 +47,8 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy
    - `depends_on_indices`: zero-based indices in this push, or `[]`
      - Use this only when the current task cannot proceed before another task is done
-   - `categories`, `project`, `user_prompts`, `files_modified`, `files_created`, `commands_run`, `commit_hashes`, `errors`
+   - `project`: current command cwd folder/repository name. Never write `"unknown"`; if you are not sure, omit the field or leave it empty so the CLI falls back to cwd.
+   - `categories`, `user_prompts`, `files_modified`, `files_created`, `commands_run`, `commit_hashes`, `errors`
 4. Create `.diary-notion-<8-random>.json` in cwd:
 
 ```json
