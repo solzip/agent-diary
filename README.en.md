@@ -133,7 +133,7 @@ Push the current session to a hierarchical Notion database as task-sized rows. U
          └── ...
 ```
 
-Rows include filterable/groupable/relational columns for `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Branch`, `Status`, `Work Period`, and `Categories`. Run `working-diary diary-notion ensure` to create or verify the 5 core Notion views.
+Rows include filterable/groupable/relational columns for `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Branch`, `Status`, `Work Period`, and `Categories`. `Project` is the command cwd folder name; if a task JSON omits it or writes `unknown`, the CLI falls back to the cwd folder. Run `working-diary diary-notion ensure` to create or verify the 5 core Notion views.
 `Parent Task` represents containment, while `Depends On` represents prerequisite order. Each Notion page body stays compact with callouts/checklists, and developer evidence such as code changes, files, commands, Git, and original prompts is hidden in appendix toggles. Code changes are high-signal summaries, not full diffs; include only behavior, schema, CLI, user workflow, or verification-scope changes.
 Titles and narrative body content are written in Korean. File paths, commands, branches, commit hashes, code identifiers, and `Purpose`/`Status` enum values remain literal or English.
 
