@@ -273,6 +273,7 @@ Operations/Intelligence views:
 
 - 메인 작업과 하위 작업의 `Parent Task` 데이터 구조는 2차에서 필수로 보장한다.
 - Notion의 접기/펼치기 sub-item UI는 최종 목표이며 2차에서는 best-effort로 활성화한다.
+- sub-item UI 설정이 실패하면 `Parent Task`와 `Work Period`가 표시되는 base table view로 fallback한다.
 
 View 자동화는 push 실패와 분리한다. view 생성/갱신 실패가 작업 기록 실패로 이어지면 안 된다.
 
