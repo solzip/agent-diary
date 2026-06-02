@@ -180,6 +180,8 @@ def _wire_parent_tasks(exporter, tasks, row_ids):
         parent_idx = _get_parent_index(task)
         if parent_idx is None:
             continue
+        if parent_idx == idx:
+            continue  # a task cannot contain itself (mirrors depends_on guard)
         my_row = row_ids.get(idx)
         parent_row = row_ids.get(parent_idx)
         if not my_row or not parent_row:
