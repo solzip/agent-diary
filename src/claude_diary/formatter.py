@@ -119,12 +119,12 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
     """Build Notion API block list for a task page body.
 
     Body layout:
-      [body_intro callout]
-      ## 요약                 - up to 3 outcome-focused callouts
-      ## 작업 한눈에          - context/scope/approach/outcome callouts
-      ## 영향                 - impact callouts
-      ## 검증 및 상태         - checked verification items + risk callouts
-      ## 다음 액션            - unchecked next-step/support items
+      [body_intro callout]   - one top-level executive summary
+      ## 결과                 - up to 3 checked outcome items
+      ## 작업 한눈에          - context/scope/approach/outcome table
+      ## 영향                 - impact bullets
+      ## 검증                 - checked verification items
+      ## 리스크 / 다음 액션    - one risk callout + unchecked next-step/support items
       ## 부록                 - collapsed developer/raw evidence toggles
 
     Skipped sections render no heading (page doesn't get noisy with empty heads).
@@ -137,20 +137,11 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
     if intro:
         blocks.append(_callout(intro, "📌"))
 
-    _add_callout_section(
-        blocks,
-        L("brief_summary"),
-        task.get("summary_hints") or task.get("summary"),
-        3,
-        "✅",
-    )
-
+    _add_results_section(blocks, task, L)
     _add_snapshot_section(blocks, task, L)
-
-    _add_callout_section(blocks, L("impact"), task.get("impact"), 3, "📈")
-
-    _add_validation_section(blocks, task, L)
-    _add_next_actions_section(blocks, task, L)
+    _add_bullet_section(blocks, L("impact"), task.get("impact"), 3)
+    _add_verification_section(blocks, task, L)
+    _add_risks_next_actions_section(blocks, task, L)
 
     appendix = _build_appendix_blocks(task, git_info, L)
     if appendix:
@@ -160,42 +151,54 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
     return blocks
 
 
+def _add_results_section(blocks, task, L):
+    items = _limited_texts(task.get("summary_hints") or task.get("summary"), 3)
+    if not items:
+        items = _limited_texts(task.get("outcome"), 1)
+    if not items:
+        return
+    blocks.append(_heading(L("results")))
+    for item in items:
+        blocks.append(_to_do(item, checked=True))
+
+
 def _add_snapshot_section(blocks, task, L):
     pairs = [
-        (L("context"), task.get("work_context") or task.get("context"), "🧭"),
-        (L("scope"), task.get("work_scope") or task.get("scope"), "🧩"),
-        (L("approach"), task.get("approach"), "🛠️"),
-        (L("outcome"), task.get("outcome"), "🎯"),
+        (L("context"), task.get("work_context") or task.get("context")),
+        (L("scope"), task.get("work_scope") or task.get("scope")),
+        (L("approach"), task.get("approach")),
+        (L("outcome"), task.get("outcome")),
     ]
-    section_blocks = []
-    for label, value, icon in pairs:
+    rows = [[L("item"), L("content")]]
+    for label, value in pairs:
         texts = _limited_texts(value, 1)
         if texts:
-            section_blocks.append(_callout("%s: %s" % (label, texts[0]), icon))
-    if section_blocks:
+            rows.append([label, texts[0]])
+    if len(rows) > 1:
         blocks.append(_heading(L("work_snapshot")))
-        blocks.extend(section_blocks)
+        blocks.append(_table(rows))
 
 
-def _add_validation_section(blocks, task, L):
+def _add_verification_section(blocks, task, L):
     section_blocks = []
     for v in _limited_texts(task.get("verification"), 3):
         section_blocks.append(_to_do(v, checked=True))
-    for r in _limited_texts(task.get("risks") or task.get("cautions"), 2):
-        section_blocks.append(_callout("%s: %s" % (L("risks"), r), "⚠️"))
     if section_blocks:
-        blocks.append(_heading(L("validation_status")))
+        blocks.append(_heading(L("verification")))
         blocks.extend(section_blocks)
 
 
-def _add_next_actions_section(blocks, task, L):
+def _add_risks_next_actions_section(blocks, task, L):
     section_blocks = []
+    risks = _limited_texts(task.get("risks") or task.get("cautions"), 2)
+    if risks:
+        section_blocks.append(_callout("\n".join(risks), "⚠️"))
     for n in _limited_texts(task.get("next_steps"), 2):
         section_blocks.append(_to_do("%s: %s" % (L("next_steps"), n), checked=False))
     for s in _limited_texts(task.get("support_needed"), 1):
         section_blocks.append(_to_do("%s: %s" % (L("support_needed"), s), checked=False))
     if section_blocks:
-        blocks.append(_heading(L("next_actions")))
+        blocks.append(_heading(L("risks_next_actions")))
         blocks.extend(section_blocks)
 
 
@@ -365,6 +368,33 @@ def _to_do(text, checked=False):
         "to_do": {
             "rich_text": _rich_text(text),
             "checked": checked,
+        },
+    }
+
+
+def _table(rows):
+    width = len(rows[0]) if rows else 0
+    return {
+        "object": "block",
+        "type": "table",
+        "table": {
+            "table_width": width,
+            "has_column_header": True,
+            "has_row_header": False,
+            "children": [_table_row(row, width) for row in rows],
+        },
+    }
+
+
+def _table_row(cells, width):
+    normalized = list(cells[:width])
+    while len(normalized) < width:
+        normalized.append("")
+    return {
+        "object": "block",
+        "type": "table_row",
+        "table_row": {
+            "cells": [_rich_text(cell) for cell in normalized],
         },
     }
 

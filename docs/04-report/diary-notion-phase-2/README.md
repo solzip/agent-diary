@@ -244,6 +244,37 @@ NotionViewsClient
 - `_build_properties()`에서 `"unknown"` 입력 시 cwd 폴더명으로 보정되는지 검증한다.
 - `cmd_notion_push()` 통합 경로에서 task JSON에 `project`가 없어도 Notion row property가 실제 cwd 폴더명으로 생성되는지 검증한다.
 
+### Step 10. Compact executive body 구현
+
+실제 생성된 Notion 본문에서 callout이 과도하게 많아 읽기 위계가 흐려지는 문제를 보정했다.
+
+변경된 본문 구조:
+
+- `body_intro`: 최상단 핵심 요약 callout 1개
+- `결과`: `summary_hints`를 checked todo로 렌더링
+- `작업 한눈에`: `배경 / 범위 / 접근 / 결과`를 2열 table로 렌더링
+- `영향`: bullet list로 렌더링
+- `검증`: checked todo로 렌더링
+- `리스크 / 다음 액션`: 여러 risk를 하나의 warning callout으로 합치고, next step/support는 unchecked todo로 렌더링
+- `부록`: 개발 근거와 원문 요청 toggle 유지
+
+보정 기준:
+
+- callout은 기본적으로 최상단 요약 1개와 risk callout 1개만 사용한다.
+- 중간 검증 기록보다 최종 검증 상태를 본문에 우선 노출한다.
+- 코드 변경, 파일, 명령어, Git, 원문 요청은 본문 중심부가 아니라 접힌 부록으로 유지한다.
+
+수정 파일:
+
+- `src/claude_diary/formatter.py`
+- `src/claude_diary/i18n.py`
+- `tests/test_formatter.py`
+- `skills/diary-notion/SKILL.md`
+- `src/claude_diary/cli/setup.py`
+- `README.md`
+- `README.en.md`
+- `CHANGELOG.md`
+
 ## 검증
 
 실행한 검증:

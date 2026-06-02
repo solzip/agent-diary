@@ -23,7 +23,13 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `title`: concise Korean noun phrase, no prefix or period
    - `body_intro`: 1-3 factual Korean sentences based only on observed work
    - Write it like a Notion task database record: compact top summary, structured relations in DB properties, and raw evidence hidden in the page body appendix
-   - `summary_hints`: up to 3 outcome-focused bullets that explain what changed and why it matters
+   - Body rendering policy:
+     - Use `body_intro` as the only top summary callout
+     - Treat `summary_hints` as checked result items, not repeated callouts
+     - Keep `work_context`, `work_scope`, `approach`, and `outcome` short because they render as a compact "work at a glance" table
+     - Put final verification state in `verification`; move intermediate command history to appendix evidence
+     - Keep risks concise; multiple risks are combined into one warning callout
+   - `summary_hints`: up to 3 outcome-focused result items that explain what changed and why it matters
    - `key_changes`: up to 3 major behavior/schema/workflow changes a developer can understand without opening the diff
    - `work_context`: 0-1 bullet explaining why this work started
    - `work_scope`: 0-1 bullet explaining what changed
