@@ -32,7 +32,7 @@ NOTION_API_VERSION = "2022-06-28"
 NOTION_API_BASE = "https://api.notion.com/v1"
 MAX_RETRIES = 3
 RICH_TEXT_LIMIT = 2000
-SCHEMA_VERSION = "v5"
+SCHEMA_VERSION = "v7"
 DATABASE_TITLE = "Entries"
 
 
@@ -210,10 +210,9 @@ class NotionHierarchicalExporter:
     def ensure_database(self, year, force_schema=False):
         """Get Entries database ID for a year, creating if missing.
 
-        Also ensures the schema extensions (Purpose, Status, Task Group, Depends On,
-        Parent Task, Work Period)
-        are present — needed for older DBs created before those columns
-        were part of the design. Tracked via cache so we only patch once.
+        Also ensures the current schema extensions are present — needed for
+        older DBs created before those columns were part of the design.
+        Tracked via cache so we only patch once on the happy path.
         """
         cached = notion_cache.get_database(self._cache, year)
         db_id = None
@@ -292,33 +291,6 @@ class NotionHierarchicalExporter:
         if current == SCHEMA_VERSION and force:
             self._request("PATCH", "/databases/%s" % db_id, {
                 "properties": _current_schema_extensions(db_id)
-            })
-            schema_v[db_id] = SCHEMA_VERSION
-            return
-        if current == "v4":
-            self._request("PATCH", "/databases/%s" % db_id, {
-                "properties": {
-                    "Work Period": {"date": {}},
-                }
-            })
-            schema_v[db_id] = SCHEMA_VERSION
-            return
-        if current == "v3":
-            self._request("PATCH", "/databases/%s" % db_id, {
-                "properties": {
-                    "Parent Task": _self_relation(db_id),
-                    "Work Period": {"date": {}},
-                }
-            })
-            schema_v[db_id] = SCHEMA_VERSION
-            return
-        if current == "v2":
-            self._request("PATCH", "/databases/%s" % db_id, {
-                "properties": {
-                    "Purpose": {"select": {}},
-                    "Parent Task": _self_relation(db_id),
-                    "Work Period": {"date": {}},
-                }
             })
             schema_v[db_id] = SCHEMA_VERSION
             return
@@ -446,6 +418,29 @@ class NotionHierarchicalExporter:
             }
         })
 
+    def update_row_subitems(self, row_id, child_row_ids):
+        """PATCH a parent row to include native Notion `Sub-items` relations."""
+        merged_ids = _unique_ids(
+            self.get_row_relation_ids(row_id, "Sub-items") + list(child_row_ids)
+        )
+        self._request("PATCH", "/pages/%s" % row_id, {
+            "properties": {
+                "Sub-items": {
+                    "relation": [{"id": rid} for rid in merged_ids]
+                }
+            }
+        })
+
+    def get_row_relation_ids(self, row_id, property_name):
+        """Return relation target IDs for a page property if present."""
+        data = self._request("GET", "/pages/%s" % row_id)
+        prop = (data.get("properties") or {}).get(property_name) or {}
+        return [
+            item.get("id")
+            for item in prop.get("relation") or []
+            if item.get("id")
+        ]
+
 
 def _short_error(resp):
     """Extract a one-line error description from a Notion error response."""
@@ -467,6 +462,19 @@ def _self_relation(db_id):
     }
 
 
+def _subitem_parent_relation(db_id):
+    """Return the Parent Task side of Notion's native sub-item relation pair."""
+    return {
+        "relation": {
+            "database_id": db_id,
+            "type": "dual_property",
+            "dual_property": {
+                "synced_property_name": "Sub-items",
+            },
+        }
+    }
+
+
 def _current_schema_extensions(db_id):
     """Return the full current extension schema beyond the base DB columns."""
     return {
@@ -474,6 +482,24 @@ def _current_schema_extensions(db_id):
         "Status": {"select": {}},
         "Task Group": {"select": {}},
         "Depends On": _self_relation(db_id),
-        "Parent Task": _self_relation(db_id),
+        "Parent Task": _subitem_parent_relation(db_id),
         "Work Period": {"date": {}},
+        "Priority": {"select": {}},
+        "Next Action": {"rich_text": {}},
+        "Blocked": {"checkbox": {}},
+        "Block Reason": {"rich_text": {}},
+        "Carryover": {"checkbox": {}},
+        "Review Status": {"select": {}},
+        "Last Reviewed": {"date": {}},
     }
+
+
+def _unique_ids(values):
+    seen = set()
+    result = []
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result

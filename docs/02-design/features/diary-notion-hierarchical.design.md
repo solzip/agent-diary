@@ -78,6 +78,7 @@
 |------|------|------|---------|------|
 | Name | title | ✅ | "DB 컬럼 스키마 의논" | 에이전트가 뽑은 task 제목 |
 | Date | date | ✅ | 2026-05-26 | 정렬/필터/캘린더 뷰 |
+| Work Period | date | ✅ | 2026-05-26 | 실제 작업 기간. 프로젝트/작업 그룹 기간 계산 재료 |
 | Project | select | ✅ | claude-diary | group/filter. task JSON 누락/unknown 시 CLI가 cwd 폴더명으로 보정 |
 | Purpose | select | ✅ | Feature | 목적별 group/filter |
 | Branch | select | ✅ | feat/diary-notion | group/filter. CLI가 자동 채움 |
@@ -87,14 +88,22 @@
 | Files | number | ✅ | 7 | 수정+생성 파일 수 |
 | Commits | number | ✅ | 3 | 커밋 개수 |
 | Lines | number | ✅ | 142 | 추가+삭제 합 |
-| Parent Task | relation (self) | ✅ | → 상위 행 | 포함 관계. 하위항목/sub-item view 자동화의 기반 |
-| Depends On | relation (self) | ✅ | → 선행 행 | 선행 작업 참조 (단방향) |
+| Parent Task | relation (self, dual) | ✅ | → 상위 행 | 포함 관계. `Sub-items`와 양방향으로 연결 |
+| Sub-items | relation (self, dual) | ✅ | → 하위 행 | Notion native 하위항목 toggle의 기준 관계 |
+| Depends On | relation (self) | ✅ | → 선행 메인 작업 | 큰 메인 작업 간 선행 연결성 참조 (단방향) |
+| Priority | select | ✅ | P1 | 오늘 우선순위/미완료/Blocked view 정렬 기준 |
+| Next Action | rich_text | ✅ | "dry-run 재검증" | 다음에 바로 실행할 수 있는 행동 |
+| Blocked | checkbox | ✅ | false | 외부 결정/권한/정보 부족으로 진행 불가 여부 |
+| Block Reason | rich_text | ✅ | "API 권한 확인 필요" | 막힘 원인 |
+| Carryover | checkbox | ✅ | true | 전날/이전 세션 미완료 작업 이어가기 표시 |
+| Review Status | select | ✅ | Needs Review | 검토 필요/완료/보류 상태 |
+| Last Reviewed | date | ✅ | 2026-06-02 | 실제 검토일 |
 | Session ID | rich_text | 🔒 hidden | "abc-123-def" | 멱등성 키 |
 | Task Index | number | 🔒 hidden | 0, 1, 2 | 멱등성 키 |
 
-→ 표시 13개 + hidden 2개 = 총 15개. 의미 요약은 컬럼이 아닌 compact body(`body_intro` + callout/checklist/toggle 부록)로 노출.
+→ 표시 22개 + hidden 2개 = 총 24개. 의미 요약은 컬럼이 아닌 compact body(`body_intro` + callout/checklist/toggle 부록)로 노출.
 
-2차 View 설계에서는 이 v4 모델을 확장해 `Work Period` date range 컬럼을 추가하는 schema v5를 사용한다. `Date`는 기록일로 유지하고, `Work Period`는 프로젝트/작업 그룹의 실제 작업 기간 계산 재료로 사용한다.
+2차 최고모델 구현에서는 이 모델을 schema v7로 확장해 `Work Period`, native `Sub-items`, 우선순위/막힘/리뷰 운영 컬럼을 함께 보장한다. `Date`는 기록일로 유지하고, `Work Period`는 프로젝트/작업 그룹의 실제 작업 기간 계산 재료로 사용한다.
 
 **Purpose (select)**:
 - 영어 enum 사용: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, `General`
@@ -111,9 +120,15 @@
 
 **Task Group (select)**: 며칠/여러 세션에 걸치는 큰 작업 단위 묶음. 에이전트가 첫 task 시점에 새 그룹명 생성, 이전 작업의 연속이면 같은 그룹명 사용. 일관성 보장은 어렵지만 group view로 묶어 보는 편의가 핵심 가치.
 
-**Parent Task (self-relation)**: 포함 관계. 예: `상품 목록 포커싱`의 Parent Task는 `로컬 테스트 진행`. 같은 push 안에서는 JSON의 `parent_index`를 row ID로 변환해 연결한다. 너무 작은 확인 항목은 별도 row가 아니라 본문 checklist로 남긴다.
+**Priority / Next Action / Carryover**: 다음날 우선순위와 오늘 실행 순서를 정하기 위한 운영 컬럼. `Priority`는 P0/P1/P2/P3만 사용하고, `Next Action`은 다음에 바로 실행 가능한 한 가지 행동을 한국어로 기록한다. 이전 날짜/세션에서 이어온 미완료 작업은 `Carryover=true`로 표시한다.
 
-**Depends On (self-relation, 단방향)**: 같은 DB 안의 다른 행 참조. JSON 스키마의 `depends_on_indices` 가 같은 push의 task index를 가리킴. CLI가 push 순서대로 row_id 누적 → 인덱스를 실제 row ID로 변환해서 relation 채움. Notion이 자동 reverse view 제공해 단방향 정의로 양방향 효과.
+**Blocked / Block Reason**: `Depends On`과 다르게 현재 진행 가능 여부를 나타낸다. 외부 결정, 권한, 정보가 없어 진행할 수 없을 때만 `Blocked=true`로 두고, `Block Reason`에 막힌 원인을 쓴다.
+
+**Review Status / Last Reviewed**: 상사 제출 전 검토, 구현 리뷰, 사후 확인이 필요한 작업을 분리하기 위한 컬럼. 검토 필요는 `Needs Review`, 검토 완료는 `Reviewed`, 뒤로 미루는 경우는 `Deferred`를 사용한다.
+
+**Parent Task / Sub-items (dual self-relation)**: 포함 관계. 예: `상품 목록 포커싱`의 Parent Task는 `로컬 테스트 진행`이고, 부모 row의 `Sub-items`에는 하위 작업들이 자동으로 연결된다. 같은 push 안에서는 JSON의 `parent_index`를 row ID로 변환해 `Parent Task`를 연결한다. Notion native 하위항목/sub-item toggle은 `Sub-items` relation을 기준으로 동작한다. 너무 작은 확인 항목은 별도 row가 아니라 본문 checklist로 남긴다.
+
+**Depends On (self-relation, 단방향)**: 같은 DB 안의 최상위 메인 작업 간 선행 연결 참조. JSON 스키마의 `depends_on_indices`가 같은 push의 top-level task index를 가리킨다. CLI가 push 순서대로 row_id 누적 → 인덱스를 실제 row ID로 변환해서 relation 채움. 하위 작업 row는 `Depends On` 연결 대상에서 제외해 sub-item 구조와 선행 관계가 섞이지 않게 한다.
 
 **Branch 컬럼 데이터 소스** (CLI 자동):
 - task의 `commit_hashes` 있으면 → 첫 commit의 branch (`git branch --contains`)
@@ -161,12 +176,12 @@
 - 문제: 정상 생성된 view가 required property 누락 conflict로 오인됨
 - 원인: data source schema와 view retrieve 응답의 property id encoding 기준이 다름
 - 조치: property id를 decode해 비교 기준을 통일
-- 결과: core view 5개 verified
+- 결과: core/operating view 10개 verified
 ```
 
-**조립**: 에이전트가 만든 `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed` + CLI가 코드/파일/명령/Git raw 데이터를 접힌 부록(toggle)으로 조립한다. 코드 변경은 full diff가 아니라 주요 변경만 기록한다.
+**조립**: 에이전트가 만든 `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, `block_reason` + CLI가 코드/파일/명령/Git raw 데이터를 접힌 부록(toggle)으로 조립한다. 코드 변경은 full diff가 아니라 주요 변경만 기록한다.
 
-**언어 정책**: `title`과 설명형 본문 필드(`body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`)는 한국어로 작성한다. 파일 경로, 명령어, branch, commit hash, 코드 식별자, 함수/클래스명, `Purpose`/`Status` enum 값은 원문 또는 영어 값을 유지한다.
+**언어 정책**: `title`과 설명형 본문 필드(`body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, `block_reason`)는 한국어로 작성한다. 파일 경로, 명령어, branch, commit hash, 코드 식별자, 함수/클래스명, `Purpose`/`Status`/`Priority`/`Review Status` enum 값은 원문 또는 영어 값을 유지한다.
 
 **본문 보고 원칙**:
 - DB relation이 구조를 담당하고, page body는 짧은 상태와 근거를 담당한다.
@@ -205,6 +220,14 @@
       "next_steps": ["사용자 환경에 최신 Codex skill 설치"],
       "support_needed": [],
       "status": "Design",
+      "work_period": "2026-06-02",
+      "priority": "P1",
+      "next_action": "사용자 환경에 최신 Codex skill 설치",
+      "blocked": false,
+      "block_reason": "",
+      "carryover": false,
+      "review_status": "Needs Review",
+      "last_reviewed": "2026-06-02",
       "task_group": "diary-notion-impl",
       "purpose": "Planning",
       "parent_index": null,
@@ -246,7 +269,7 @@
 
 ```
 1. 에이전트: cwd에 `.diary-notion-<short-id>.json` 작성
-2. !`claude-diary notion push --input .diary-notion-<short-id>.json`
+2. !`working-diary diary-notion push --input .diary-notion-<short-id>.json`
 3. CLI: 파일 read → push → try/finally로 파일 삭제 (성공/실패 무관)
 4. (보험) 슬래시 커맨드 마지막에서 한 번 더 삭제 시도
 ```
@@ -271,18 +294,18 @@
 [Agent (현재 세션)]                               ── Claude Code/Codex 세션 컨텍스트로 동작
   ├─ transcript 분석
   ├─ 작업 단위 N개 분리
-  ├─ 각 task: title / body_intro / summary_hints / key_changes / work_context / work_scope / approach / outcome / impact / code_change_highlights / decisions / implementation_notes / verification / risks / next_steps / support_needed / parent_index / depends_on_indices / categories / prompts / files / commands / commit_hashes
+  ├─ 각 task: title / body_intro / summary_hints / key_changes / work_context / work_scope / approach / outcome / impact / code_change_highlights / decisions / implementation_notes / verification / risks / next_steps / support_needed / work_period / priority / next_action / blocked / block_reason / carryover / review_status / last_reviewed / parent_index / depends_on_indices / categories / prompts / files / commands / commit_hashes
   └─ JSON 생성
        │
-       ▼  !`claude-diary notion push --input .diary-notion-<id>.json`
-[CLI: notion push 명령]
+       ▼  !`working-diary diary-notion push --input .diary-notion-<id>.json`
+[CLI: diary-notion push 명령]
   ├─ JSON 파싱
   ├─ commit_hashes → git_info.py로 메타+lines 수집
   ├─ Notion API 호출:
   │   ├─ 캐시 확인: 연도 페이지 / DB ID
   │   ├─ 없으면 생성:
   │   │   ├─ 연도 페이지: POST /pages (parent=root_page_id)
-  │   │   └─ DB: POST /databases (parent=year_page_id, schema=10 columns)
+  │   │   └─ DB: POST /databases + schema v7 extension PATCH
   │   ├─ 각 task:
   │   │   ├─ 쿼리: Session ID + Task Index 매치 행 있나?
   │   │   ├─ 있으면 skip (--force면 archive 후 재생성)
@@ -319,13 +342,13 @@
 - `CLAUDE_DIARY_NOTION_TOKEN`
 - `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID`
 
-### 6.3 Setup Command — `claude-diary notion init`
+### 6.3 Setup Command — `claude-diary diary-notion init`
 
 대화형 셋업 명령. 처음 사용자가 한 번만 실행.
 
 **흐름**:
 ```
-$ claude-diary notion init
+$ claude-diary diary-notion init
 
 Step 1/3: Integration token
   Get it from: https://www.notion.so/my-integrations
@@ -412,7 +435,7 @@ Saved to: <config_dir>/config.json
 | 6 | 본문 markdown | C: 에이전트의 intro + CLI의 raw 섹션 | 의미 정리 + 일관성 동시 확보 |
 | 7 | git 정보 수집 | A: CLI가 자체 수집 | 정확도 ↑, `git_info.py` 재사용 |
 | 8 | 멱등성 | B + `--force`: skip 기본, force는 archive&recreate | 실수 방지 + 강제 갱신 옵션 |
-| 9 | 셋업 흐름 | B: `notion init` 대화형 명령 + URL 파싱 + token/read 검증 | 첫 인상 비용 ↓, page_id 헷갈림 해결, 권한 디버깅 비용 ↓ |
+| 9 | 셋업 흐름 | B: `diary-notion init` 대화형 명령 + URL 파싱 + token/read 검증 | 첫 인상 비용 ↓, page_id 헷갈림 해결, 권한 디버깅 비용 ↓ |
 | 10 | 작업 분리 우선순위 | B: Semantic-first (의미 단위) | 의논 세션도 풍부, 큰 commit 안 묶임, 에이전트 정리 능력 활용 |
 | 11 | Title 형식 | 명사구, 30~50자, 시제/주어/prefix/마침표 없음 | DB 뷰 한 줄에 들어감. 일관성 |
 | 12 | Body intro 톤 | 평어체, 1~3문장, 결과 중심, markdown 강조 OK, 추측 금지 | 글로벌 지침과 일관. 회고 시 빠른 회상 |
@@ -420,7 +443,7 @@ Saved to: <config_dir>/config.json
 | 14 | JSON 전달 방식 | 임시 파일 (cwd, `.diary-notion-<id>.json`) | PowerShell 호환. escape 문제 회피. 디버깅 쉬움 |
 | 20 | Status 컬럼 | select, 5단계 (Discussion/Design/Implementation/Testing/Deployed) | 진행도 시각화. 한 task 안에 여러 단계 섞이면 가장 진행된 단계 |
 | 21 | Depends On 컬럼 | self-relation, 단방향 | 작업 순서 시각화. Notion이 reverse view 자동 제공 |
-| 22 | Parent Task 컬럼 | self-relation, 단방향 | 포함 관계를 DB에 보존하고 후속 sub-item view 자동화의 기반으로 사용 |
+| 22 | Parent Task / Sub-items 컬럼 | self-relation, 양방향 | 포함 관계를 DB에 보존하고 native sub-item view 자동화의 기반으로 사용 |
 | 22 | Task Group 컬럼 | select. 에이전트가 task별로 추출 | 며칠/여러 세션에 걸치는 큰 작업을 group view로 묶기 |
 | 23 | 멱등성 + 새 컬럼 마이그레이션 | 기존 행 archive(`--force`) 후 새 스키마로 재push | Status/Depends On/Parent Task/Task Group 소급 채움 |
 | 15 | Branch 컬럼 추가 + 경계 룰 | Branch select 컬럼 + "branch 다르면 task 분리"를 최우선 분리 룰로 | 한 task = 한 branch 보장. select 컬럼이 의미 있어짐. 여러 branch 섞이는 케이스 자동 해결 |
@@ -464,8 +487,8 @@ allowed-tools:
 
 3. **각 task별 추출**
    - 언어 정책:
-     - `title`, `body_intro`, `summary_hints`, `key_changes`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps` 같은 설명형 필드는 반드시 한국어로 작성
-     - `status`, `purpose` enum 값은 지정된 영어 값을 그대로 사용
+     - `title`, `body_intro`, `summary_hints`, `key_changes`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `next_action`, `block_reason` 같은 설명형 필드는 반드시 한국어로 작성
+     - `status`, `purpose`, `priority`, `review_status` enum 값은 지정된 영어 값을 그대로 사용
      - 파일 경로, 명령어, branch, commit hash, 코드 식별자, 함수/클래스명은 원문 그대로 유지
      - `user_prompts`는 사용자가 말한 원문을 증거로 보존
    - `title`: 30~50자 명사구. 시제/주어/prefix/마침표 없음
@@ -494,8 +517,17 @@ allowed-tools:
    - `support_needed`: 필요한 결정/지원이 있으면 0~2개
    - `status`: `Discussion` / `Design` / `Implementation` / `Testing` / `Deployed`
    - `purpose`: `Feature` / `Bugfix` / `Refactor` / `Docs` / `Test` / `Infra` / `Planning` / `Research` / `Review` / `Release` / `Support` / `Maintenance` / `General`
+   - `work_period`: 실제 작업 기간. 기본은 오늘 날짜, 여러 날이면 start/end range 사용
+   - `priority`: `P0` / `P1` / `P2` / `P3`
+   - `next_action`: 다음에 바로 실행 가능한 구체적 행동
+   - `blocked`: 외부 결정/권한/정보 없이는 진행할 수 없으면 `true`
+   - `block_reason`: `blocked`가 `true`이면 막힌 원인
+   - `carryover`: 전날/이전 세션 미완료 작업을 이어서 처리한 row면 `true`
+   - `review_status`: `Needs Review` / `Reviewed` / `Deferred`
+   - `last_reviewed`: 실제 검토일 `YYYY-MM-DD`
    - `task_group`: 며칠/여러 세션에 걸치는 큰 작업 단위 식별자
-   - `depends_on_indices`: 같은 push 안에서 의존하는 선행 task 인덱스 배열
+   - `parent_index`: 하위 작업이면 같은 push 안의 부모 task 인덱스, 최상위면 `null`
+   - `depends_on_indices`: 같은 push 안에서 의존하는 선행 top-level task 인덱스 배열. 하위 작업에는 사용하지 않음
    - `categories`: 1~3개. design/refactor/bugfix/test/docs/infra/discussion 같은 자유 라벨
    - `project`: 현재 cwd의 폴더명
    - `user_prompts`, `files_modified`, `files_created`, `commands_run`, `errors`
@@ -503,7 +535,7 @@ allowed-tools:
 
 4. **JSON 출력 및 CLI 호출**
    - cwd에 `.diary-notion-<8자리>.json` 작성 (Write 도구)
-   - `!claude-diary notion push --input .diary-notion-<8자리>.json` 실행
+   - `!working-diary diary-notion push --input .diary-notion-<8자리>.json` 실행
    - 종료 후 파일 삭제
 
 ## JSON 형식
@@ -540,7 +572,7 @@ CLI 결과를 그대로 보여주고 push/skip된 task 요약.
 
 ### 11.2 신규
 
-- `cli/notion_push.py` — `claude-diary notion push --input` 명령
+- `cli/notion_push.py` — `claude-diary diary-notion push --input`, `working-diary diary-notion push --input` 명령
 - `exporters/notion.py` 안에 `_hierarchical_export()` 추가 (또는 `NotionHierarchicalExporter` 클래스 분리)
 - `lib/notion_cache.py` — 캐시 read/write
 - `~/.claude/commands/diary-notion.md` — 슬래시 커맨드 instructions

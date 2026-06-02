@@ -13,8 +13,10 @@ from claude_diary.exporters.notion_hierarchical import (
 )
 
 
-NOTION_VIEWS_API_VERSION = "2025-09-03"
+NOTION_VIEWS_API_VERSION = "2026-03-11"
 CORE_VIEW_NAMES = ("작업 계층", "오늘 작업", "상태별", "목적별", "프로젝트별")
+OPERATION_VIEW_NAMES = ("오늘 우선순위", "전날 미완료", "Blocked", "리뷰 필요", "작업 그룹별")
+ENSURED_VIEW_NAMES = CORE_VIEW_NAMES + OPERATION_VIEW_NAMES
 
 REQUIRED_PROPERTIES = (
     "Name",
@@ -25,7 +27,15 @@ REQUIRED_PROPERTIES = (
     "Status",
     "Task Group",
     "Parent Task",
+    "Sub-items",
     "Depends On",
+    "Priority",
+    "Next Action",
+    "Blocked",
+    "Block Reason",
+    "Carryover",
+    "Review Status",
+    "Last Reviewed",
     "Session ID",
     "Task Index",
 )
@@ -37,7 +47,15 @@ SCHEMA_EXTENSION_PROPERTIES = (
     "Task Group",
     "Depends On",
     "Parent Task",
+    "Sub-items",
     "Work Period",
+    "Priority",
+    "Next Action",
+    "Blocked",
+    "Block Reason",
+    "Carryover",
+    "Review Status",
+    "Last Reviewed",
 )
 
 
@@ -56,8 +74,10 @@ class ViewFailure:
 @dataclass
 class EnsureViewsResult:
     created: list = field(default_factory=list)
+    updated: list = field(default_factory=list)
     verified: list = field(default_factory=list)
     planned: list = field(default_factory=list)
+    updates_planned: list = field(default_factory=list)
     conflicts: list = field(default_factory=list)
     failed: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
@@ -171,6 +191,7 @@ class NotionViewsClient:
             prop_map[name] = {
                 "id": unquote(prop.get("id") or name),
                 "type": prop.get("type") or _infer_property_type(prop),
+                "relation": prop.get("relation"),
             }
         return prop_map
 
@@ -196,9 +217,15 @@ class NotionViewsClient:
     def create_view(self, payload):
         return self._request("POST", "/views", payload)
 
+    def update_view(self, view_id, payload):
+        return self._request("PATCH", "/views/%s" % view_id, payload)
+
+    def update_data_source(self, data_source_id, payload):
+        return self._request("PATCH", "/data_sources/%s" % data_source_id, payload)
+
 
 class CoreViewsEnsurer:
-    """Create or verify the 5 permanent core views for the working diary DB."""
+    """Create or verify the permanent core and operating views."""
 
     def __init__(self, client):
         self.client = client
@@ -207,13 +234,28 @@ class CoreViewsEnsurer:
         result = EnsureViewsResult()
         data_source_id = self.client.get_primary_data_source_id(database_id)
         prop_map = self.client.get_property_map(data_source_id)
+
+        if _needs_subitems_schema(prop_map):
+            if dry_run:
+                result.updates_planned.append("작업 계층")
+                result.warnings.append(
+                    "schema v7 would convert Parent Task to a dual-property "
+                    "Sub-items relation"
+                )
+                return result
+            self.client.update_data_source(
+                data_source_id,
+                _subitems_schema_payload(data_source_id),
+            )
+            prop_map = self.client.get_property_map(data_source_id)
+
         missing = [name for name in REQUIRED_PROPERTIES if name not in prop_map]
         if missing:
             if dry_run and set(missing).issubset(set(SCHEMA_EXTENSION_PROPERTIES)):
-                result.planned.extend(CORE_VIEW_NAMES)
+                result.planned.extend(ENSURED_VIEW_NAMES)
                 result.warnings.append(
                     "schema %s would add missing properties: %s" %
-                    ("v5", ", ".join(missing))
+                    ("v7", ", ".join(missing))
                 )
                 return result
             result.failed.append(ViewFailure(
@@ -234,7 +276,14 @@ class CoreViewsEnsurer:
             if existing:
                 reasons = _verify_view(existing, spec, prop_map, today)
                 if reasons:
-                    result.conflicts.append(ViewConflict(spec["name"], "; ".join(reasons)))
+                    if dry_run:
+                        result.updates_planned.append(spec["name"])
+                        result.warnings.append(
+                            "%s would update required settings: %s" %
+                            (spec["name"], "; ".join(reasons))
+                        )
+                    else:
+                        self._update_view(existing, spec, result, reasons)
                 else:
                     result.verified.append(spec["name"])
                 continue
@@ -269,7 +318,10 @@ class CoreViewsEnsurer:
                     return
             if spec.get("relative_today"):
                 fallback_spec = dict(spec)
-                fallback_spec["filter"] = _fixed_today_filter(spec["today"])
+                fallback_spec["filter"] = _fixed_relative_today_filter(
+                    spec["today"],
+                    spec.get("filter"),
+                )
                 fallback_spec["relative_today"] = False
                 fallback = _payload_for_spec(fallback_spec)
                 try:
@@ -277,6 +329,57 @@ class CoreViewsEnsurer:
                     result.created.append(spec["name"])
                     result.warnings.append(
                         "%s relative today filter failed: fixed date fallback created" %
+                        spec["name"]
+                    )
+                    return
+                except Exception as fallback_error:
+                    result.failed.append(ViewFailure(spec["name"], str(fallback_error)))
+                    return
+            result.failed.append(ViewFailure(spec["name"], str(e)))
+        except Exception as e:
+            result.failed.append(ViewFailure(spec["name"], str(e)))
+
+    def _update_view(self, existing, spec, result, reasons):
+        view_id = existing.get("id")
+        if not view_id:
+            result.conflicts.append(ViewConflict(
+                spec["name"],
+                "missing view id for update: %s" % "; ".join(reasons),
+            ))
+            return
+
+        payload = _update_payload_for_spec(spec)
+        try:
+            self.client.update_view(view_id, payload)
+            result.updated.append(spec["name"])
+            return
+        except NotionBadRequest as e:
+            if spec.get("subtasks"):
+                fallback = _update_payload_for_spec(spec, include_subtasks=False)
+                try:
+                    self.client.update_view(view_id, fallback)
+                    result.updated.append(spec["name"])
+                    result.warnings.append(
+                        "%s subtasks not enabled: base table fallback updated" %
+                        spec["name"]
+                    )
+                    return
+                except Exception as fallback_error:
+                    result.failed.append(ViewFailure(spec["name"], str(fallback_error)))
+                    return
+            if spec.get("relative_today"):
+                fallback_spec = dict(spec)
+                fallback_spec["filter"] = _fixed_relative_today_filter(
+                    spec["today"],
+                    spec.get("filter"),
+                )
+                fallback_spec["relative_today"] = False
+                fallback = _update_payload_for_spec(fallback_spec)
+                try:
+                    self.client.update_view(view_id, fallback)
+                    result.updated.append(spec["name"])
+                    result.warnings.append(
+                        "%s relative today filter failed: fixed date fallback updated" %
                         spec["name"]
                     )
                     return
@@ -297,11 +400,12 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             prop_map,
             visible=[
                 "Name", "Status", "Project", "Purpose", "Task Group",
-                "Parent Task", "Depends On", "Work Period", "Date",
+                "Parent Task", "Work Period", "Date",
             ],
+            hidden=["Depends On", "Sub-items"],
             sorts=[_date_desc_sort()],
             subtasks={
-                "property_id": _prop_id(prop_map, "Parent Task"),
+                "property_id": _prop_id(prop_map, "Sub-items"),
                 "display_mode": "show",
                 "filter_scope": "parents_and_subitems",
                 "toggle_column_id": _prop_id(prop_map, "Name"),
@@ -345,6 +449,70 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             visible=["Name", "Status", "Purpose", "Task Group", "Parent Task", "Work Period", "Date"],
             group_by=_group_by(prop_map, "Project"),
         ),
+        _view_spec(
+            "오늘 우선순위",
+            database_id,
+            data_source_id,
+            prop_map,
+            visible=[
+                "Name", "Priority", "Status", "Project", "Task Group",
+                "Next Action", "Blocked", "Work Period", "Date",
+            ],
+            filter_body=_today_unblocked_filter(),
+            sorts=[_priority_asc_sort(), _date_desc_sort()],
+            relative_today=True,
+            today=today,
+        ),
+        _view_spec(
+            "전날 미완료",
+            database_id,
+            data_source_id,
+            prop_map,
+            visible=[
+                "Name", "Priority", "Status", "Project", "Task Group",
+                "Next Action", "Carryover", "Work Period", "Date",
+            ],
+            filter_body=_unfinished_before_today_filter(),
+            sorts=[_priority_asc_sort(), _date_desc_sort()],
+            relative_today=True,
+            today=today,
+        ),
+        _view_spec(
+            "Blocked",
+            database_id,
+            data_source_id,
+            prop_map,
+            visible=[
+                "Name", "Priority", "Status", "Project", "Task Group",
+                "Block Reason", "Next Action", "Work Period", "Date",
+            ],
+            filter_body=_blocked_filter(),
+            sorts=[_priority_asc_sort(), _date_desc_sort()],
+        ),
+        _view_spec(
+            "리뷰 필요",
+            database_id,
+            data_source_id,
+            prop_map,
+            visible=[
+                "Name", "Review Status", "Last Reviewed", "Priority",
+                "Project", "Task Group", "Next Action", "Date",
+            ],
+            filter_body=_needs_review_filter(),
+            sorts=[_date_desc_sort()],
+        ),
+        _view_spec(
+            "작업 그룹별",
+            database_id,
+            data_source_id,
+            prop_map,
+            visible=[
+                "Name", "Status", "Priority", "Project", "Purpose",
+                "Parent Task", "Work Period", "Date",
+            ],
+            group_by=_group_by(prop_map, "Task Group"),
+            sorts=[_date_desc_sort()],
+        ),
     ]
 
 
@@ -354,6 +522,7 @@ def _view_spec(
     data_source_id,
     prop_map,
     visible,
+    hidden=None,
     filter_body=None,
     sorts=None,
     group_by=None,
@@ -366,7 +535,8 @@ def _view_spec(
         "database_id": database_id,
         "data_source_id": data_source_id,
         "visible": visible,
-        "properties": _property_config(prop_map, visible),
+        "hidden": hidden or [],
+        "properties": _property_config(prop_map, visible, hidden or []),
         "filter": filter_body,
         "sorts": sorts or [],
         "group_by": group_by,
@@ -403,15 +573,33 @@ def _payload_for_spec(spec, include_subtasks=True):
     return payload
 
 
-def _property_config(prop_map, visible):
+def _update_payload_for_spec(spec, include_subtasks=True):
+    payload = _payload_for_spec(spec, include_subtasks=include_subtasks)
+    result = {
+        "name": payload["name"],
+        "configuration": payload["configuration"],
+    }
+    if payload.get("filter"):
+        result["filter"] = payload["filter"]
+    if payload.get("sorts"):
+        result["sorts"] = payload["sorts"]
+    return result
+
+
+def _property_config(prop_map, visible, hidden=None):
     visible_set = set(visible)
+    hidden_set = set(hidden or [])
     ordered = []
     for name in visible:
         ordered.append({"property_id": _prop_id(prop_map, name), "visible": True})
-    for name in HIDDEN_PROPERTIES:
-        ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
-    for name in ("Files", "Commits", "Lines", "Categories", "Branch"):
+    for name in hidden or []:
         if name in prop_map and name not in visible_set:
+            ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
+    for name in HIDDEN_PROPERTIES:
+        if name in prop_map and name not in visible_set and name not in hidden_set:
+            ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
+    for name in ("Files", "Commits", "Lines", "Categories", "Branch"):
+        if name in prop_map and name not in visible_set and name not in hidden_set:
             ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
     return ordered
 
@@ -450,6 +638,42 @@ def _fixed_today_filter(today):
     return {"property": "Date", "date": {"equals": today}}
 
 
+def _fixed_relative_today_filter(today, filter_body=None):
+    if not filter_body:
+        return _fixed_today_filter(today)
+    return _replace_relative_today(filter_body, today)
+
+
+def _today_unblocked_filter():
+    return {
+        "and": [
+            {"property": "Date", "date": {"equals": "today"}},
+            {"property": "Blocked", "checkbox": {"equals": False}},
+        ]
+    }
+
+
+def _unfinished_before_today_filter():
+    return {
+        "and": [
+            {"property": "Date", "date": {"before": "today"}},
+            {"property": "Status", "select": {"does_not_equal": "Deployed"}},
+        ]
+    }
+
+
+def _blocked_filter():
+    return {"property": "Blocked", "checkbox": {"equals": True}}
+
+
+def _needs_review_filter():
+    return {"property": "Review Status", "select": {"equals": "Needs Review"}}
+
+
+def _priority_asc_sort():
+    return {"property": "Priority", "direction": "ascending"}
+
+
 def _verify_view(view, spec, prop_map, today):
     reasons = []
     if view.get("type") != "table":
@@ -467,15 +691,44 @@ def _verify_view(view, spec, prop_map, today):
         if prop_id in explicitly_visible_ids or name in visible_names:
             reasons.append("hidden property is visible: %s" % name)
 
+    for name in spec.get("hidden", []):
+        prop_id = _prop_id(prop_map, name)
+        if prop_id in explicitly_visible_ids or name in visible_names:
+            reasons.append("property should be hidden: %s" % name)
+
     if spec["name"] == "오늘 작업":
         if not _has_today_filter(view.get("filter"), prop_map, today):
             reasons.append("missing Date=today filter")
         if not _has_date_desc_sort(view.get("sorts"), prop_map):
             reasons.append("missing Date descending sort")
 
+    if spec["name"] == "오늘 우선순위":
+        if not _has_today_filter(view.get("filter"), prop_map, today):
+            reasons.append("missing Date=today filter")
+        if not _has_checkbox_filter(view.get("filter"), "Blocked", False, prop_map):
+            reasons.append("missing Blocked=false filter")
+
+    if spec["name"] == "전날 미완료":
+        if not _has_date_before_today_filter(view.get("filter"), prop_map, today):
+            reasons.append("missing Date before today filter")
+        if not _has_select_filter(view.get("filter"), "Status", "does_not_equal", "Deployed", prop_map):
+            reasons.append("missing Status!=Deployed filter")
+
+    if spec["name"] == "Blocked":
+        if not _has_checkbox_filter(view.get("filter"), "Blocked", True, prop_map):
+            reasons.append("missing Blocked=true filter")
+
+    if spec["name"] == "리뷰 필요":
+        if not _has_select_filter(view.get("filter"), "Review Status", "equals", "Needs Review", prop_map):
+            reasons.append("missing Review Status=Needs Review filter")
+
     if spec.get("group_by"):
         if not _has_group_by(view, spec["group_by"]):
             reasons.append("missing %s group_by" % _group_name(spec["name"]))
+
+    if spec.get("subtasks"):
+        if not _has_subtasks(view, spec["subtasks"]):
+            reasons.append("missing required subtasks configuration")
 
     return reasons
 
@@ -492,7 +745,7 @@ def _visible_properties(view, prop_map):
         is_visible = entry.get("visible") is not False
         if is_visible:
             visible_ids.add(prop)
-            visible_names.add(prop)
+            visible_names.add(entry.get("property_name") or prop)
             explicitly_visible_ids.add(prop)
     return visible_ids, visible_names, explicitly_visible_ids
 
@@ -511,11 +764,59 @@ def _has_today_filter(filter_body, prop_map, today):
     return False
 
 
+def _has_date_before_today_filter(filter_body, prop_map, today):
+    date_names = {"Date", _prop_id(prop_map, "Date")}
+    for node in _walk(filter_body):
+        if not isinstance(node, dict):
+            continue
+        if (node.get("property") or node.get("property_id")) not in date_names:
+            continue
+        date_filter = node.get("date") or {}
+        before = date_filter.get("before")
+        if before == "today" or before == today:
+            return True
+    return False
+
+
 def _has_date_desc_sort(sorts, prop_map):
     date_keys = {"Date", _prop_id(prop_map, "Date")}
     for sort in sorts or []:
         prop = sort.get("property") or sort.get("property_id")
         if prop in date_keys and sort.get("direction") == "descending":
+            return True
+    return False
+
+
+def _has_filter_property(filter_body, name, prop_map):
+    keys = {name, _prop_id(prop_map, name)}
+    for node in _walk(filter_body):
+        if isinstance(node, dict) and (node.get("property") or node.get("property_id")) in keys:
+            return True
+    return False
+
+
+def _has_checkbox_filter(filter_body, name, expected, prop_map):
+    keys = {name, _prop_id(prop_map, name)}
+    for node in _walk(filter_body):
+        if not isinstance(node, dict):
+            continue
+        if (node.get("property") or node.get("property_id")) not in keys:
+            continue
+        checkbox = node.get("checkbox") or {}
+        if checkbox.get("equals") is expected:
+            return True
+    return False
+
+
+def _has_select_filter(filter_body, name, op, expected, prop_map):
+    keys = {name, _prop_id(prop_map, name)}
+    for node in _walk(filter_body):
+        if not isinstance(node, dict):
+            continue
+        if (node.get("property") or node.get("property_id")) not in keys:
+            continue
+        select_filter = node.get("select") or {}
+        if select_filter.get(op) == expected:
             return True
     return False
 
@@ -529,6 +830,17 @@ def _has_group_by(view, required):
     )
 
 
+def _has_subtasks(view, required):
+    config = view.get("configuration") or {}
+    subtasks = config.get("subtasks") or {}
+    return (
+        subtasks.get("property_id") == required.get("property_id")
+        and subtasks.get("display_mode") == required.get("display_mode")
+        and subtasks.get("filter_scope") == required.get("filter_scope")
+        and subtasks.get("toggle_column_id") == required.get("toggle_column_id")
+    )
+
+
 def _group_name(view_name):
     if view_name == "상태별":
         return "Status"
@@ -537,6 +849,49 @@ def _group_name(view_name):
     if view_name == "프로젝트별":
         return "Project"
     return "required"
+
+
+def _needs_subitems_schema(prop_map):
+    parent = prop_map.get("Parent Task")
+    if not parent:
+        return False
+    subitems = prop_map.get("Sub-items")
+    relation = parent.get("relation") or {}
+    dual = relation.get("dual_property") or {}
+    return not subitems or dual.get("synced_property_name") != "Sub-items"
+
+
+def _subitems_schema_payload(data_source_id):
+    return {
+        "properties": {
+            "Parent Task": {
+                "relation": {
+                    "data_source_id": data_source_id,
+                    "dual_property": {
+                        "synced_property_name": "Sub-items",
+                    },
+                }
+            }
+        }
+    }
+
+
+def _replace_relative_today(value, today):
+    if isinstance(value, dict):
+        result = {}
+        for key, child in value.items():
+            if key == "date" and isinstance(child, dict):
+                date_filter = dict(child)
+                for op in ("equals", "before", "after", "on_or_before", "on_or_after"):
+                    if date_filter.get(op) == "today":
+                        date_filter[op] = today
+                result[key] = date_filter
+                continue
+            result[key] = _replace_relative_today(child, today)
+        return result
+    if isinstance(value, list):
+        return [_replace_relative_today(child, today) for child in value]
+    return value
 
 
 def _walk(value):

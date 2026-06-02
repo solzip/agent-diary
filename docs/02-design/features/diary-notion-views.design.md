@@ -1,6 +1,6 @@
-# /diary-notion Views — Core View Automation
+# /diary-notion Views — Core + Operating View Automation
 
-> **Summary**: 1차에서 만든 Notion 작업 DB 구조를 실제 업무 관리 화면으로 탐색할 수 있도록 core views를 자동 보장한다.
+> **Summary**: 1차에서 만든 Notion 작업 DB 구조를 실제 업무 관리 화면으로 탐색할 수 있도록 core views와 최고모델 운영 view를 자동 보장한다.
 >
 > **Project**: claude-code-hooks-diary
 > **Date**: 2026-06-02
@@ -15,8 +15,8 @@
 | 관점 | 내용 |
 |------|------|
 | **Problem** | 1차에서 `Parent Task`, `Depends On`, `Project`, `Purpose`, `Status` 등 구조화 컬럼을 만들었지만 Notion 사용자는 여전히 직접 view를 구성해야 한다. |
-| **Solution** | `working-diary notion ensure` 명령으로 Notion 작업 DB 기반 상태와 Core Views를 자동 생성/보장한다. |
-| **Core Value** | 같은 작업 row를 계층, 오늘, 상태, 목적, 프로젝트 관점으로 즉시 탐색할 수 있게 한다. |
+| **Solution** | `working-diary diary-notion ensure` 명령으로 Notion 작업 DB schema v7, Core Views, Operating Views를 자동 생성/보장한다. |
+| **Core Value** | 같은 작업 row를 계층, 오늘, 상태, 목적, 프로젝트, 우선순위, 막힘, 리뷰 관점으로 즉시 탐색할 수 있게 한다. |
 
 ---
 
@@ -26,9 +26,9 @@ Core Views는 모든 작업 row가 공통으로 가지는 DB 컬럼을 기준으
 
 MVP 5개 view는 임시가 아니라 최종 모델에서도 유지되는 core view다.
 
-`작업 그룹별`은 2차 후속 core view로 둔다.
+`작업 그룹별`은 core 5개에는 넣지 않지만 최고모델 운영 view로 함께 보장한다.
 
-Blocked/stale/today-plan/weekly brief는 core가 아니라 3차 이후 운영/지능화 view로 분리한다.
+Blocked, 전날 미완료, 오늘 우선순위, 리뷰 필요, 작업 그룹별은 최고모델 운영 view로 보장한다. 오래 방치된 작업, 자동 today-plan 생성, weekly brief는 3차 이후 지능화 단계로 분리한다.
 
 ### 1.1 왜 Core Views인가
 
@@ -47,6 +47,13 @@ Status
 Task Group
 Parent Task
 Depends On
+Priority
+Next Action
+Blocked
+Block Reason
+Carryover
+Review Status
+Last Reviewed
 Categories
 Files
 Commits
@@ -63,6 +70,11 @@ Core Views는 이 공통 컬럼을 다른 질문으로 재배열한다.
 상태별 = 어디까지 진행됐는가
 목적별 = 어떤 성격의 일인가
 프로젝트별 = 어느 프로젝트의 일인가
+오늘 우선순위 = 오늘 무엇을 먼저 처리할 것인가
+전날 미완료 = 어제 이전에 남은 일은 무엇인가
+Blocked = 어떤 일이 외부 조건 때문에 막혔는가
+리뷰 필요 = 검토가 필요한 일은 무엇인가
+작업 그룹별 = 며칠/여러 세션에 걸친 큰 흐름은 무엇인가
 ```
 
 `Date`와 `Work Period`는 의미가 다르다.
@@ -79,25 +91,26 @@ Work Period = 실제 작업 기간. 프로젝트/작업 그룹 산출물의 기�
 ### 2.1 명령
 
 ```bash
-working-diary notion ensure
-working-diary notion ensure --year 2026
-working-diary notion ensure --dry-run
-claude-diary notion ensure
-claude-diary notion ensure --year 2026
-claude-diary notion ensure --dry-run
+working-diary diary-notion ensure
+working-diary diary-notion ensure --year 2026
+working-diary diary-notion ensure --dry-run
+claude-diary diary-notion ensure
+claude-diary diary-notion ensure --year 2026
+claude-diary diary-notion ensure --dry-run
 ```
 
 역할:
 
-- 현재 연도 Entries DB와 schema v5를 보장한다.
-- 현재 설정된 hierarchical Notion DB에 core view가 있는지 확인한다.
+- 현재 연도 Entries DB와 schema v7를 보장한다.
+- 현재 설정된 hierarchical Notion DB에 core view와 operating view가 있는지 확인한다.
 - 없는 view만 생성한다.
 - 같은 이름의 view가 있으면 required 설정을 검사한다.
 - required 설정을 충족하면 verified로 처리한다.
-- required 설정이 맞지 않으면 기존 view를 자동 수정하지 않고 conflict로 보고한다.
+- required 설정이 맞지 않으면 기존 core view를 Views API update로 보정한다.
+- `--dry-run`에서는 실제 보정 없이 update planned로 보고한다.
 - 기존 row는 생성/수정/삭제하지 않는다.
 - 실패해도 `/diary-notion` 또는 `$diary-notion` push 기능에 영향을 주지 않는다.
-- 사용자-facing 명령은 `notion ensure` 하나로 둔다.
+- 사용자-facing 명령은 `diary-notion ensure` 하나로 둔다.
 - `views ensure`는 구현 내부의 view 보장 단계 이름으로만 사용하고, 사용자에게 별도 하위 명령으로 노출하지 않는다.
 - `--year`는 대상 연도 페이지/DB를 명시한다.
 - `--dry-run`은 생성/수정 없이 현재 접근 가능한 상태 기준으로 변경 계획만 출력한다.
@@ -114,25 +127,27 @@ claude-diary notion ensure --dry-run
 | 목적별 | 어떤 성격의 일인가? | `Purpose` |
 | 프로젝트별 | 어느 프로젝트의 일인가? | `Project`, `Work Period` |
 
-### 2.3 Core Follow-up
+### 2.3 최고모델 Operating Views
 
-`작업 그룹별`은 core follow-up으로 둔다.
+Core Views 5개는 최종 모델에서도 유지되는 기본 화면이다. 최고모델에서는 같은 `ensure` 명령으로 운영 view 5개를 추가 보장한다.
 
-| View | 주 질문 | 기준 컬럼 | 이유 |
-|------|---------|-----------|------|
-| 작업 그룹별 | 며칠/여러 세션에 걸친 큰 작업 흐름은 무엇인가? | `Task Group` | 최고모델에서는 중요하지만 MVP 5개보다 우선순위가 낮다. |
+| View | 주 질문 | 기준 컬럼 |
+|------|---------|-----------|
+| 오늘 우선순위 | 오늘 무엇을 먼저 처리할 것인가? | `Date`, `Priority`, `Blocked` |
+| 전날 미완료 | 어제 이전에 남은 일은 무엇인가? | `Date`, `Status`, `Priority`, `Carryover` |
+| Blocked | 어떤 일이 외부 조건 때문에 막혔는가? | `Blocked`, `Block Reason` |
+| 리뷰 필요 | 검토가 필요한 일은 무엇인가? | `Review Status`, `Last Reviewed` |
+| 작업 그룹별 | 며칠/여러 세션에 걸친 큰 작업 흐름은 무엇인가? | `Task Group`, `Work Period` |
 
 ### 2.4 3차 이후로 미루는 View
 
-다음 view는 core가 아니라 운영/지능화 view다.
+다음 view와 자동화는 schema v7의 재료를 기반으로 하지만, 이번 보장 대상은 아니다.
 
-| View | 단계 | 보류 이유 |
+| View/Automation | 단계 | 보류 이유 |
 |------|------|-----------|
-| 막힌 작업 | Phase 3 Operations | `Blocked` 컬럼과 blocked 계산 규칙이 필요하다. |
-| 오래 방치된 작업 | Phase 3 Operations | stale 기준과 마지막 검토일 계산이 필요하다. |
-| 검증 대기 | Phase 3 Operations | status와 verification 누락 규칙이 필요하다. |
-| 오늘 우선순위 | Phase 4 Intelligence | 전날 todo/`next_steps`와 우선순위 scoring이 필요하다. |
-| 주간 보고 | Phase 4 Intelligence | summary/review 생성 로직이 필요하다. |
+| 오래 방치된 작업 | Phase 3 Operations | stale 기준과 마지막 검토일 계산 정책이 더 필요하다. |
+| 자동 today-plan 생성 | Phase 3 Intelligence | 전날 todo/`next_steps` 수집과 사용자 승인 흐름이 필요하다. |
+| 주간 보고 | Phase 3 Intelligence | summary/review 생성 로직과 보고서 승인 흐름이 필요하다. |
 
 ---
 
@@ -145,6 +160,7 @@ claude-diary notion ensure --dry-run
 - `Parent Task` 기반으로 큰 작업과 하위 작업을 탐색한다.
 - 1차에서 추가한 포함 관계를 사용자가 실제로 확인하게 한다.
 - 메인 작업을 두고, 메인 작업을 수행하기 위한 세부 작업을 하위 항목으로 연결한다.
+- `Depends On`은 하위 작업 표현 수단이 아니므로 작업 계층 view의 기본 표시에서 제외한다.
 
 2차 MVP는 **하위 항목 데이터 구조**를 필수로 보장한다.
 
@@ -169,13 +185,13 @@ Working Diary OS
 - `Purpose`
 - `Task Group`
 - `Parent Task`
-- `Depends On`
 - `Work Period`
 - `Date`
 
 정렬/그룹:
 
 - `Parent Task` 컬럼 표시는 required다.
+- `Depends On` 컬럼은 작업 계층 view에서 hidden으로 둔다.
 - `Work Period` 컬럼 표시는 required다.
 - `subtasks` configuration 적용은 시도하되, Notion UI의 접기/펼치기 렌더링 성공은 best-effort다.
 - sub-item UI 자동화가 API 제약으로 실패하면 `subtasks`를 제거한 base table view로 fallback한다.
@@ -184,13 +200,14 @@ Working Diary OS
 
 - `작업 계층` view가 생성된다.
 - `Parent Task` 컬럼이 표시된다.
+- `Depends On` 컬럼이 표시되지 않는다.
 - `Work Period` 컬럼이 표시된다.
 - 메인 작업과 하위 작업의 포함 관계를 view에서 확인할 수 있다.
 
 Best-effort 기준:
 
 - Notion table의 접기/펼치기 sub-item UI를 활성화한다.
-- sub-item UI 설정 실패 후 base table fallback이 성공하면 전체 `notion ensure` 실패로 보지 않고 warning으로 보고한다.
+- sub-item UI 설정 실패 후 base table fallback이 성공하면 전체 `diary-notion ensure` 실패로 보지 않고 warning으로 보고한다.
 
 실패 기준:
 
@@ -257,9 +274,10 @@ fixed date filter fallback을 사용한 경우에는 CLI warning으로 다음 �
 - 오늘 수행분을 `$diary-notion`으로 새로 기록하지 않았다면 `오늘 작업` view에는 나타나지 않는다.
 - `Date`는 오늘로 기록하고, `Work Period`는 오늘 수행분의 실제 작업일 또는 작업 구간을 기록한다.
 - 같은 push 안에서 메인 작업과 세부 작업이 함께 생성된 경우에는 `Parent Task`로 포함 관계를 연결한다.
+- `Depends On`은 하위 작업이 아니라 최상위 메인 작업끼리의 선행 연결성에만 사용한다.
 - 과거 row를 찾아 cross-day `Parent Task` relation으로 자동 연결하는 것은 2차 MVP 범위가 아니며, 필요하면 후속 작업으로 분리한다.
 - 2차 MVP에서는 “오늘 해야 할 작업 추천”까지 하지 않는다.
-- 추천은 Phase 4 `today-plan`에서 처리한다.
+- 추천은 Phase 3 이후 자동 today-plan 단계에서 처리한다.
 
 예시:
 
@@ -365,27 +383,157 @@ Group by Project
 - 최종 Multi-project OS의 기본 진입점이 된다.
 - 프로젝트별 기간 계산은 2차 MVP에서 하지 않고, `Work Period` 표시만 보장한다.
 
+### 3.6 오늘 우선순위
+
+목적:
+
+- 오늘 기록된 작업 중 막히지 않은 작업을 우선순위 기준으로 확인한다.
+- 전날 todo 자동 추천은 아니며, 사용자가 오늘 `$diary-notion`으로 남긴 row 중 실행 우선순위를 보는 운영 화면이다.
+
+기준:
+
+```text
+Date = today
+Blocked = false
+Sort: Priority asc, Date desc
+```
+
+초기 표시 컬럼:
+
+- `Name`
+- `Priority`
+- `Status`
+- `Project`
+- `Task Group`
+- `Next Action`
+- `Blocked`
+- `Work Period`
+- `Date`
+
+### 3.7 전날 미완료
+
+목적:
+
+- 오늘 이전 기록일의 row 중 완료되지 않은 일을 확인한다.
+- 전날 또는 이전 세션의 미완료 작업을 다음날 우선순위 논의 재료로 남긴다.
+
+기준:
+
+```text
+Date before today
+Status != Deployed
+Sort: Priority asc, Date desc
+```
+
+초기 표시 컬럼:
+
+- `Name`
+- `Priority`
+- `Status`
+- `Project`
+- `Task Group`
+- `Next Action`
+- `Carryover`
+- `Work Period`
+- `Date`
+
+### 3.8 Blocked
+
+목적:
+
+- 외부 결정, 권한, 정보 부족 때문에 진행이 막힌 작업을 별도로 확인한다.
+- `Depends On`은 작업 간 선행 관계이고, `Blocked`는 현재 진행 가능 여부다.
+
+기준:
+
+```text
+Blocked = true
+Sort: Priority asc, Date desc
+```
+
+초기 표시 컬럼:
+
+- `Name`
+- `Priority`
+- `Status`
+- `Project`
+- `Task Group`
+- `Block Reason`
+- `Next Action`
+- `Work Period`
+- `Date`
+
+### 3.9 리뷰 필요
+
+목적:
+
+- 사용자의 검토, 상사 제출 전 확인, 구현 후 리뷰가 필요한 작업을 모은다.
+
+기준:
+
+```text
+Review Status = Needs Review
+Sort: Date desc
+```
+
+초기 표시 컬럼:
+
+- `Name`
+- `Review Status`
+- `Last Reviewed`
+- `Priority`
+- `Project`
+- `Task Group`
+- `Next Action`
+- `Date`
+
+### 3.10 작업 그룹별
+
+목적:
+
+- 며칠 또는 여러 세션에 걸친 큰 작업 흐름을 `Task Group` 기준으로 확인한다.
+- 프로젝트 산출물 기간 계산은 `Work Period`를 재료로 하지만, 이 view는 일단 탐색 화면으로 둔다.
+
+기준:
+
+```text
+Group by Task Group
+Sort: Date desc
+```
+
+초기 표시 컬럼:
+
+- `Name`
+- `Status`
+- `Priority`
+- `Project`
+- `Purpose`
+- `Parent Task`
+- `Work Period`
+- `Date`
+
 ---
 
 ## 4. 자동화 정책
 
 ### 4.1 DB/schema 보장
 
-`notion ensure`는 현재 연도 Entries DB와 schema v5까지 보장한다.
+`diary-notion ensure`는 현재 연도 Entries DB와 schema v7까지 보장한다.
 
 ```text
-working-diary notion ensure
+working-diary diary-notion ensure
 → year page 확인/생성
 → Entries DB 확인/생성
-→ schema v5 확인/보강
+→ schema v7 확인/보강
 → core views 확인/생성
+→ operating views 확인/생성
 ```
 
 정책:
 
 - DB가 없으면 현재 연도 기준으로 생성할 수 있다.
-- schema가 오래됐으면 core view 생성에 필요한 v5 schema까지 보강한다.
-- schema v5는 기존 v4에 `Work Period` date range 컬럼을 추가한다.
+- schema가 오래됐으면 view 생성에 필요한 현재 schema v7까지 보강한다.
+- schema v7은 `Work Period`, `Parent Task` ↔ `Sub-items`, `Priority`, `Next Action`, `Blocked`, `Block Reason`, `Carryover`, `Review Status`, `Last Reviewed`를 보장한다.
 - 기존 row는 생성/수정/삭제하지 않는다.
 - view 생성 전 root page, year, database 상태를 CLI 출력에 표시한다.
 - 이 명령의 DB/schema 보장은 view 생성의 전제 조건을 맞추기 위한 것이며 작업 기록 push를 대신하지 않는다.
@@ -393,48 +541,58 @@ working-diary notion ensure
 예상 출력:
 
 ```text
-[working-diary notion ensure]
+[working-diary diary-notion ensure]
 Root page: ...
 Year: 2026
 Database: Entries (created)
-Schema: v5 ensured
+Schema: v7 ensured
 Views:
   + 작업 계층
   + 오늘 작업
   + 상태별
   + 목적별
   + 프로젝트별
+  + 오늘 우선순위
+  + 전날 미완료
+  + Blocked
+  + 리뷰 필요
+  + 작업 그룹별
 ```
 
 이미 모두 있으면:
 
 ```text
-[working-diary notion ensure]
+[working-diary diary-notion ensure]
 Root page: ...
 Year: 2026
 Database: Entries (existing)
-Schema: v5 already ensured
+Schema: v7 ensured
 Views:
   = 작업 계층 (verified)
   = 오늘 작업 (verified)
   = 상태별 (verified)
   = 목적별 (verified)
   = 프로젝트별 (verified)
+  = 오늘 우선순위 (verified)
+  = 전날 미완료 (verified)
+  = Blocked (verified)
+  = 리뷰 필요 (verified)
+  = 작업 그룹별 (verified)
 ```
 
 ### 4.2 기본은 non-destructive
 
 View 자동화는 사용자의 수동 Notion 편집을 존중한다.
 
-- `notion ensure`는 내부적으로 core view를 create + verify 한다.
+- `diary-notion ensure`는 내부적으로 core view와 operating view를 create + verify 한다.
 - 이름이 같은 view가 있으면 무조건 skip하지 않고 required 설정을 검사한다.
 - required 설정을 충족하면 verified로 처리한다.
-- required 설정이 맞지 않으면 기존 view를 자동 수정하지 않고 conflict로 보고한다.
+- required 설정이 맞지 않으면 기존 보장 view를 Views API update로 보정한다.
 - 없는 view만 required 설정으로 create 한다.
 - 기존 view의 수동 설정을 덮어쓰지 않음
 - 기존 row는 수정하지 않음
-- conflict가 있으면 core view 보장이 실패한 것이므로 exit 1을 반환한다.
-- conflict가 있더라도 `오늘 작업 (Generated)` 같은 대체 view를 자동 생성하지 않는다.
+- update가 실패해 conflict/failure가 남으면 보장 view 보장이 실패한 것이므로 exit 1을 반환한다.
+- required 설정이 맞지 않아도 `오늘 작업 (Generated)` 같은 대체 view를 자동 생성하지 않고 같은 이름의 보장 view를 update한다.
 - view 생성/검증 실패가 diary push 실패로 전파되지 않음
 
 conflict 출력에는 view 이름, mismatch 이유, 해결 안내를 포함한다.
@@ -443,7 +601,7 @@ conflict 출력에는 view 이름, mismatch 이유, 해결 안내를 포함한�
 Views:
   x 오늘 작업 -- conflict
     reason: missing Date=today filter
-    action: rename/delete this view or fix the filter, then rerun
+    action: check view permissions or fix the filter, then rerun
 
 Exit: 1
 ```
@@ -458,8 +616,8 @@ Exit: 1
 
 - credential 확인
 - root/year/database 접근 가능 여부 확인
-- schema v5 보강 필요 여부 계산
-- core view 생성/verify 계획 출력
+- schema v7 보강 필요 여부 계산
+- core/operating view 생성/verify 계획 출력
 - conflict 예상 출력
 - 예상 exit code 출력
 
@@ -475,21 +633,22 @@ Exit: 1
 DB가 없을 때의 dry-run 출력 예:
 
 ```text
-[working-diary notion ensure --dry-run]
+[working-diary diary-notion ensure --dry-run]
 Database: missing
 Plan:
   + create year page
   + create Entries DB
-  + ensure schema v5
+  + ensure schema v7
   + create 5 core views
+  + create 5 operating views
 ```
 
 후속 옵션:
 
 ```bash
-working-diary notion ensure --plan
-working-diary notion ensure --apply
-working-diary notion ensure --force
+working-diary diary-notion ensure --plan
+working-diary diary-notion ensure --apply
+working-diary diary-notion ensure --force
 ```
 
 예상 동작:
@@ -515,12 +674,12 @@ $diary-notion
 View 자동화는 별도 명령으로 둔다.
 
 ```text
-working-diary notion ensure
-→ 현재 연도 Entries DB/schema v5 보장
-→ core view 존재 확인
+working-diary diary-notion ensure
+→ 현재 연도 Entries DB/schema v7 보장
+→ core/operating view 존재 확인
 → 없으면 생성
 → 있으면 required 설정 검증
-→ required 설정 미충족 시 conflict 보고
+→ required 설정 미충족 시 보장 view update
 ```
 
 이 분리를 유지하는 이유:
@@ -567,7 +726,7 @@ Required mismatch:
 
 Best-effort:
 
-- `작업 계층` view의 `Parent Task` 기반 subtask configuration payload 구성
+- `작업 계층` view의 `Sub-items` 기반 subtask configuration payload 구성
 - Notion UI의 접기/펼치기 sub-item 렌더링이 실제 workspace에서 기대대로 활성화되는지
 - group order 세부 순서
 - column width, frozen column, wrap, vertical line 같은 presentation detail
@@ -593,7 +752,7 @@ Core view별 payload / verify 기준:
 
 | View | Create payload 기준 | Verify 기준 |
 |------|----------------------|-------------|
-| 작업 계층 | `type=table`, 핵심 properties visible, `Parent Task` visible, `Work Period` visible, `Date desc` sort, `subtasks` best-effort | table view, `Parent Task` visible, `Work Period` visible |
+| 작업 계층 | `type=table`, 핵심 properties visible, `Parent Task` visible, `Sub-items` hidden, `Depends On` hidden, `Work Period` visible, `Date desc` sort, `subtasks` best-effort | table view, `Parent Task` visible, `Sub-items` hidden, `Depends On` hidden, `Work Period` visible |
 | 오늘 작업 | `type=table`, `Date equals today` relative filter, `Date desc` sort, 핵심 properties visible | table view, `Date = today` filter 또는 fixed date fallback filter, `Date desc` sort, `Work Period` visible |
 | 상태별 | `type=table`, `Status` group_by, 핵심 properties visible | table view, `Status` group_by, `Work Period` visible |
 | 목적별 | `type=table`, `Purpose` group_by, 핵심 properties visible | table view, `Purpose` group_by, `Work Period` visible |
@@ -605,7 +764,7 @@ Core view별 payload / verify 기준:
 
 | 설정 | 기준 |
 |------|------|
-| `subtasks.property_id` | `Parent Task` relation property id |
+| `subtasks.property_id` | `Sub-items` relation property id |
 | `display_mode` | `show` |
 | `filter_scope` | `parents_and_subitems` |
 
@@ -650,20 +809,18 @@ Notion-Version: 2022-06-28
 
 신규 view 경로
 NotionViewsClient
-Notion-Version: 2025-09-03
-역할: data_source_id 확인, property id map 생성, view 조회, core view 생성
+Notion-Version: 2026-03-11
+역할: data_source_id 확인, property id map 생성, data source schema 보정, view 조회/생성/수정
 ```
 
 이유:
 
 - `$diary-notion` push 경로는 이미 작업 기록의 핵심 경로이므로 안정성이 가장 중요하다.
 - `2025-09-03`부터 Notion이 database와 data source를 더 명확히 분리했기 때문에 기존 push 경로를 통째로 올리면 DB 생성, relation, page parent, query 쪽 영향 범위가 커진다.
-- `notion ensure`의 view 보장 단계는 Views API가 필요하므로 `2025-09-03` 이상이 필수다.
+- `diary-notion ensure`의 view 보장 단계는 Views API와 data source schema update가 필요하므로 `2026-03-11` client로 분리한다.
 - 따라서 view 자동화만 새 API version을 쓰고, 기존 기록 기능은 안정 버전에 남긴다.
 
-`2026-03-11`은 2차 MVP에서 바로 적용하지 않는다. 이 버전은 view 생성 때문에 필수인 버전이 아니며, block append의 `after` → `position`, `archived` → `in_trash`, `transcription` → `meeting_notes` 변경이 있어 기존 push/body append 경로까지 함께 검토해야 한다.
-
-후속으로 `2026-03-11`을 적용할 때는 전체 Notion API 호출 목록을 기준으로 별도 migration 문서를 만든다.
+`2026-03-11`을 push 경로 전체에 적용하지는 않는다. block append의 `after` → `position`, `archived` → `in_trash`, `transcription` → `meeting_notes` 변경 영향이 있으므로 row/body push는 안정 버전으로 유지한다.
 
 ### 5.2 기존 push 경로
 
@@ -675,7 +832,7 @@ Notion-Version: 2022-06-28
 역할: year page, database, row, schema, relation
 ```
 
-`notion ensure`는 view 생성 전 이 경로의 `ensure_database(year)`를 재사용해 현재 연도 DB와 schema v5를 보장한다.
+`diary-notion ensure`는 view 생성 전 이 경로의 `ensure_database(year, force_schema=True)`를 재사용해 현재 연도 DB와 schema v7를 보장한다.
 
 ### 5.3 view 자동화 경로
 
@@ -683,8 +840,8 @@ Views API는 별도 client로 분리한다.
 
 ```text
 NotionViewsExporter 또는 NotionViewsClient
-Notion-Version: 2025-09-03
-역할: view 조회, view 생성, view 설정
+Notion-Version: 2026-03-11
+역할: data source schema 보정, view 조회, view 생성, view 설정 update
 ```
 
 조회 순서:
@@ -694,7 +851,7 @@ Notion-Version: 2025-09-03
    → root page 확인
    → year page 확인/생성
    → Entries DB 확인/생성
-   → schema v5 보장
+   → schema v7 보장
    → database_id 반환
 
 2. NotionViewsClient
@@ -712,10 +869,18 @@ Notion-Version: 2025-09-03
    → Purpose
    → Parent Task
    → Task Group
+   → Sub-items
+   → Priority
+   → Next Action
+   → Blocked
+   → Block Reason
+   → Carryover
+   → Review Status
+   → Last Reviewed
    → Session ID
    → Task Index
 
-5. core view payload 생성
+5. core/operating view payload 생성
    → filter/group/sorts/subtasks에 property id 사용
 
 6. existing views 조회
@@ -733,14 +898,14 @@ Notion-Version: 2025-09-03
 - existing view 조회
 - 같은 이름 view required 설정 검사
 - required 설정 충족 시 verified 처리
-- required 설정 미충족 시 conflict 처리
+- required 설정 미충족 시 view update 처리
 - API 버전 변경 영향 격리
 
 공식 API 확인 사항:
 
 - Views API는 API version `2025-09-03` 이상이 필요하다.
-- 2차 MVP의 view client는 `2025-09-03`을 사용한다.
-- 2026-06-02 기준 공식 문서에는 `2026-03-11` 업그레이드도 존재하지만, 기존 body append/push 경로까지 함께 검토해야 하므로 후속 단계로 둔다.
+- 현재 view/data source client는 `2026-03-11`을 사용한다.
+- 2026-03-11 적용은 view/data source client로 제한하고, 기존 body append/push 경로까지 전역 적용하지 않는다.
 - view 생성에는 `data_source_id`, `name`, `type`이 필요하고, top-level database view에는 `database_id`가 필요하다.
 - filter/sorts는 data source query와 같은 shape를 사용한다.
 - table configuration은 `properties`, `group_by`, `subtasks`를 지원한다.
@@ -749,7 +914,7 @@ Notion-Version: 2025-09-03
 
 경계:
 
-- schema v5 보장은 기존 push 경로를 재사용한다.
+- schema v7 보장은 기존 push 경로를 재사용하고, `Parent Task` ↔ `Sub-items` data source relation 보정은 view client가 추가 방어한다.
 - view payload 작성과 view 생성은 `NotionViewsClient`가 담당한다.
 - property id는 절대 hard-code하지 않는다.
 - 신규 컬럼이 추가되어도 data source schema에서 name → id map을 다시 만들어 view payload를 구성한다.
@@ -770,7 +935,7 @@ Partial failure → 성공/실패 view를 나눠 보고
 ```text
 database_id 확보 실패 → exit 1
 data_source_id 확보 실패 → exit 1
-required property 누락 → schema v5 보장 실패 또는 property map 실패, exit 1
+required property 누락 → schema v7 보장 실패 또는 property map 실패, exit 1
 property id 조회 실패 → view 생성 불가, exit 1
 existing view 조회 실패 → view 보장 실패, exit 1
 ```
@@ -779,29 +944,30 @@ existing view 조회 실패 → view 보장 실패, exit 1
 
 ### 5.5 exit code와 partial failure
 
-`notion ensure`의 view 보장 단계는 core view 생성 실패와 best-effort 실패를 구분한다.
+`diary-notion ensure`의 view 보장 단계는 보장 view 생성 실패와 best-effort 실패를 구분한다.
 
 | 상황 | exit code | rollback | 이유 |
 |------|-----------|----------|------|
-| core view 전부 생성 | 0 | 없음 | 성공 |
-| core view 전부 verified | 0 | 없음 | 성공 |
-| 기존 core view required 설정 conflict | 1 | 없음 | 보장 실패 |
-| 일부 core view 실패 | 1 | 없음 | partial failure |
+| core/operating view 전부 생성 | 0 | 없음 | 성공 |
+| core/operating view 전부 verified | 0 | 없음 | 성공 |
+| 기존 보장 view required 설정 update 성공 | 0 | 없음 | 보장 성공 |
+| 기존 보장 view required 설정 update 실패 | 1 | 없음 | 보장 실패 |
+| 일부 보장 view 실패 | 1 | 없음 | partial failure |
 | 인증/권한 실패 | 1 | 없음 | 전제 실패 |
 | DB/schema 보장 실패 | 1 | 없음 | 전제 실패 |
 | relative today filter 실패 후 fixed date fallback 성공 | 0 | 없음 | best-effort warning |
 | `subtasks` 설정 실패 후 base table fallback 성공 | 0 | 없음 | best-effort warning |
-| `subtasks` 설정 실패 후 base table fallback 실패 | 1 | 없음 | core view 생성 실패 |
+| `subtasks` 설정 실패 후 base table fallback 실패 | 1 | 없음 | 작업 계층 view 생성 실패 |
 
 정책:
 
-- Core view 생성 실패는 partial failure로 보고 exit 1을 반환한다.
-- 기존 view가 required 설정을 충족하지 못하면 conflict로 보고 exit 1을 반환한다.
+- 보장 view 생성 실패는 partial failure로 보고 exit 1을 반환한다.
+- 기존 view가 required 설정을 충족하지 못하면 같은 이름의 보장 view를 update한다. update 실패 시 exit 1을 반환한다.
 - 이미 생성된 view는 rollback하지 않는다.
 - rollback이 기존 사용자 view나 새로 생성된 정상 view를 건드릴 수 있으므로 더 위험하다.
 - relative today filter 실패 후 fixed date fallback이 성공하면 best-effort warning이며 exit code에 영향을 주지 않는다.
 - `subtasks` 설정 실패 후 base table fallback이 성공하면 best-effort warning이며 exit code에 영향을 주지 않는다.
-- base table fallback까지 실패하면 core view 생성 실패이므로 exit 1을 반환한다.
+- base table fallback까지 실패하면 작업 계층 view 생성 실패이므로 exit 1을 반환한다.
 - warning은 CLI 출력에 남겨 사용자가 추후 수동 설정하거나 후속 개선을 요청할 수 있게 한다.
 
 내부 결과 모델 후보:
@@ -819,9 +985,9 @@ existing view 조회 실패 → view 보장 실패, exit 1
 CLI 출력 예시:
 
 ```text
-[working-diary notion ensure]
+[working-diary diary-notion ensure]
 Database: Entries (existing)
-Schema: v5 already ensured
+Schema: v7 ensured
 Views:
   + 작업 계층
   + 오늘 작업
@@ -839,21 +1005,21 @@ Warnings:
 ### Step 1. 설계 고정
 
 - Core Views 5개 확정
-- `작업 그룹별`은 core follow-up으로 명시
-- Operations/Intelligence views는 3차 이후로 분리
-- `notion ensure`가 현재 연도 Entries DB와 schema v5를 보장한다고 명시
+- 최고모델 Operating Views 5개 확정
+- 오래 방치된 작업, 자동 today-plan, weekly brief는 3차 이후로 분리
+- `diary-notion ensure`가 현재 연도 Entries DB와 schema v7를 보장한다고 명시
 
 ### Step 2. CLI 뼈대
 
 예상 명령:
 
 ```bash
-working-diary notion ensure
-working-diary notion ensure --year 2026
-working-diary notion ensure --dry-run
-claude-diary notion ensure
-claude-diary notion ensure --year 2026
-claude-diary notion ensure --dry-run
+working-diary diary-notion ensure
+working-diary diary-notion ensure --year 2026
+working-diary diary-notion ensure --dry-run
+claude-diary diary-notion ensure
+claude-diary diary-notion ensure --year 2026
+claude-diary diary-notion ensure --dry-run
 ```
 
 CLI 구조 후보:
@@ -875,7 +1041,7 @@ claude_diary.cli.notion_ensure
 NotionHierarchicalExporter.ensure_database(year)
 → year page 보장
 → Entries DB 보장
-→ schema v5 보장
+→ schema v7 보장
 → database_id 반환
 ```
 
@@ -891,7 +1057,7 @@ src/claude_diary/exporters/notion_views.py
 
 역할:
 
-- credential resolve는 기존 notion push/init과 공유
+- credential resolve는 기존 diary-notion push/init과 공유
 - target database/data source 확인
 - `database_id`로 `data_source_id` 확보
 - data source schema 조회
@@ -922,19 +1088,19 @@ src/claude_diary/exporters/notion_views.py
 - relative today filter validation 실패 시 fixed date filter fallback + warning
 - fixed date fallback view가 오늘 날짜가 아니면 conflict
 - 이미 있고 required 설정을 충족하는 view는 verified
-- 이미 있지만 required 설정이 부족한 view는 conflict
-- 없는 core view는 create
+- 이미 있지만 required 설정이 부족한 view는 update
+- 없는 core/operating view는 create
 - `Status` group order 차이는 warning 또는 ignore이며 conflict가 아님
 - `Purpose`의 빈 값/`General` 그룹 위치 차이는 conflict가 아님
 - partial failure를 report
 - conflict가 있으면 exit 1
-- 일부 core view 실패 시 exit 1
+- 일부 보장 view 실패 시 exit 1
 - `subtasks` 설정 실패 후 base table fallback 성공 시 warning만 남기고 exit 0
 - `subtasks` 설정 실패 후 base table fallback 실패 시 exit 1
 - credential missing 시 안내
 - 기존 row를 수정하지 않음
 - push 경로와 view 경로가 분리되어 있음
-- `작업 그룹별`, `막힌 작업`, `today-plan` view는 MVP에서 생성하지 않음
+- core 5개와 operating 5개가 모두 보장 대상에 포함됨
 
 ---
 
@@ -942,9 +1108,10 @@ src/claude_diary/exporters/notion_views.py
 
 2차 MVP에서 하지 않는다.
 
-- `$diary-notion` 실행마다 `notion ensure` 자동 실행
-- `Blocked`, `Progress`, `Priority` 컬럼 추가
-- stale/blocked/review/today-plan view 생성
+- `$diary-notion` 실행마다 `diary-notion ensure` 자동 실행
+- `Progress` 계산 컬럼 추가
+- stale view 생성
+- 자동 today-plan 생성과 apply
 - weekly brief 생성
 - 프로젝트/작업 그룹 전체 기간 자동 계산
 - 기존 사용자 view 강제 수정
@@ -958,15 +1125,17 @@ src/claude_diary/exporters/notion_views.py
 
 2차 MVP 성공 기준:
 
-- `working-diary notion ensure`가 현재 연도 Entries DB와 schema v5를 보장한다.
-- `working-diary notion ensure --year YYYY`가 지정 연도 Entries DB와 schema v5를 보장한다.
-- `working-diary notion ensure --dry-run`이 생성/수정 없이 계획만 출력한다.
+- `working-diary diary-notion ensure`가 현재 연도 Entries DB와 schema v7를 보장한다.
+- `working-diary diary-notion ensure --year YYYY`가 지정 연도 Entries DB와 schema v7를 보장한다.
+- `working-diary diary-notion ensure --dry-run`이 생성/수정 없이 계획만 출력한다.
 - `Work Period` date range 컬럼을 보장하고 core view에 표시한다.
-- `working-diary notion ensure`가 core view 5개를 자동 보장한다.
+- `Priority`, `Next Action`, `Blocked`, `Block Reason`, `Carryover`, `Review Status`, `Last Reviewed` 운영 컬럼을 보장한다.
+- `Parent Task` ↔ `Sub-items` native 하위항목 relation을 보장한다.
+- `working-diary diary-notion ensure`가 core view 5개와 operating view 5개를 자동 보장한다.
 - 같은 이름의 view가 이미 있으면 중복 생성하지 않는다.
 - 같은 이름의 view가 required 설정을 충족하면 verified로 처리한다.
-- 같은 이름의 view가 required 설정을 충족하지 않으면 conflict로 보고 exit 1을 반환한다.
+- 같은 이름의 view가 required 설정을 충족하지 않으면 view update로 보정하고, update 실패 시 exit 1을 반환한다.
 - 기존 row는 수정하지 않는다.
 - 기존 `$diary-notion` push는 변경 없이 계속 동작한다.
-- 사용자가 Notion DB에서 작업 계층, 오늘 작업, 상태별, 목적별, 프로젝트별로 즉시 탐색할 수 있다.
-- 3차 Operations와 4차 Intelligence view는 core view와 혼동되지 않는다.
+- 사용자가 Notion DB에서 작업 계층, 오늘 작업, 상태별, 목적별, 프로젝트별, 오늘 우선순위, 전날 미완료, Blocked, 리뷰 필요, 작업 그룹별로 즉시 탐색할 수 있다.
+- stale/자동 today-plan/weekly brief는 operating view와 혼동되지 않는다.

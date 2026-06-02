@@ -42,14 +42,14 @@ $diary-notion
 추가 명령은 필요할 때만 실행한다.
 
 ```bash
-working-diary notion ensure
-working-diary notion ensure --dry-run
-working-diary notion today-plan
-working-diary notion review
-working-diary notion weekly-brief
+working-diary diary-notion ensure
+working-diary diary-notion ensure --dry-run
+working-diary diary-notion today-plan
+working-diary diary-notion review
+working-diary diary-notion weekly-brief
 ```
 
-최종 모델에서도 사용자-facing 명령은 최소화한다. Notion 기반 정비는 `working-diary notion ensure` 하나를 기본 진입점으로 두고, schema/view/status/drift 관련 세부 작업은 내부 단계와 옵션으로 확장한다.
+최종 모델에서도 사용자-facing 명령은 최소화한다. Notion 기반 정비는 `working-diary diary-notion ensure` 하나를 기본 진입점으로 두고, schema/view/status/drift 관련 세부 작업은 내부 단계와 옵션으로 확장한다.
 
 최종적으로 사용자는 Notion DB를 열어 다음을 확인할 수 있어야 한다.
 
@@ -77,6 +77,14 @@ working-diary notion weekly-brief
 - `Status`
 - `Parent Task`
 - `Depends On`
+- `Work Period`
+- `Priority`
+- `Next Action`
+- `Blocked`
+- `Block Reason`
+- `Carryover`
+- `Review Status`
+- `Last Reviewed`
 
 본문은 사람이 읽는 근거를 담당한다.
 
@@ -94,11 +102,11 @@ working-diary notion weekly-brief
 Parent Task = 포함 관계
 예: "상품 목록 포커싱"은 "로컬 테스트 진행"의 하위 작업
 
-Depends On = 선행 관계
-예: "웹페이지 구동 확인"은 "docker 실행"이 끝나야 가능
+Depends On = 큰 메인 작업끼리의 선행 관계
+예: "2차 view 자동화 구현"은 "schema v7 보장"이 끝나야 가능
 ```
 
-두 관계를 섞지 않는다. 이 원칙이 깨지면 view, 진행률, blocked 계산이 모두 부정확해진다.
+하위 작업은 `Parent Task`와 Notion sub-item으로 표현하고, 종속성으로 연결하지 않는다. 두 관계를 섞으면 view, 진행률, blocked 계산이 모두 부정확해진다.
 
 ### 3.4 수동 수정은 자동화보다 우선
 
@@ -137,8 +145,13 @@ row로 만들 기준:
 | `Purpose` | Feature, Bugfix, Planning 등 목적 |
 | `Status` | Discussion, Design, Implementation, Testing, Deployed |
 | `Task Group` | 여러 세션을 묶는 큰 작업 단위 |
-| `Parent Task` | 포함 관계 |
-| `Depends On` | 선행 관계 |
+| `Parent Task` | 포함 관계. Notion 하위항목/sub-item 기반 |
+| `Depends On` | 큰 메인 작업끼리의 선행 관계 |
+| `Priority` | P0/P1/P2/P3 우선순위 |
+| `Next Action` | 다음에 바로 실행할 행동 |
+| `Blocked`, `Block Reason` | 현재 진행 불가 여부와 막힘 원인 |
+| `Carryover` | 전날/이전 세션 미완료 작업 이어가기 |
+| `Review Status`, `Last Reviewed` | 검토 필요/완료/보류와 실제 검토일 |
 | `Categories` | 보조 라벨 |
 | `Files`, `Commits`, `Lines` | 변경 규모 |
 | `Session ID`, `Task Index` | 멱등성 |
@@ -149,11 +162,8 @@ row로 만들 기준:
 
 | 필드 | 역할 |
 |------|------|
+| `Stale Score` | 오래 방치된 정도 |
 | `Progress` | 하위 작업 기준 진행률 |
-| `Blocked` | 선행 작업/리스크 기반 막힘 여부 |
-| `Block Reason` | 막힘 이유 |
-| `Last Reviewed` | 자동/수동 리뷰 시점 |
-| `Priority` | 사용자가 승인한 우선순위 |
 | `Review Notes` | 주간/일간 리뷰 결과 |
 
 확장 컬럼은 기존 핵심 모델을 대체하지 않고 보조한다.
@@ -208,13 +218,17 @@ Task Group = diary-notion-view-design
 - 제목과 설명형 본문을 한국어로 작성한다.
 - 파일, 명령어, branch, commit hash, 코드 식별자는 원문을 보존한다.
 - `parent_index`와 `depends_on_indices`를 구분해 작성한다.
+- 하위 작업은 `parent_index`로 연결하고, `depends_on_indices`는 최상위 메인 작업 간 선행 관계에만 사용한다.
+- `Priority`, `Next Action`, `Blocked`, `Block Reason`, `Carryover`, `Review Status`, `Last Reviewed`를 보수적으로 작성한다.
 
 ### 5.2 CLI 책임
 
 - JSON을 검증하고 Notion row를 생성한다.
 - Git 메타데이터를 수집한다.
 - `Parent Task`와 `Depends On` relation을 row 생성 후 연결한다.
-- Notion schema/view/status 동기화는 명령 단위로 분리한다.
+- `Depends On` 연결 시 하위 작업 row는 제외해 sub-item 구조와 선행 관계가 섞이지 않게 한다.
+- `Project` 누락/unknown은 명령 실행 cwd 폴더명으로 보정한다.
+- Notion schema/view 동기화는 `diary-notion ensure` 명령 단위로 분리한다.
 
 ### 5.3 운영/리뷰 엔진 책임
 
@@ -249,20 +263,20 @@ Conflict 감지
 명령 방향:
 
 ```bash
-working-diary notion ensure
-working-diary notion ensure --dry-run
-working-diary notion ensure --plan
-working-diary notion ensure --apply
-working-diary notion ensure --force
+working-diary diary-notion ensure
+working-diary diary-notion ensure --dry-run
+working-diary diary-notion ensure --plan
+working-diary diary-notion ensure --apply
+working-diary diary-notion ensure --force
 ```
 
 동작:
 
-- `notion ensure`: conflict를 감지하고 이유와 수동 해결 안내를 출력한다.
-- `notion ensure --dry-run`: 생성/수정 없이 현재 상태 기준 계획만 출력한다.
-- `notion ensure --plan`: 어떤 view/schema를 어떻게 고칠지 변경 계획만 출력한다.
-- `notion ensure --apply`: 사용자가 승인한 변경만 적용한다.
-- `notion ensure --force`: 시스템이 관리하는 view만 재생성하거나 업데이트한다.
+- `diary-notion ensure`: conflict를 감지하고 이유와 수동 해결 안내를 출력한다.
+- `diary-notion ensure --dry-run`: 생성/수정 없이 현재 상태 기준 계획만 출력한다.
+- `diary-notion ensure --plan`: 어떤 view/schema를 어떻게 고칠지 변경 계획만 출력한다.
+- `diary-notion ensure --apply`: 사용자가 승인한 변경만 적용한다.
+- `diary-notion ensure --force`: 시스템이 관리하는 view만 재생성하거나 업데이트한다.
 
 conflict 유형:
 
@@ -301,7 +315,7 @@ conflict 유형:
 예상 명령:
 
 ```bash
-working-diary notion ensure
+working-diary diary-notion ensure
 ```
 
 Core Views:
@@ -314,15 +328,25 @@ Core Views:
 
 Core follow-up:
 
-- 작업 그룹별
+- 없음. Core Views 5개는 최종 모델에서도 기본 화면으로 유지한다.
 
 Operations/Intelligence views:
 
-- 막힌 작업
-- 오래 방치된 작업
-- 검증 대기
 - 오늘 우선순위
-- 주간 보고
+- 전날 미완료
+- Blocked
+- 리뷰 필요
+- 작업 그룹별
+
+Phase 2에서 보장하는 schema v7 운영 컬럼:
+
+- `Priority`
+- `Next Action`
+- `Blocked`
+- `Block Reason`
+- `Carryover`
+- `Review Status`
+- `Last Reviewed`
 
 하위 항목 정책:
 
@@ -339,14 +363,13 @@ View 자동화는 push 실패와 분리한다. view 생성/갱신 실패가 작�
 예상 명령:
 
 ```bash
-working-diary notion ensure --dry-run
-working-diary notion ensure --apply
+working-diary diary-notion ensure --dry-run
+working-diary diary-notion ensure --apply
 ```
 
 기능 후보:
 
 - 하위 작업 기반 진행률 계산
-- 선행 작업 기반 blocked 탐지
 - schema/view conflict 유형 분류
 - conflict dry-run plan 출력
 - 반복 conflict 추적
@@ -355,6 +378,7 @@ working-diary notion ensure --apply
 - 오래 방치된 작업 탐지
 - 검증 누락 탐지
 - 상위 작업 상태 제안
+- 전날 미완료 row와 `Next Action`을 기반으로 today-plan 후보 제안
 
 ### Phase 4. Intelligence
 
@@ -363,9 +387,9 @@ working-diary notion ensure --apply
 예상 명령:
 
 ```bash
-working-diary notion today-plan
-working-diary notion review
-working-diary notion weekly-brief
+working-diary diary-notion today-plan
+working-diary diary-notion review
+working-diary diary-notion weekly-brief
 ```
 
 기능 후보:

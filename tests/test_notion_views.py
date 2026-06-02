@@ -12,6 +12,7 @@ from claude_diary.exporters.notion_views import (
     NotionViewsClient,
     _build_core_view_specs,
     _payload_for_spec,
+    _update_payload_for_spec,
 )
 
 
@@ -37,8 +38,34 @@ def _prop_map():
         "Purpose": {"id": "purpose_id", "type": "select"},
         "Status": {"id": "status_id", "type": "select"},
         "Task Group": {"id": "task_group_id", "type": "select"},
-        "Parent Task": {"id": "parent_id", "type": "relation"},
+        "Parent Task": {
+            "id": "parent_id",
+            "type": "relation",
+            "relation": {
+                "dual_property": {
+                    "synced_property_name": "Sub-items",
+                    "synced_property_id": "subitems_id",
+                }
+            },
+        },
+        "Sub-items": {
+            "id": "subitems_id",
+            "type": "relation",
+            "relation": {
+                "dual_property": {
+                    "synced_property_name": "Parent Task",
+                    "synced_property_id": "parent_id",
+                }
+            },
+        },
         "Depends On": {"id": "depends_id", "type": "relation"},
+        "Priority": {"id": "priority_id", "type": "select"},
+        "Next Action": {"id": "next_action_id", "type": "rich_text"},
+        "Blocked": {"id": "blocked_id", "type": "checkbox"},
+        "Block Reason": {"id": "block_reason_id", "type": "rich_text"},
+        "Carryover": {"id": "carryover_id", "type": "checkbox"},
+        "Review Status": {"id": "review_status_id", "type": "select"},
+        "Last Reviewed": {"id": "last_reviewed_id", "type": "date"},
         "Session ID": {"id": "session_id", "type": "rich_text"},
         "Task Index": {"id": "task_index_id", "type": "number"},
         "Files": {"id": "files_id", "type": "number"},
@@ -70,6 +97,8 @@ class FakeViewsClient:
         self.views = views if views is not None else []
         self.prop_map = prop_map if prop_map is not None else _prop_map()
         self.created_payloads = []
+        self.updated_payloads = []
+        self.updated_data_sources = []
 
     def get_primary_data_source_id(self, database_id):
         return "ds1"
@@ -83,6 +112,34 @@ class FakeViewsClient:
     def create_view(self, payload):
         self.created_payloads.append(payload)
         return {"id": "created_%d" % len(self.created_payloads)}
+
+    def update_view(self, view_id, payload):
+        self.updated_payloads.append((view_id, payload))
+        return {"id": view_id}
+
+    def update_data_source(self, data_source_id, payload):
+        self.updated_data_sources.append((data_source_id, payload))
+        self.prop_map["Parent Task"] = {
+            "id": "parent_id",
+            "type": "relation",
+            "relation": {
+                "dual_property": {
+                    "synced_property_name": "Sub-items",
+                    "synced_property_id": "subitems_id",
+                }
+            },
+        }
+        self.prop_map["Sub-items"] = {
+            "id": "subitems_id",
+            "type": "relation",
+            "relation": {
+                "dual_property": {
+                    "synced_property_name": "Parent Task",
+                    "synced_property_id": "parent_id",
+                }
+            },
+        }
+        return {"id": data_source_id}
 
 
 class TestNotionViewsClient:
@@ -113,9 +170,9 @@ class TestNotionViewsClient:
             }
         }):
             prop_map = client.get_property_map("ds1")
-        assert prop_map["Name"] == {"id": "title", "type": "title"}
-        assert prop_map["Status"] == {"id": "abc", "type": "select"}
-        assert prop_map["Date"] == {"id": "yo}Q", "type": "date"}
+        assert prop_map["Name"] == {"id": "title", "type": "title", "relation": None}
+        assert prop_map["Status"] == {"id": "abc", "type": "select", "relation": None}
+        assert prop_map["Date"] == {"id": "yo}Q", "type": "date", "relation": None}
 
 
 class TestCoreViewsEnsurer:
@@ -123,15 +180,18 @@ class TestCoreViewsEnsurer:
         client = FakeViewsClient()
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
 
-        assert result.created == list(CORE_VIEW_NAMES)
+        from claude_diary.exporters.notion_views import ENSURED_VIEW_NAMES
+        assert result.created == list(ENSURED_VIEW_NAMES)
         assert result.ok()
-        assert len(client.created_payloads) == 5
+        assert len(client.created_payloads) == 10
 
         by_name = {payload["name"]: payload for payload in client.created_payloads}
         hierarchy = by_name["작업 계층"]
         hierarchy_config = hierarchy["configuration"]
-        assert hierarchy_config["subtasks"]["property_id"] == "parent_id"
+        assert hierarchy_config["subtasks"]["property_id"] == "subitems_id"
         assert _visible(hierarchy, "parent_id") is True
+        assert _visible(hierarchy, "subitems_id") is False
+        assert _visible(hierarchy, "depends_id") is False
         assert _visible(hierarchy, "work_period_id") is True
         assert _visible(hierarchy, "session_id") is False
 
@@ -142,12 +202,26 @@ class TestCoreViewsEnsurer:
         assert by_name["상태별"]["configuration"]["group_by"]["property_id"] == "status_id"
         assert by_name["목적별"]["configuration"]["group_by"]["property_id"] == "purpose_id"
         assert by_name["프로젝트별"]["configuration"]["group_by"]["property_id"] == "project_id"
+        assert by_name["오늘 우선순위"]["filter"]["and"][0] == {
+            "property": "Date",
+            "date": {"equals": "today"},
+        }
+        assert by_name["오늘 우선순위"]["sorts"][0] == {
+            "property": "Priority",
+            "direction": "ascending",
+        }
+        assert by_name["Blocked"]["filter"] == {
+            "property": "Blocked",
+            "checkbox": {"equals": True},
+        }
+        assert by_name["작업 그룹별"]["configuration"]["group_by"]["property_id"] == "task_group_id"
 
     def test_verifies_existing_matching_views(self):
         client = FakeViewsClient(views=_matching_views())
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
 
-        assert result.verified == list(CORE_VIEW_NAMES)
+        from claude_diary.exporters.notion_views import ENSURED_VIEW_NAMES
+        assert result.verified == list(ENSURED_VIEW_NAMES)
         assert result.ok()
         assert client.created_payloads == []
 
@@ -155,11 +229,62 @@ class TestCoreViewsEnsurer:
         client = FakeViewsClient()
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02", dry_run=True)
 
-        assert result.planned == list(CORE_VIEW_NAMES)
+        from claude_diary.exporters.notion_views import ENSURED_VIEW_NAMES
+        assert result.planned == list(ENSURED_VIEW_NAMES)
         assert result.ok()
         assert client.created_payloads == []
 
-    def test_existing_view_with_required_mismatch_is_conflict(self):
+    def test_converts_parent_task_to_dual_subitems_schema(self):
+        prop_map = dict(_prop_map())
+        prop_map.pop("Sub-items")
+        prop_map["Parent Task"] = {
+            "id": "parent_id",
+            "type": "relation",
+            "relation": {"single_property": {}},
+        }
+        client = FakeViewsClient(prop_map=prop_map)
+
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+
+        assert result.ok()
+        assert client.updated_data_sources == [
+            (
+                "ds1",
+                {
+                    "properties": {
+                        "Parent Task": {
+                            "relation": {
+                                "data_source_id": "ds1",
+                                "dual_property": {
+                                    "synced_property_name": "Sub-items",
+                                },
+                            }
+                        }
+                    }
+                },
+            )
+        ]
+        from claude_diary.exporters.notion_views import ENSURED_VIEW_NAMES
+        assert result.created == list(ENSURED_VIEW_NAMES)
+
+    def test_dry_run_plans_subitems_schema_conversion(self):
+        prop_map = dict(_prop_map())
+        prop_map.pop("Sub-items")
+        prop_map["Parent Task"] = {
+            "id": "parent_id",
+            "type": "relation",
+            "relation": {"single_property": {}},
+        }
+        client = FakeViewsClient(prop_map=prop_map)
+
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02", dry_run=True)
+
+        assert result.ok()
+        assert result.updates_planned == ["작업 계층"]
+        assert client.updated_data_sources == []
+        assert any("Sub-items" in warning for warning in result.warnings)
+
+    def test_existing_view_with_required_mismatch_is_updated(self):
         views = _matching_views()
         for view in views:
             if view["name"] == "오늘 작업":
@@ -168,10 +293,44 @@ class TestCoreViewsEnsurer:
         client = FakeViewsClient(views=views)
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
 
-        assert not result.ok()
-        assert len(result.conflicts) == 1
-        assert result.conflicts[0].name == "오늘 작업"
-        assert "Date=today" in result.conflicts[0].reason
+        assert result.ok()
+        assert result.updated == ["오늘 작업"]
+        assert len(client.updated_payloads) == 1
+        view_id, payload = client.updated_payloads[0]
+        assert view_id == "오늘 작업_id"
+        assert payload["filter"] == {"property": "Date", "date": {"equals": "today"}}
+        assert payload["sorts"] == [{"property": "Date", "direction": "descending"}]
+
+    def test_dry_run_plans_required_mismatch_update(self):
+        views = _matching_views()
+        for view in views:
+            if view["name"] == "작업 계층":
+                for entry in view["configuration"]["properties"]:
+                    if entry["property_id"] == "depends_id":
+                        entry["visible"] = True
+
+        client = FakeViewsClient(views=views)
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02", dry_run=True)
+
+        assert result.ok()
+        assert result.updates_planned == ["작업 계층"]
+        assert client.updated_payloads == []
+        assert any("Depends On" in warning for warning in result.warnings)
+
+    def test_existing_hierarchy_view_with_parent_task_subtasks_is_updated(self):
+        views = _matching_views()
+        for view in views:
+            if view["name"] == "작업 계층":
+                view["configuration"]["subtasks"]["property_id"] = "parent_id"
+
+        client = FakeViewsClient(views=views)
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+
+        assert result.ok()
+        assert result.updated == ["작업 계층"]
+        view_id, payload = client.updated_payloads[0]
+        assert view_id == "작업 계층_id"
+        assert payload["configuration"]["subtasks"]["property_id"] == "subitems_id"
 
     def test_missing_required_property_fails_before_create(self):
         prop_map = dict(_prop_map())
@@ -193,7 +352,8 @@ class TestCoreViewsEnsurer:
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02", dry_run=True)
 
         assert result.ok()
-        assert result.planned == list(CORE_VIEW_NAMES)
+        from claude_diary.exporters.notion_views import ENSURED_VIEW_NAMES
+        assert result.planned == list(ENSURED_VIEW_NAMES)
         assert any("Work Period" in w for w in result.warnings)
         assert client.created_payloads == []
 
@@ -216,6 +376,37 @@ class TestCoreViewsEnsurer:
             "date": {"equals": "2026-06-02"},
         }
         assert any("relative today filter failed" in w for w in result.warnings)
+
+    def test_today_priority_relative_filter_fallback_keeps_blocked_filter(self):
+        views = [v for v in _matching_views() if v["name"] != "오늘 우선순위"]
+        client = FailingCreateClient(
+            views=views,
+            fail_when=lambda payload: (
+                payload["name"] == "오늘 우선순위"
+                and payload.get("filter", {}).get("and", [{}])[0].get("date", {}).get("equals") == "today"
+            ),
+        )
+
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+
+        assert result.ok()
+        assert result.created == ["오늘 우선순위"]
+        assert client.created_payloads[-1]["filter"] == {
+            "and": [
+                {"property": "Date", "date": {"equals": "2026-06-02"}},
+                {"property": "Blocked", "checkbox": {"equals": False}},
+            ]
+        }
+        assert any("relative today filter failed" in w for w in result.warnings)
+
+    def test_update_payload_omits_empty_filter_and_sorts(self):
+        spec = _build_core_view_specs("db1", "ds1", _prop_map(), "2026-06-02")[2]
+        payload = _update_payload_for_spec(spec)
+
+        assert payload["name"] == "상태별"
+        assert "configuration" in payload
+        assert "filter" not in payload
+        assert "sorts" not in payload
 
     def test_subtasks_failure_falls_back_to_base_table(self):
         views = [v for v in _matching_views() if v["name"] != "작업 계층"]

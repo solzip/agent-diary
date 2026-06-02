@@ -38,6 +38,13 @@ def test_codex_skills_exist_and_cover_diary_workflows():
     assert '"risks": ["..."]' in notion_text
     assert '"support_needed": ["..."]' in notion_text
     assert '"work_period": "2026-06-02"' in notion_text
+    assert '"priority": "P1"' in notion_text
+    assert '"next_action": "..."' in notion_text
+    assert '"blocked": false' in notion_text
+    assert '"block_reason": ""' in notion_text
+    assert '"carryover": false' in notion_text
+    assert '"review_status": "Needs Review"' in notion_text
+    assert '"last_reviewed": "2026-06-02"' in notion_text
     assert '"parent_index": null' in notion_text
     assert "Exclude full diffs" in notion_text
     assert "in Korean" in notion_text

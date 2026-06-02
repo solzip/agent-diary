@@ -1,6 +1,6 @@
 ---
 name: diary-notion
-description: Push the current Codex work session to the hierarchical Notion working diary DB. Use when the user invokes $diary-notion or asks Codex to record the current session in Notion by project, purpose, task group, branch, status, categories, files, commands, commits, and dependencies.
+description: Push the current Codex work session to the hierarchical Notion working diary DB. Use when the user invokes $diary-notion or asks Codex to record the current session in Notion by project, purpose, task group, status, priority, sub-items, dependencies, blockers, next actions, files, commands, and commits.
 ---
 
 # Diary Notion
@@ -13,10 +13,11 @@ Split the current Codex session into task-sized entries and push them to Notion.
 2. Split work into task-sized database rows. Branch changes are hard task boundaries; within a branch, split by semantic work unit.
    - Create a row for work that has its own status, evidence, code/test output, or can block another task
    - Keep tiny check items, raw notes, long SQL/JS snippets, and reference links inside the page body evidence instead of making them separate rows
-   - Use `parent_index` for containment hierarchy and `depends_on_indices` for prerequisite order; do not mix the two
+   - Use `parent_index` for containment hierarchy and Notion sub-items; do not model subtasks with dependencies
+   - Use `depends_on_indices` only for prerequisite links between large top-level tasks
 3. For each task, produce:
    - Language policy:
-     - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, and `support_needed` in Korean
+     - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, and `block_reason` in Korean
      - Keep `status` and `purpose` as the exact English enum values below
      - Preserve file paths, commands, branches, commit hashes, code identifiers, function names, and class names as written
      - Preserve `user_prompts` in the user's original wording as evidence
@@ -49,10 +50,18 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
    - `work_period`: actual work period; use today's `YYYY-MM-DD` by default, or `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for a range
+   - `priority`: one of `P0`, `P1`, `P2`, `P3`; use `P0` for urgent/blocking work, `P1` for today's highest priority, `P2` for normal follow-up, and `P3` for low priority
+   - `next_action`: 0-1 concrete Korean action that can be started next
+   - `blocked`: `true` only when the task cannot continue without external decision, permission, or information
+   - `block_reason`: Korean reason when `blocked` is `true`
+   - `carryover`: `true` when this row continues unfinished work from a previous day/session
+   - `review_status`: `Needs Review`, `Reviewed`, or `Deferred`
+   - `last_reviewed`: `YYYY-MM-DD` when this work was actually reviewed
    - `task_group`: stable kebab-case/snake-case group for multi-session work
-   - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy
+   - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy and Notion sub-items
    - `depends_on_indices`: zero-based indices in this push, or `[]`
-     - Use this only when the current task cannot proceed before another task is done
+     - Use this only when a top-level main task cannot proceed before another top-level main task is done
+     - Do not use this for child/subtask rows; use `parent_index` instead
    - `project`: current command cwd folder/repository name. Never write `"unknown"`; if you are not sure, omit the field or leave it empty so the CLI falls back to cwd.
    - `categories`, `user_prompts`, `files_modified`, `files_created`, `commands_run`, `commit_hashes`, `errors`
 4. Create `.diary-notion-<8-random>.json` in cwd:
@@ -81,6 +90,13 @@ Split the current Codex session into task-sized entries and push them to Notion.
       "status": "Implementation",
       "purpose": "Feature",
       "work_period": "2026-06-02",
+      "priority": "P1",
+      "next_action": "...",
+      "blocked": false,
+      "block_reason": "",
+      "carryover": false,
+      "review_status": "Needs Review",
+      "last_reviewed": "2026-06-02",
       "task_group": "working-diary-notion",
       "parent_index": null,
       "depends_on_indices": [],

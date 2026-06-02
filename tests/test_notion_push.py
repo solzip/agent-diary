@@ -196,6 +196,27 @@ class TestBuildProperties:
         )
         assert props["Project"]["select"]["name"] == "actual-project"
 
+    def test_v7_operating_properties_included(self):
+        task = dict(
+            self._base_task(),
+            priority="high",
+            next_action="다른 세션에서 ensure 검증",
+            blocked=True,
+            block_reason="Notion API 응답 확인 필요",
+            carryover=True,
+            review_status="needs_review",
+            last_reviewed="2026-06-02T09:00:00",
+        )
+        props = _build_properties(task, "2026-06-02", "main", {}, "sess1", 0)
+
+        assert props["Priority"]["select"]["name"] == "P1"
+        assert props["Next Action"]["rich_text"][0]["text"]["content"] == "다른 세션에서 ensure 검증"
+        assert props["Blocked"]["checkbox"] is True
+        assert props["Block Reason"]["rich_text"][0]["text"]["content"] == "Notion API 응답 확인 필요"
+        assert props["Carryover"]["checkbox"] is True
+        assert props["Review Status"]["select"]["name"] == "Needs Review"
+        assert props["Last Reviewed"]["date"]["start"] == "2026-06-02"
+
 
 class TestNormalizeWorkPeriod:
     def test_missing_falls_back_to_date(self):
@@ -291,6 +312,21 @@ class TestDependsOnWiring:
         _wire_depends_on(mock_exp, tasks, row_ids)
         mock_exp.update_row_relation.assert_not_called()
 
+    def test_wire_depends_on_only_links_top_level_tasks(self):
+        """Sub-items use Parent Task, while Depends On is only for main rows."""
+        from claude_diary.cli.notion_push import _wire_depends_on
+        mock_exp = MagicMock()
+        tasks = [
+            {"title": "Main A"},
+            {"title": "Sub A", "parent_index": 0, "depends_on_indices": [0]},
+            {"title": "Main B", "depends_on_indices": [0, 1]},
+        ]
+        row_ids = {0: "row_a", 1: "row_sub_a", 2: "row_b"}
+
+        _wire_depends_on(mock_exp, tasks, row_ids)
+
+        mock_exp.update_row_relation.assert_called_once_with("row_b", ["row_a"])
+
     def test_wire_parent_tasks_calls_update_for_children(self, tmp_path):
         input_path = tmp_path / "in.json"
         self._write_json(str(input_path), {
@@ -325,6 +361,10 @@ class TestDependsOnWiring:
         assert len(parent_calls) == 2
         assert parent_calls[0].args == ("row_b", "row_a")
         assert parent_calls[1].args == ("row_c", "row_b")
+        subitem_calls = mock_exp.update_row_subitems.call_args_list
+        assert len(subitem_calls) == 2
+        assert subitem_calls[0].args == ("row_a", ["row_b"])
+        assert subitem_calls[1].args == ("row_b", ["row_c"])
 
     def test_wire_parent_tasks_skips_missing_parent(self):
         from claude_diary.cli.notion_push import _wire_parent_tasks
@@ -336,6 +376,7 @@ class TestDependsOnWiring:
         row_ids = {0: "row_a", 1: "row_b"}
         _wire_parent_tasks(mock_exp, tasks, row_ids)
         mock_exp.update_row_parent.assert_not_called()
+        mock_exp.update_row_subitems.assert_not_called()
 
 
 class TestGatherGitInfo:
