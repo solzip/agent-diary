@@ -136,7 +136,7 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
 한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Work Period` 컬럼으로 Notion에서 필터/그룹/관계 조회가 가능합니다.
 `$diary-notion`과 `/diary-notion`은 작업 row push에 집중하고, `working-diary diary-notion ensure`는 schema v5와 core view 5개 보장에 집중합니다.
 `Parent Task`는 포함 관계, `Depends On`은 선행 관계를 나타냅니다. `Project`가 task JSON에서 누락되거나 `unknown`으로 들어오면 CLI가 명령 실행 cwd의 폴더명으로 보정합니다.
-각 Notion 페이지 본문은 `body_intro`, `요약`, `작업 한눈에`, `영향`, `검증 및 상태`, `다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
+각 Notion 페이지 본문은 `body_intro` 핵심 callout 1개, `결과` 체크리스트, `작업 한눈에` 표, `영향` bullet, `검증` 체크리스트, `리스크 / 다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
 제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status` enum 값은 원문 또는 영어 값을 유지합니다.
 
 ### 5분 셋업
