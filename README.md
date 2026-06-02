@@ -133,11 +133,24 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
          └── ...
 ```
 
-한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Sub-items`, `Depends On`, `Work Period`, `Priority`, `Blocked`, `Next Action` 컬럼으로 Notion에서 필터/그룹/관계/운영 상태 조회가 가능합니다.
-`$diary-notion`과 `/diary-notion`은 작업 row push에 집중하고, `working-diary diary-notion ensure`는 schema v7, native sub-items, core views 5개, operating views 5개 보장에 집중합니다.
-`Parent Task`와 `Sub-items`는 Notion 하위항목/sub-item을 위한 양방향 포함 관계이고, `Depends On`은 큰 메인 작업끼리의 선행 연결성만 나타냅니다. 하위 작업을 종속성으로 연결하지 않습니다. `Project`가 task JSON에서 누락되거나 `unknown`으로 들어오면 CLI가 명령 실행 cwd의 폴더명으로 보정합니다.
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리합니다. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Sub-items`, `Depends On`, `Work Period`, `Priority`, `Blocked`, `Next Action` 컬럼으로 Notion에서 필터/그룹/관계/운영 상태 조회가 가능합니다.
+
+현재 구현 기준:
+
+| 항목 | 동작 |
+|------|------|
+| `/diary-notion`, `$diary-notion` | 현재 세션을 작업 row로 분리해 Notion에 push |
+| `working-diary diary-notion ensure` | schema v7, native sub-items, core views 5개, operating views 5개 보장 |
+| `Parent Task` / `Sub-items` | Notion native 하위항목/sub-item을 위한 양방향 포함 관계 |
+| `Depends On` | 하위 작업이 아니라 큰 메인 작업끼리의 선행 연결성 |
+| `Project` | task JSON에 없거나 `unknown`이면 명령 실행 cwd 폴더명으로 보정 |
+| Page body | compact executive body. 결과/작업 한눈에/영향/검증/리스크/부록 순서 |
+
+`$diary-notion`과 `/diary-notion`은 작업 row push에 집중합니다. DB schema와 view 정리는 `working-diary diary-notion ensure`로 분리되어 있어, view API 문제가 작업 기록 실패로 바로 이어지지 않습니다.
+
 각 Notion 페이지 본문은 `body_intro` 핵심 callout 1개, `결과` 체크리스트, `작업 한눈에` 표, `영향` bullet, `검증` 체크리스트, `리스크 / 다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
-제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status` enum 값은 원문 또는 영어 값을 유지합니다.
+
+제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status`, `Priority`, `Review Status` enum 값은 원문 또는 영어 값을 유지합니다.
 
 ### 5분 셋업
 
@@ -172,9 +185,13 @@ working-diary diary-notion ensure --year 2026
 /diary-notion       # Claude Code 세션 안에서
 $diary-notion       # Codex 세션 안에서
 
-# 같은 세션 다시 push (실수 등):
+# 수동 push가 필요한 경우
+working-diary diary-notion push --input .diary-notion-<id>.json
+
+# 같은 세션 다시 push:
 #   기본은 skip (Session ID + Task Index로 멱등성)
 #   --force 로 기존 행 archive 후 재push
+working-diary diary-notion push --input .diary-notion-<id>.json --force
 ```
 
 다른 Codex 세션에서 최신 `$diary-notion` 지시문을 쓰려면 repo를 최신화한 뒤 `claude-diary install --force --codex`를 다시 실행하고 새 Codex 세션을 여는 것을 권장합니다.
@@ -185,7 +202,7 @@ $diary-notion       # Codex 세션 안에서
 
 | View | 용도 | 기준 |
 |------|------|------|
-| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | `Parent Task` 표시, `Sub-items` 기반 native 하위항목/sub-item, `Work Period` 표시, `Date desc` |
+| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | `Parent Task` 표시, `Sub-items` 기반 native 하위항목/sub-item, `Depends On` hidden, `Work Period` 표시, `Date desc` |
 | 오늘 작업 | 오늘 기록된 수행분 확인 | `Date = today`, `Date desc`, `Work Period` 표시 |
 | 상태별 | 진행 단계별 작업 확인 | `Status` group_by, `Work Period` 표시 |
 | 목적별 | 작업 성격별 확인 | `Purpose` group_by, `Work Period` 표시 |
@@ -205,11 +222,24 @@ $diary-notion       # Codex 세션 안에서
 | 리뷰 필요 | 검토가 필요한 작업 확인 | `Review Status = Needs Review` |
 | 작업 그룹별 | 여러 날/세션에 걸친 큰 작업 흐름 확인 | `Task Group` group_by |
 
+### 작업 row 분리 기준
+
+row는 의미 있는 작업 단위로만 만듭니다. 작은 확인 항목, 긴 SQL/JS 조각, 참고 링크, 단순 메모는 별도 row가 아니라 page body 부록에 남깁니다.
+
+| 기준 | 처리 |
+|------|------|
+| 독립 상태, 검증, 코드 변경, 커밋 근거가 있는 작업 | 별도 row |
+| 메인 작업을 수행하기 위한 세부 작업 | `parent_index` → `Parent Task` / `Sub-items` |
+| 큰 메인 작업 간 선행 관계 | `depends_on_indices` → `Depends On` |
+| 전날/이전 세션에서 이어진 작업 | 새 row + 같은 `Task Group` + 필요 시 `Carryover=true` |
+| 다음에 바로 할 일 | `Next Action` |
+| 외부 결정/권한/정보 없이는 못 하는 일 | `Blocked=true` + `Block Reason` |
+
 ### DB 컬럼
 
 | 컬럼 | 타입 | 비고 |
 |------|------|------|
-| Name | title | Claude가 뽑은 task 제목 (명사구) |
+| Name | title | 에이전트가 뽑은 task 제목 (명사구) |
 | Date | date | |
 | Work Period | date | 실제 작업 기간. 프로젝트/작업 그룹 기간 계산 재료 |
 | Project | select | cwd 폴더명. group/filter용. task JSON에서 누락되거나 `unknown`이면 CLI가 명령 실행 cwd로 보정 |
@@ -233,7 +263,11 @@ $diary-notion       # Codex 세션 안에서
 | Lines | number | 추가+삭제 합 |
 | Session ID, Task Index | (hidden 권장) | 멱등성 키 |
 
-자세한 설계는 [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md).
+자세한 설계와 구현 기록:
+
+- [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md)
+- [`docs/02-design/features/diary-notion-views.design.md`](docs/02-design/features/diary-notion-views.design.md)
+- [`docs/04-report/diary-notion-phase-2/README.md`](docs/04-report/diary-notion-phase-2/README.md)
 
 ### 주의
 
