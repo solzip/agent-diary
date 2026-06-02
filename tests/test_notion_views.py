@@ -11,6 +11,7 @@ from claude_diary.exporters.notion_views import (
     CoreViewsEnsurer,
     NotionViewsClient,
     _build_core_view_specs,
+    _compute_subitem_repairs,
     _payload_for_spec,
     _update_payload_for_spec,
 )
@@ -93,15 +94,24 @@ def _matching_views(database_id="db1", data_source_id="ds1", today="2026-06-02")
 
 
 class FakeViewsClient:
-    def __init__(self, views=None, prop_map=None):
+    def __init__(self, views=None, prop_map=None, rows=None):
         self.views = views if views is not None else []
         self.prop_map = prop_map if prop_map is not None else _prop_map()
+        self.rows = rows if rows is not None else []
         self.created_payloads = []
         self.updated_payloads = []
         self.updated_data_sources = []
+        self.relation_updates = []
 
     def get_primary_data_source_id(self, database_id):
         return "ds1"
+
+    def query_data_source_rows(self, data_source_id):
+        return self.rows
+
+    def update_page_relation(self, page_id, property_name, target_ids):
+        self.relation_updates.append((page_id, property_name, list(target_ids)))
+        return {"id": page_id}
 
     def get_property_map(self, data_source_id):
         return self.prop_map
@@ -443,3 +453,92 @@ def _visible(payload, property_id):
         if entry["property_id"] == property_id:
             return entry["visible"]
     return None
+
+
+def _row(rid, title="t", parent=None, subitems=None):
+    props = {"Name": {"title": [{"plain_text": title}]}}
+    if parent is not None:
+        props["Parent Task"] = {"relation": [{"id": parent}]}
+    props["Sub-items"] = {"relation": [{"id": s} for s in (subitems or [])]}
+    return {"id": rid, "properties": props}
+
+
+class TestComputeSubitemRepairs:
+    def test_missing_reverse_link_is_repaired(self):
+        rows = [
+            _row("p", "parent", subitems=[]),
+            _row("c1", "child1", parent="p"),
+            _row("c2", "child2", parent="p"),
+        ]
+        repairs = _compute_subitem_repairs(rows)
+        assert len(repairs) == 1
+        parent_id, merged, missing = repairs[0]
+        assert parent_id == "p"
+        assert set(merged) == {"c1", "c2"}
+        assert missing == 2
+
+    def test_already_consistent_needs_no_repair(self):
+        rows = [
+            _row("p", "parent", subitems=["c1"]),
+            _row("c1", "child1", parent="p"),
+        ]
+        assert _compute_subitem_repairs(rows) == []
+
+    def test_partial_link_only_adds_missing(self):
+        rows = [
+            _row("p", "parent", subitems=["c1"]),
+            _row("c1", "child1", parent="p"),
+            _row("c2", "child2", parent="p"),
+        ]
+        repairs = _compute_subitem_repairs(rows)
+        assert len(repairs) == 1
+        _pid, merged, missing = repairs[0]
+        assert merged == ["c1", "c2"]  # existing kept, missing appended
+        assert missing == 1
+
+    def test_self_reference_ignored(self):
+        rows = [_row("p", "parent", parent="p", subitems=[])]
+        assert _compute_subitem_repairs(rows) == []
+
+    def test_dangling_parent_ignored(self):
+        rows = [_row("c1", "child1", parent="ghost")]
+        assert _compute_subitem_repairs(rows) == []
+
+
+class TestEnsureRepairsSubitems:
+    def _seed(self):
+        return [
+            _row("p", "parent", subitems=[]),
+            _row("c1", "child1", parent="p"),
+            _row("c2", "child2", parent="p"),
+        ]
+
+    def test_ensure_patches_broken_parent(self):
+        client = FakeViewsClient(views=_matching_views(), rows=self._seed())
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+        assert result.ok()
+        assert len(client.relation_updates) == 1
+        page_id, prop, ids = client.relation_updates[0]
+        assert page_id == "p"
+        assert prop == "Sub-items"
+        assert set(ids) == {"c1", "c2"}
+        assert any("parent" in entry and "+2" in entry for entry in result.repaired)
+
+    def test_dry_run_reports_but_does_not_patch(self):
+        client = FakeViewsClient(views=_matching_views(), rows=self._seed())
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02", dry_run=True)
+        assert client.relation_updates == []
+        assert any("planned" in entry for entry in result.repaired)
+
+    def test_no_rows_no_repair(self):
+        client = FakeViewsClient(views=_matching_views(), rows=[])
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+        assert result.repaired == []
+        assert client.relation_updates == []
+
+    def test_query_failure_degrades_to_warning(self):
+        client = FakeViewsClient(views=_matching_views())
+        client.query_data_source_rows = MagicMock(side_effect=RuntimeError("boom"))
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+        assert result.ok()  # repair failure must not fail the ensure run
+        assert any("sub-item sync check skipped" in w for w in result.warnings)

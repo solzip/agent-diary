@@ -81,6 +81,7 @@ class EnsureViewsResult:
     conflicts: list = field(default_factory=list)
     failed: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
+    repaired: list = field(default_factory=list)
 
     def ok(self):
         return not self.conflicts and not self.failed
@@ -223,6 +224,30 @@ class NotionViewsClient:
     def update_data_source(self, data_source_id, payload):
         return self._request("PATCH", "/data_sources/%s" % data_source_id, payload)
 
+    def query_data_source_rows(self, data_source_id):
+        """Return all rows (pages) of a data source, following pagination."""
+        rows = []
+        cursor = None
+        while True:
+            body = {"page_size": 100}
+            if cursor:
+                body["start_cursor"] = cursor
+            data = self._request(
+                "POST", "/data_sources/%s/query" % data_source_id, body
+            )
+            rows.extend(data.get("results", []))
+            if not data.get("has_more"):
+                return rows
+            cursor = data.get("next_cursor")
+
+    def update_page_relation(self, page_id, property_name, target_ids):
+        """PATCH a single page's relation property to the given target IDs."""
+        return self._request("PATCH", "/pages/%s" % page_id, {
+            "properties": {
+                property_name: {"relation": [{"id": tid} for tid in target_ids]}
+            }
+        })
+
 
 class CoreViewsEnsurer:
     """Create or verify the permanent core and operating views."""
@@ -294,7 +319,38 @@ class CoreViewsEnsurer:
 
             self._create_view(spec, result)
 
+        self._repair_subitem_links(data_source_id, result, dry_run)
         return result
+
+    def _repair_subitem_links(self, data_source_id, result, dry_run):
+        """Re-sync parents whose `Sub-items` lost children pushed before the
+        relation was a proper dual_property. Best-effort: row-query or PATCH
+        failures degrade to warnings, never failing the ensure run."""
+        try:
+            rows = self.client.query_data_source_rows(data_source_id)
+        except Exception as e:
+            result.warnings.append("sub-item sync check skipped: %s" % e)
+            return
+
+        repairs = _compute_subitem_repairs(rows)
+        if not repairs:
+            return
+
+        by_id = {row["id"]: row for row in rows if row.get("id")}
+        if dry_run:
+            for parent_id, _merged, missing in repairs:
+                result.repaired.append(
+                    "%s (+%d planned)" % (_row_title(by_id.get(parent_id, {})), missing)
+                )
+            return
+
+        for parent_id, merged, missing in repairs:
+            title = _row_title(by_id.get(parent_id, {}))
+            try:
+                self.client.update_page_relation(parent_id, "Sub-items", merged)
+                result.repaired.append("%s (+%d)" % (title, missing))
+            except Exception as e:
+                result.warnings.append("sub-item sync failed for %s: %s" % (title, e))
 
     def _create_view(self, spec, result):
         payload = _payload_for_spec(spec)
@@ -849,6 +905,44 @@ def _group_name(view_name):
     if view_name == "프로젝트별":
         return "Project"
     return "required"
+
+
+def _relation_ids(row, property_name):
+    prop = (row.get("properties") or {}).get(property_name) or {}
+    return [item.get("id") for item in (prop.get("relation") or []) if item.get("id")]
+
+
+def _row_title(row):
+    arr = ((row.get("properties") or {}).get("Name") or {}).get("title") or []
+    return "".join(part.get("plain_text", "") for part in arr)
+
+
+def _compute_subitem_repairs(rows):
+    """Find parents whose Sub-items relation is missing children.
+
+    The `Parent Task` side is the source of truth: any child naming a parent
+    must appear in that parent's `Sub-items`. Rows pushed before the relation
+    became a synced dual_property can be missing this reverse link, which hides
+    the native sub-item toggle on the parent. Returns a list of
+    (parent_id, merged_child_ids, missing_count) for parents needing a fix.
+    """
+    by_id = {row["id"]: row for row in rows if row.get("id")}
+    desired = {}
+    for row in rows:
+        rid = row.get("id")
+        for parent_id in _relation_ids(row, "Parent Task"):
+            if parent_id == rid or parent_id not in by_id:
+                continue
+            desired.setdefault(parent_id, []).append(rid)
+
+    repairs = []
+    for parent_id, children in desired.items():
+        current = _relation_ids(by_id[parent_id], "Sub-items")
+        current_set = set(current)
+        missing = [cid for cid in dict.fromkeys(children) if cid not in current_set]
+        if missing:
+            repairs.append((parent_id, current + missing, len(missing)))
+    return repairs
 
 
 def _needs_subitems_schema(prop_map):

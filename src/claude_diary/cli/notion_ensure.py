@@ -118,6 +118,10 @@ def _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_r
         print("    action: check view permissions or fix the required setting, then rerun")
     for failure in result.failed:
         print("  ! %s -- %s" % (failure.name, failure.reason))
+    if result.repaired:
+        print("Sub-item sync:")
+        for entry in result.repaired:
+            print("  ~ %s" % entry)
     if result.warnings:
         print("Warnings:")
         for warning in result.warnings:
