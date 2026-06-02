@@ -378,6 +378,21 @@ class TestDependsOnWiring:
         mock_exp.update_row_parent.assert_not_called()
         mock_exp.update_row_subitems.assert_not_called()
 
+    def test_wire_parent_tasks_skips_self_parent(self):
+        """A task whose parent_index points at itself must not be wired.
+
+        Mirrors the self-reference guard in _wire_depends_on; without it a row
+        would be set as its own Parent Task and own Sub-item.
+        """
+        from claude_diary.cli.notion_push import _wire_parent_tasks
+        mock_exp = MagicMock()
+        tasks = [{"title": "A", "parent_index": 0}]
+        row_ids = {0: "row_a"}
+        failures = _wire_parent_tasks(mock_exp, tasks, row_ids)
+        mock_exp.update_row_parent.assert_not_called()
+        mock_exp.update_row_subitems.assert_not_called()
+        assert failures == []
+
 
 class TestGatherGitInfo:
     def test_with_commit_hashes(self):
