@@ -129,6 +129,7 @@ row로 만들 기준:
 |------|------|
 | `Name` | 작업 제목 |
 | `Date` | 작업 기록일 |
+| `Work Period` | 실제 작업 기간. 프로젝트/작업 그룹 기간 계산 재료 |
 | `Project` | 프로젝트 필터/그룹 |
 | `Purpose` | Feature, Bugfix, Planning 등 목적 |
 | `Status` | Discussion, Design, Implementation, Testing, Deployed |
@@ -154,6 +155,48 @@ row로 만들 기준:
 
 확장 컬럼은 기존 핵심 모델을 대체하지 않고 보조한다.
 
+### 4.3 Work Period 적용 원칙
+
+`Date`와 `Work Period`는 최종 모델에서도 분리한다.
+
+```text
+Date = 기록일
+Work Period = 실제 작업 기간
+```
+
+`오늘 작업` view와 daily brief는 `Date`를 기준으로 한다. 사용자가 오늘 `$diary-notion`으로 남긴 수행분을 보여주는 것이 목적이기 때문이다.
+
+프로젝트 산출물, 작업 그룹, 주간/월간 회고의 실제 작업 기간은 `Work Period`를 기준으로 계산한다.
+
+집계 규칙:
+
+```text
+Project duration
+= 같은 Project row들의 min(Work Period.start) ~ max(Work Period.end)
+
+Task Group duration
+= 같은 Task Group row들의 min(Work Period.start) ~ max(Work Period.end)
+
+Work days
+= Work Period가 포함하는 날짜의 unique day count
+```
+
+어제 시작한 작업을 오늘 이어서 했다면 오늘 수행분은 새 row로 남기고 같은 `Task Group`으로 묶는다. 기존 row의 `Work Period`를 자동으로 늘리지 않는다.
+
+```text
+2026-06-01 row
+Date = 2026-06-01
+Work Period = 2026-06-01
+Task Group = diary-notion-view-design
+
+2026-06-02 row
+Date = 2026-06-02
+Work Period = 2026-06-02
+Task Group = diary-notion-view-design
+```
+
+최종 모델에서는 이 row들을 읽어 프로젝트/작업 그룹 단위의 기간을 제안한다. 실제 요약 row, 요약 DB, `First Worked On`, `Last Worked On`, `Work Days` 같은 계산 컬럼을 만들지는 Phase 3 이후 별도 apply 단계로 둔다.
+
 ## 5. 자동화 경계
 
 ### 5.1 에이전트 책임
@@ -170,12 +213,13 @@ row로 만들 기준:
 - `Parent Task`와 `Depends On` relation을 row 생성 후 연결한다.
 - Notion schema/view/status 동기화는 명령 단위로 분리한다.
 
-### 5.3 리뷰 엔진 책임
+### 5.3 운영/리뷰 엔진 책임
 
-4차 이후의 책임이다.
+3차 이후의 책임이다.
 
 - 오래 방치된 작업을 찾는다.
 - 반복되는 리스크를 요약한다.
+- `Project` 또는 `Task Group`별 `Work Period`의 최소 시작일과 최대 종료일을 계산해 실제 작업 기간을 제안한다.
 - 전날/최근 N일의 미완료 todo와 `next_steps`를 수집한다.
 - `Depends On`, `Blocked`, `Status`, `Task Group` 연속성을 반영해 오늘 우선순위를 제안한다.
 - 다음 액션 후보를 제안한다.
@@ -205,14 +249,30 @@ row로 만들 기준:
 working-diary notion views ensure
 ```
 
-기본 view:
+Core Views:
 
 - 작업 계층
-- 오늘 작업
+- 오늘 작업: 오늘 해야 할 일이 아니라 오늘 실제로 기록된 수행분
 - 상태별
 - 목적별
 - 프로젝트별
+
+Core follow-up:
+
+- 작업 그룹별
+
+Operations/Intelligence views:
+
 - 막힌 작업
+- 오래 방치된 작업
+- 검증 대기
+- 오늘 우선순위
+- 주간 보고
+
+하위 항목 정책:
+
+- 메인 작업과 하위 작업의 `Parent Task` 데이터 구조는 2차에서 필수로 보장한다.
+- Notion의 접기/펼치기 sub-item UI는 최종 목표이며 2차에서는 best-effort로 활성화한다.
 
 View 자동화는 push 실패와 분리한다. view 생성/갱신 실패가 작업 기록 실패로 이어지면 안 된다.
 
@@ -231,6 +291,8 @@ working-diary notion sync-status
 
 - 하위 작업 기반 진행률 계산
 - 선행 작업 기반 blocked 탐지
+- `Project`/`Task Group`별 실제 작업 기간 계산
+- `Work Period` 기반 work days 계산
 - 오래 방치된 작업 탐지
 - 검증 누락 탐지
 - 상위 작업 상태 제안
@@ -252,7 +314,7 @@ working-diary notion weekly-brief
 - 전날 남긴 todo/`next_steps` 기반 오늘 작업 우선순위 Top N 생성
 - 선행 작업이 완료된 후속 작업을 오늘 후보로 승격
 - 아직 막힌 작업은 blocker로 분리하고 우선순위 산정에서 제외하거나 낮춤
-- 프로젝트별 이번 주 요약
+- 프로젝트별 이번 주 요약과 실제 작업 기간 요약
 - 다음 작업 우선순위 추천
 - 반복 이슈 탐지
 - 상사 보고용 brief 생성
@@ -311,6 +373,7 @@ working-diary notion weekly-brief
 
 - 작업 하나를 열면 무엇을 했는지 30초 안에 파악된다.
 - 프로젝트 하나를 보면 진행 중/막힌 일/다음 액션이 보인다.
+- 프로젝트나 작업 그룹을 모아 보면 실제 작업 기간이 파악된다.
 - 하루 시작 시 전날 todo와 미완료 작업을 다시 훑지 않아도 오늘 우선순위가 제안된다.
 - 다음 세션을 시작할 때 이전 맥락을 다시 설명하지 않아도 된다.
 - 상사 보고용 daily/weekly brief를 별도 정리 없이 만들 수 있다.
