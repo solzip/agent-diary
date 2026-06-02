@@ -133,9 +133,9 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
          └── ...
 ```
 
-한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Work Period` 컬럼으로 Notion에서 필터/그룹/관계 조회가 가능합니다.
-`$diary-notion`과 `/diary-notion`은 작업 row push에 집중하고, `working-diary diary-notion ensure`는 schema v5와 core view 5개 보장에 집중합니다.
-`Parent Task`는 포함 관계, `Depends On`은 선행 관계를 나타냅니다. `Project`가 task JSON에서 누락되거나 `unknown`으로 들어오면 CLI가 명령 실행 cwd의 폴더명으로 보정합니다.
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Sub-items`, `Depends On`, `Work Period`, `Priority`, `Blocked`, `Next Action` 컬럼으로 Notion에서 필터/그룹/관계/운영 상태 조회가 가능합니다.
+`$diary-notion`과 `/diary-notion`은 작업 row push에 집중하고, `working-diary diary-notion ensure`는 schema v7, native sub-items, core views 5개, operating views 5개 보장에 집중합니다.
+`Parent Task`와 `Sub-items`는 Notion 하위항목/sub-item을 위한 양방향 포함 관계이고, `Depends On`은 큰 메인 작업끼리의 선행 연결성만 나타냅니다. 하위 작업을 종속성으로 연결하지 않습니다. `Project`가 task JSON에서 누락되거나 `unknown`으로 들어오면 CLI가 명령 실행 cwd의 폴더명으로 보정합니다.
 각 Notion 페이지 본문은 `body_intro` 핵심 callout 1개, `결과` 체크리스트, `작업 한눈에` 표, `영향` bullet, `검증` 체크리스트, `리스크 / 다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
 제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status` enum 값은 원문 또는 영어 값을 유지합니다.
 
@@ -149,7 +149,7 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
    claude-diary diary-notion init
    ```
    대화형으로 token과 root page URL(또는 ID)을 입력하면 권한 검증 후 config에 저장됩니다.
-5. **DB schema와 core views 보장**:
+5. **DB schema와 core/operating views 보장**:
    ```bash
    working-diary diary-notion ensure
    ```
@@ -165,7 +165,7 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
 # 처음 한 번
 claude-diary diary-notion init
 working-diary diary-notion ensure --dry-run  # 변경 없이 schema/view 상태 확인
-working-diary diary-notion ensure            # schema v5와 core views 보장
+working-diary diary-notion ensure            # schema v7, native sub-items, core/operating views 보장
 working-diary diary-notion ensure --year 2026
 
 # 매 세션
@@ -185,13 +185,25 @@ $diary-notion       # Codex 세션 안에서
 
 | View | 용도 | 기준 |
 |------|------|------|
-| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | `Parent Task`, `Depends On`, `Work Period` 표시, `Date desc` |
+| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | `Parent Task` 표시, `Sub-items` 기반 native 하위항목/sub-item, `Work Period` 표시, `Date desc` |
 | 오늘 작업 | 오늘 기록된 수행분 확인 | `Date = today`, `Date desc`, `Work Period` 표시 |
 | 상태별 | 진행 단계별 작업 확인 | `Status` group_by, `Work Period` 표시 |
 | 목적별 | 작업 성격별 확인 | `Purpose` group_by, `Work Period` 표시 |
 | 프로젝트별 | 프로젝트별 작업 확인 | `Project` group_by, `Work Period` 표시 |
 
-같은 이름의 view가 이미 있고 required 설정을 만족하면 `verified`로 처리합니다. required 설정이 다르면 자동으로 덮어쓰지 않고 conflict로 보고합니다. `작업 계층`의 sub-item UI와 `오늘 작업`의 relative today filter는 Notion API 제약에 따라 best-effort fallback을 사용합니다.
+같은 이름의 view가 이미 있고 required 설정을 만족하면 `verified`로 처리합니다. required 설정이 다르면 `working-diary diary-notion ensure`가 보장 view 기본 설정을 업데이트하고, `--dry-run`에서는 `update planned`로만 표시합니다. `작업 계층`의 sub-item UI와 `오늘 작업`의 relative today filter는 Notion API 제약에 따라 best-effort fallback을 사용합니다.
+
+### Operating Views
+
+최고모델 기준에서는 core view 5개를 유지하면서, 오늘 실행과 막힘 관리를 위한 operating view 5개도 같은 `ensure` 명령으로 보장합니다.
+
+| View | 용도 | 기준 |
+|------|------|------|
+| 오늘 우선순위 | 오늘 처리할 작업을 우선순위대로 확인 | `Date = today`, `Blocked = false`, `Priority asc`, `Date desc` |
+| 전날 미완료 | 이전 기록일에서 완료되지 않은 작업 확인 | `Date before today`, `Status != Deployed`, `Priority asc` |
+| Blocked | 외부 결정/권한/정보 때문에 막힌 작업 확인 | `Blocked = true`, `Block Reason` 표시 |
+| 리뷰 필요 | 검토가 필요한 작업 확인 | `Review Status = Needs Review` |
+| 작업 그룹별 | 여러 날/세션에 걸친 큰 작업 흐름 확인 | `Task Group` group_by |
 
 ### DB 컬럼
 
@@ -205,8 +217,16 @@ $diary-notion       # Codex 세션 안에서
 | Branch | select | task별 branch (group/filter용) |
 | Status | select | Discussion/Design/Implementation/Testing/Deployed |
 | Task Group | select | 며칠/여러 세션에 걸치는 큰 작업 묶음 |
-| Parent Task | relation | 같은 DB의 상위 작업. 하위항목/sub-item view 자동화의 기반 |
-| Depends On | relation | 같은 DB의 선행 작업 |
+| Parent Task | relation | 같은 DB의 상위 작업. `Sub-items`와 양방향으로 연결되는 하위항목/sub-item 부모 관계 |
+| Sub-items | relation | 같은 DB의 하위 작업 목록. `작업 계층` view의 native sub-item toggle 기준 |
+| Depends On | relation | 같은 DB의 선행 작업. 하위 작업이 아니라 큰 메인 작업끼리의 연결성에만 사용 |
+| Priority | select | P0/P1/P2/P3. `오늘 우선순위`, `전날 미완료`, `Blocked` view 정렬 기준 |
+| Next Action | rich_text | 다음에 바로 실행할 수 있는 구체적 행동 |
+| Blocked | checkbox | 외부 결정/권한/정보 없이는 진행할 수 없는 작업 표시 |
+| Block Reason | rich_text | 막힌 원인 |
+| Carryover | checkbox | 전날 또는 이전 세션 미완료 작업을 오늘 이어서 처리한 row 표시 |
+| Review Status | select | Needs Review/Reviewed/Deferred |
+| Last Reviewed | date | 실제 검토일 |
 | Categories | multi_select | design/refactor/bugfix/... 자유 라벨 |
 | Files | number | 수정+생성 파일 수 |
 | Commits | number | task별 commit 수 |

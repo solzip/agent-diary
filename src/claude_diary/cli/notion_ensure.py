@@ -15,13 +15,14 @@ from claude_diary.exporters.notion_hierarchical import (
 )
 from claude_diary.exporters.notion_views import (
     CORE_VIEW_NAMES,
+    OPERATION_VIEW_NAMES,
     CoreViewsEnsurer,
     NotionViewsClient,
 )
 
 
 def cmd_notion_ensure(args):
-    """Ensure the current year's hierarchical Notion DB and 5 core views."""
+    """Ensure the current year's hierarchical Notion DB and guaranteed views."""
     config = load_config()
     configure_from_config(config)
 
@@ -91,6 +92,7 @@ def _print_missing_database_plan(root_page_id, year):
     print("  + create Entries DB")
     print("  + ensure schema %s" % SCHEMA_VERSION)
     print("  + create %d core views" % len(CORE_VIEW_NAMES))
+    print("  + create %d operating views" % len(OPERATION_VIEW_NAMES))
 
 
 def _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_run):
@@ -103,13 +105,17 @@ def _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_r
     print("Views:")
     for name in result.created:
         print("  + %s" % name)
+    for name in result.updated:
+        print("  ~ %s (updated)" % name)
     for name in result.planned:
         print("  + %s (planned)" % name)
+    for name in result.updates_planned:
+        print("  ~ %s (update planned)" % name)
     for name in result.verified:
         print("  = %s (verified)" % name)
     for conflict in result.conflicts:
         print("  x %s -- conflict: %s" % (conflict.name, conflict.reason))
-        print("    action: rename/delete this view or fix the required setting, then rerun")
+        print("    action: check view permissions or fix the required setting, then rerun")
     for failure in result.failed:
         print("  ! %s -- %s" % (failure.name, failure.reason))
     if result.warnings:

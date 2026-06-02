@@ -50,11 +50,12 @@ allowed-tools:
    - **commit이 0개인 의논 세션도 정상** — 의미 단위로 task N개 생성
    - 독립 상태/근거/코드 변경/검증 결과가 있거나 다른 작업을 막는 일만 row로 만들 것
    - 단순 확인 항목, 긴 SQL/JS/메모/참고 링크는 별도 row가 아니라 본문 근거로 남길 것
-   - `parent_index`는 포함 관계, `depends_on_indices`는 선행 관계에만 사용할 것
+   - `parent_index`는 포함 관계와 Notion 하위항목에 사용하고, 하위 작업을 종속성으로 표현하지 말 것
+   - `depends_on_indices`는 큰 메인 작업끼리의 선행 연결성에만 사용할 것
 
 3. **각 task별 추출**
    - 언어 정책:
-     - `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed` 같은 설명형 필드는 반드시 한국어로 작성
+     - `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, `block_reason` 같은 설명형 필드는 반드시 한국어로 작성
      - `status`, `purpose` enum 값은 지정된 영어 값을 그대로 사용
      - 파일 경로, 명령어, branch, commit hash, 코드 식별자, 함수/클래스명은 원문 그대로 유지
      - `user_prompts`는 사용자가 말한 원문을 증거로 보존
@@ -93,6 +94,13 @@ allowed-tools:
      - 결정만 했으면 Design, 코드 작성까지 했으면 Implementation, 테스트까지 했으면 Testing,
        머지/배포까지 했으면 Deployed
    - `work_period`: 실제 작업 기간. 기본은 오늘 날짜 `YYYY-MM-DD`; 여러 날에 걸친 수행분이면 `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` 사용
+   - `priority`: `P0`, `P1`, `P2`, `P3` 중 하나. 오늘 바로 처리해야 하면 `P1`, 긴급/차단 해소가 최우선이면 `P0`, 일반 후속이면 `P2`, 낮은 우선순위면 `P3`
+   - `next_action`: 다음에 바로 실행할 수 있는 구체적 행동 0~1개
+   - `blocked`: 외부 결정/권한/정보 없이는 진행할 수 없을 때만 `true`
+   - `block_reason`: `blocked`가 `true`이면 원인을 한국어로 작성
+   - `carryover`: 전날 또는 이전 세션의 미완료 작업을 오늘 이어서 처리한 row이면 `true`
+   - `review_status`: 검토가 필요하면 `Needs Review`, 검토 완료면 `Reviewed`, 뒤로 미루면 `Deferred`
+   - `last_reviewed`: 실제로 검토한 날짜가 있으면 `YYYY-MM-DD`
    - `task_group`: 며칠/여러 세션에 걸치는 큰 작업 단위 식별자 (예: `diary-notion-impl`, `auth-refactor`)
      - 같은 큰 작업의 task들끼리 같은 그룹명 사용 → Notion에서 group view로 묶임
      - 이전 작업의 연속이면 같은 그룹명, 새 작업이면 새 그룹명 (snake-case/kebab-case 권장)
@@ -101,10 +109,10 @@ allowed-tools:
      - `Planning` / `Research` / `Review` / `Release` / `Support` / `Maintenance` / `General`
      - 불확실하면 `General`
    - `parent_index`: 이 task가 다른 task의 하위 작업이면 부모 task의 **같은 push 내 인덱스**. 최상위 task면 `null`
-     - 포함 관계에만 사용. 예: "상품 목록 포커싱"의 parent는 "로컬 테스트 진행"
+     - 포함 관계와 Notion 하위항목에만 사용. 예: "상품 목록 포커싱"의 parent는 "로컬 테스트 진행"
    - `depends_on_indices`: 이 task가 선행을 의존하는 다른 task의 **같은 push 내 인덱스 배열** (예: `[0, 1]`)
      - 같은 JSON 안의 tasks 배열 순서 (0-base) 기준
-     - 선행 순서에만 사용. 없으면 빈 배열 `[]`
+     - 하위 작업이 아니라 큰 메인 작업끼리의 선행 연결성에만 사용. 없으면 빈 배열 `[]`
    - `categories`: 1~3개 (design/refactor/bugfix/test/docs/infra/discussion 등 자유 라벨)
    - `project`: 현재 명령 실행 cwd의 폴더명. `"unknown"`을 쓰지 말 것. 확실하지 않으면 생략하거나 빈 값으로 두면 CLI가 cwd에서 보정함
    - `user_prompts`, `files_modified`, `files_created`, `commands_run`, `errors`
@@ -140,6 +148,13 @@ allowed-tools:
       "support_needed": ["..."],
       "status": "Implementation",
       "work_period": "2026-06-02",
+      "priority": "P1",
+      "next_action": "...",
+      "blocked": false,
+      "block_reason": "",
+      "carryover": false,
+      "review_status": "Needs Review",
+      "last_reviewed": "2026-06-02",
       "task_group": "diary-notion-impl",
       "purpose": "Feature",
       "parent_index": null,
@@ -208,7 +223,7 @@ Only include content visible in the current conversation or tool history. Do not
 CODEX_DIARY_NOTION_SKILL = """\
 ---
 name: diary-notion
-description: Push the current Codex work session to the hierarchical Notion working diary DB. Use when the user invokes $diary-notion or asks Codex to record the current session in Notion by project, purpose, task group, branch, status, categories, files, commands, commits, and dependencies.
+description: Push the current Codex work session to the hierarchical Notion working diary DB. Use when the user invokes $diary-notion or asks Codex to record the current session in Notion by project, purpose, task group, status, priority, sub-items, dependencies, blockers, next actions, files, commands, and commits.
 ---
 
 # Diary Notion
@@ -221,10 +236,11 @@ Split the current Codex session into task-sized entries and push them to Notion.
 2. Split work into task-sized database rows. Branch changes are hard task boundaries; within a branch, split by semantic work unit.
    - Create a row for work that has its own status, evidence, code/test output, or can block another task
    - Keep tiny check items, raw notes, long SQL/JS snippets, and reference links inside the page body evidence instead of making them separate rows
-   - Use `parent_index` for containment hierarchy and `depends_on_indices` for prerequisite order; do not mix the two
+   - Use `parent_index` for containment hierarchy and Notion sub-items; do not model subtasks with dependencies
+   - Use `depends_on_indices` only for prerequisite links between large top-level tasks
 3. For each task, produce:
    - Language policy:
-     - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, and `support_needed` in Korean
+     - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, and `block_reason` in Korean
      - Keep `status` and `purpose` as the exact English enum values below
      - Preserve file paths, commands, branches, commit hashes, code identifiers, function names, and class names as written
      - Preserve `user_prompts` in the user's original wording as evidence
@@ -257,10 +273,18 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
    - `work_period`: actual work period; use today's `YYYY-MM-DD` by default, or `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for a range
+   - `priority`: one of `P0`, `P1`, `P2`, `P3`; use `P0` for urgent/blocking work, `P1` for today's highest priority, `P2` for normal follow-up, and `P3` for low priority
+   - `next_action`: 0-1 concrete Korean action that can be started next
+   - `blocked`: `true` only when the task cannot continue without external decision, permission, or information
+   - `block_reason`: Korean reason when `blocked` is `true`
+   - `carryover`: `true` when this row continues unfinished work from a previous day/session
+   - `review_status`: `Needs Review`, `Reviewed`, or `Deferred`
+   - `last_reviewed`: `YYYY-MM-DD` when this work was actually reviewed
    - `task_group`: stable kebab-case/snake-case group for multi-session work
-   - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy
+   - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy and Notion sub-items
    - `depends_on_indices`: zero-based indices in this push, or `[]`
-     - Use this only when the current task cannot proceed before another task is done
+     - Use this only when a top-level main task cannot proceed before another top-level main task is done
+     - Do not use this for child/subtask rows; use `parent_index` instead
    - `project`: current command cwd folder/repository name. Never write `"unknown"`; if you are not sure, omit the field or leave it empty so the CLI falls back to cwd.
    - `categories`, `user_prompts`, `files_modified`, `files_created`, `commands_run`, `commit_hashes`, `errors`
 4. Create `.diary-notion-<8-random>.json` in cwd:
@@ -289,6 +313,13 @@ Split the current Codex session into task-sized entries and push them to Notion.
       "status": "Implementation",
       "purpose": "Feature",
       "work_period": "2026-06-02",
+      "priority": "P1",
+      "next_action": "...",
+      "blocked": false,
+      "block_reason": "",
+      "carryover": false,
+      "review_status": "Needs Review",
+      "last_reviewed": "2026-06-02",
       "task_group": "working-diary-notion",
       "parent_index": null,
       "depends_on_indices": [],
