@@ -133,7 +133,7 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
          └── ...
 ```
 
-한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On` 컬럼으로 Notion에서 필터/그룹/관계 조회가 가능하며, view 자동 생성은 후속 단계로 분리합니다.
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Work Period` 컬럼으로 Notion에서 필터/그룹/관계 조회가 가능하며, `working-diary diary-notion ensure`로 core view 5개를 생성하거나 검증합니다.
 `Parent Task`는 포함 관계, `Depends On`은 선행 관계를 나타냅니다. 각 Notion 페이지 본문은 짧은 callout/checklist 중심으로 정리하고, 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
 제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status` enum 값은 원문 또는 영어 값을 유지합니다.
 
@@ -144,7 +144,7 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
 3. **그 페이지를 Integration에 공유** — 페이지 우상단 ⋯ → "Connections" → 만든 Integration 추가
 4. **셋업 명령 실행**:
    ```bash
-   claude-diary notion init
+   claude-diary diary-notion init
    ```
    대화형으로 token과 root page URL(또는 ID)을 입력하면 권한 검증 후 config에 저장됩니다.
 5. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
@@ -153,7 +153,8 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
 
 ```bash
 # 처음 한 번
-claude-diary notion init
+claude-diary diary-notion init
+working-diary diary-notion ensure
 
 # 매 세션
 /diary-notion       # Claude Code 세션 안에서
@@ -170,6 +171,7 @@ $diary-notion       # Codex 세션 안에서
 |------|------|------|
 | Name | title | Claude가 뽑은 task 제목 (명사구) |
 | Date | date | |
+| Work Period | date | 실제 작업 기간. 프로젝트/작업 그룹 기간 계산 재료 |
 | Project | select | cwd 폴더명. group/filter용 |
 | Purpose | select | Feature/Bugfix/Refactor/Docs/Test/Infra/Planning/Research/Review/Release/Support/Maintenance/General |
 | Branch | select | task별 branch (group/filter용) |

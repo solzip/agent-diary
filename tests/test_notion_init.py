@@ -1,4 +1,4 @@
-"""Tests for `claude-diary notion init` interactive setup."""
+"""Tests for `claude-diary diary-notion init` interactive setup."""
 
 import json
 from unittest.mock import patch, MagicMock
