@@ -70,6 +70,13 @@ class TestDiaryNotionInstructions:
             "next_steps",
             "support_needed",
             "work_period",
+            "priority",
+            "next_action",
+            "blocked",
+            "block_reason",
+            "carryover",
+            "review_status",
+            "last_reviewed",
             "parent_index",
             "depends_on_indices",
         ]

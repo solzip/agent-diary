@@ -6,6 +6,7 @@ from unittest.mock import ANY, MagicMock, patch
 import pytest
 
 from claude_diary.cli.notion_ensure import cmd_notion_ensure
+from claude_diary.exporters.notion_hierarchical import SCHEMA_VERSION
 from claude_diary.exporters.notion_views import EnsureViewsResult, ViewConflict
 
 
@@ -54,9 +55,29 @@ class TestCmdNotionEnsure:
         client_cls.assert_called_once_with({"api_token": "token"})
         ensurer.ensure.assert_called_once_with("db1", ANY, dry_run=False)
         captured = capsys.readouterr()
-        assert "Schema: v5 ensured" in captured.out
+        assert "Schema: %s ensured" % SCHEMA_VERSION in captured.out
         assert "+ 작업 계층" in captured.out
         assert "= 오늘 작업 (verified)" in captured.out
+
+    def test_prints_updated_and_update_planned(self, capsys):
+        exporter = MagicMock()
+        exporter.ensure_database.return_value = "db1"
+        result = EnsureViewsResult(
+            updated=["작업 계층"],
+            updates_planned=["오늘 작업"],
+        )
+        ensurer = MagicMock()
+        ensurer.ensure.return_value = result
+
+        with patch("claude_diary.cli.notion_ensure.load_config", return_value=_config()), \
+             patch.dict("os.environ", {}, clear=True), \
+             patch("claude_diary.cli.notion_ensure.NotionHierarchicalExporter", return_value=exporter), \
+             patch("claude_diary.cli.notion_ensure.CoreViewsEnsurer", return_value=ensurer):
+            cmd_notion_ensure(_args(year=2026))
+
+        captured = capsys.readouterr()
+        assert "~ 작업 계층 (updated)" in captured.out
+        assert "~ 오늘 작업 (update planned)" in captured.out
 
     def test_dry_run_missing_database_prints_plan_without_writes(self, capsys):
         exporter = MagicMock()
@@ -76,6 +97,7 @@ class TestCmdNotionEnsure:
         captured = capsys.readouterr()
         assert "Database: missing" in captured.out
         assert "+ create 5 core views" in captured.out
+        assert "+ create 5 operating views" in captured.out
 
     def test_conflict_exits_1(self):
         exporter = MagicMock()

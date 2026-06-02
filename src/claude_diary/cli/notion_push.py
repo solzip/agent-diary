@@ -131,20 +131,33 @@ def cmd_notion_push(args):
 
 
 def _wire_depends_on(exporter, tasks, row_ids):
-    """Pass 2: set Depends On relations using the row_ids gathered in pass 1.
+    """Pass 2: set main-task Depends On relations from gathered row_ids.
 
     Returns a list of (idx, title, reason) for tasks whose relation update
     failed. Tasks without depends_on are silently skipped.
+
+    Containment is represented by `Parent Task`/Notion sub-items. `Depends On`
+    is deliberately limited to top-level rows so subtask hierarchy does not
+    get mixed with prerequisite order.
     """
     failures = []
     for idx, task in enumerate(tasks):
         deps = task.get("depends_on_indices") or []
         if not deps:
             continue
+        if not _is_top_level_task(task):
+            continue
         my_row = row_ids.get(idx)
         if not my_row:
             continue  # task itself failed in pass 1
-        target_rows = [row_ids[d] for d in deps if d in row_ids]
+        target_rows = [
+            row_ids[d]
+            for d in deps
+            if d != idx
+            and d in row_ids
+            and 0 <= d < len(tasks)
+            and _is_top_level_task(tasks[d])
+        ]
         if not target_rows:
             continue
         try:
@@ -162,6 +175,7 @@ def _wire_parent_tasks(exporter, tasks, row_ids):
     depends-on means execution order.
     """
     failures = []
+    parent_to_children = {}
     for idx, task in enumerate(tasks):
         parent_idx = _get_parent_index(task)
         if parent_idx is None:
@@ -172,8 +186,23 @@ def _wire_parent_tasks(exporter, tasks, row_ids):
             continue
         try:
             exporter.update_row_parent(my_row, parent_row)
+            parent_to_children.setdefault(parent_idx, []).append(idx)
         except Exception as e:
             failures.append((idx, task.get("title") or "(untitled)", "parent_task: %s" % e))
+
+    for parent_idx, child_indices in parent_to_children.items():
+        parent_row = row_ids.get(parent_idx)
+        child_rows = [row_ids[idx] for idx in child_indices if idx in row_ids]
+        if not parent_row or not child_rows:
+            continue
+        try:
+            exporter.update_row_subitems(parent_row, child_rows)
+        except Exception as e:
+            failures.append((
+                parent_idx,
+                tasks[parent_idx].get("title") or "(untitled)",
+                "subitems: %s" % e,
+            ))
     return failures
 
 
@@ -194,6 +223,11 @@ def _get_parent_index(task):
     except (TypeError, ValueError):
         return None
     return parsed if parsed >= 0 else None
+
+
+def _is_top_level_task(task):
+    """Return True when a task is a main row, not a sub-item row."""
+    return _get_parent_index(task) is None
 
 
 def _resolve_credentials(config):
@@ -268,6 +302,8 @@ def _gather_git_info(cwd, commit_hashes):
 
 
 VALID_STATUSES = {"Discussion", "Design", "Implementation", "Testing", "Deployed"}
+VALID_PRIORITIES = {"P0", "P1", "P2", "P3"}
+VALID_REVIEW_STATUSES = {"Needs Review", "Reviewed", "Deferred"}
 
 VALID_PURPOSES = {
     "Feature",
@@ -349,6 +385,32 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index, 
     if task_group:
         props["Task Group"] = {"select": {"name": _safe_select(task_group)}}
 
+    priority = _normalize_priority(task.get("priority"))
+    if priority:
+        props["Priority"] = {"select": {"name": priority}}
+
+    next_action = _clean_rich_text(task.get("next_action"))
+    if next_action:
+        props["Next Action"] = {"rich_text": [{"text": {"content": next_action}}]}
+
+    if isinstance(task.get("blocked"), bool):
+        props["Blocked"] = {"checkbox": task.get("blocked")}
+
+    block_reason = _clean_rich_text(task.get("block_reason"))
+    if block_reason:
+        props["Block Reason"] = {"rich_text": [{"text": {"content": block_reason}}]}
+
+    if isinstance(task.get("carryover"), bool):
+        props["Carryover"] = {"checkbox": task.get("carryover")}
+
+    review_status = _normalize_review_status(task.get("review_status"))
+    if review_status:
+        props["Review Status"] = {"select": {"name": review_status}}
+
+    last_reviewed = _clean_date(task.get("last_reviewed"))
+    if last_reviewed:
+        props["Last Reviewed"] = {"date": {"start": last_reviewed}}
+
     return props
 
 
@@ -424,6 +486,34 @@ def _normalize_purpose(value):
     if raw in VALID_PURPOSES:
         return raw
     return PURPOSE_ALIASES.get(raw.lower(), "General")
+
+
+def _normalize_priority(value):
+    raw = str(value or "").strip().upper()
+    aliases = {
+        "CRITICAL": "P0",
+        "HIGH": "P1",
+        "MEDIUM": "P2",
+        "LOW": "P3",
+    }
+    raw = aliases.get(raw, raw)
+    return raw if raw in VALID_PRIORITIES else ""
+
+
+def _normalize_review_status(value):
+    raw = str(value or "").strip()
+    normalized = {
+        "needs_review": "Needs Review",
+        "needs review": "Needs Review",
+        "reviewed": "Reviewed",
+        "deferred": "Deferred",
+    }.get(raw.lower(), raw)
+    return normalized if normalized in VALID_REVIEW_STATUSES else ""
+
+
+def _clean_rich_text(value):
+    raw = str(value or "").strip()
+    return raw[:2000] if raw else ""
 
 
 def _print_report(results, input_path):
