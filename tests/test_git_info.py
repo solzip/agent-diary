@@ -1,5 +1,6 @@
 """Tests for git information collector."""
 
+import os
 import subprocess
 from unittest.mock import patch, MagicMock
 
@@ -301,3 +302,65 @@ class TestGetDiffStatForCommits:
     def test_empty_list_returns_zeros(self):
         total = get_diff_stat_for_commits("/repo", [])
         assert total == {"added": 0, "deleted": 0, "files": 0}
+
+
+class TestSubprocessEncoding:
+    """Git emits UTF-8; on non-UTF-8 locales (e.g. cp949) text=True without an
+    explicit encoding raises UnicodeDecodeError on Korean output, which the
+    broad excepts swallow into silent loss of git info. Every git subprocess
+    call must pin encoding='utf-8' with errors='replace'.
+    """
+
+    def _run_all_git_calls(self):
+        recorded = []
+
+        def fake_run(cmd, **kwargs):
+            recorded.append(kwargs)
+            return MagicMock(returncode=0, stdout="main\n")
+
+        with patch("claude_diary.lib.git_info.subprocess.run", side_effect=fake_run):
+            _is_git_repo("/repo")
+            _get_branch("/repo")
+            _get_recent_commits("/repo")
+            get_branch_for_commit("/repo", "abc1234")
+            get_head_branch("/repo")
+            get_commit_info("/repo", "abc1234")
+            get_diff_stat("/repo")
+            get_diff_stat_for_commits("/repo", ["abc1234"])
+        return recorded
+
+    def test_all_git_calls_pin_utf8(self):
+        recorded = self._run_all_git_calls()
+        assert recorded, "expected at least one git subprocess call"
+        for kwargs in recorded:
+            assert kwargs.get("encoding") == "utf-8"
+            assert kwargs.get("errors") == "replace"
+
+    def test_korean_commit_decoded_end_to_end(self, tmp_path):
+        """Real git repo with a Korean commit subject must decode without loss.
+
+        Under text=True on a cp949 locale this raised UnicodeDecodeError and the
+        commit info was silently dropped; encoding='utf-8' preserves it.
+        """
+        import shutil
+        if shutil.which("git") is None:
+            import pytest
+            pytest.skip("git not available")
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        env = {
+            **os.environ,
+            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+        }
+        for cmd in (
+            ["git", "init", "-q"],
+            ["git", "commit", "-q", "--allow-empty", "-m", "feat: 한글 커밋 메시지"],
+        ):
+            subprocess.run(cmd, cwd=str(repo), env=env,
+                           capture_output=True, encoding="utf-8", timeout=10)
+
+        commits = _get_recent_commits(str(repo))
+        assert len(commits) == 1
+        assert "한글 커밋 메시지" in commits[0]["message"]

@@ -36,7 +36,7 @@ def _is_git_repo(cwd):
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
@@ -48,7 +48,7 @@ def _get_branch(cwd):
     try:
         result = subprocess.run(
             ["git", "branch", "--show-current"],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         return result.stdout.strip() or "HEAD"
     except Exception:
@@ -63,7 +63,7 @@ def _get_recent_commits(cwd, since=None):
 
     try:
         result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True, timeout=5
+            cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         commits = []
         for line in result.stdout.strip().split("\n"):
@@ -92,7 +92,7 @@ def get_branch_for_commit(cwd, commit_hash):
     try:
         result = subprocess.run(
             ["git", "branch", "--contains", commit_hash, "--format=%(refname:short)"],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         for line in result.stdout.strip().split("\n"):
             line = line.strip().lstrip("* ").strip()
@@ -110,7 +110,7 @@ def get_head_branch(cwd):
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         branch = result.stdout.strip()
         if branch and branch != "HEAD":
@@ -127,7 +127,7 @@ def get_commit_info(cwd, commit_hash):
     try:
         result = subprocess.run(
             ["git", "log", "-n", "1", "--format=%H%x09%h%x09%s", commit_hash],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         line = result.stdout.strip()
         if not line:
@@ -154,7 +154,7 @@ def get_diff_stat_for_commits(cwd, commit_hashes):
         try:
             result = subprocess.run(
                 ["git", "show", "--stat", "--format=", h],
-                cwd=cwd, capture_output=True, text=True, timeout=5
+                cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
             )
             lines = result.stdout.strip().split("\n")
             if not lines:
@@ -192,7 +192,7 @@ def get_diff_stat(cwd, since=None):
         import re
         cmd = ["git", "diff", "--stat", "HEAD"]
         result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True, timeout=5
+            cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         lines = result.stdout.strip().split("\n")
         if lines:
