@@ -133,8 +133,10 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
          └── ...
 ```
 
-한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Work Period` 컬럼으로 Notion에서 필터/그룹/관계 조회가 가능하며, `working-diary diary-notion ensure`로 core view 5개를 생성하거나 검증합니다.
-`Parent Task`는 포함 관계, `Depends On`은 선행 관계를 나타냅니다. 각 Notion 페이지 본문은 짧은 callout/checklist 중심으로 정리하고, 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Depends On`, `Work Period` 컬럼으로 Notion에서 필터/그룹/관계 조회가 가능합니다.
+`$diary-notion`과 `/diary-notion`은 작업 row push에 집중하고, `working-diary diary-notion ensure`는 schema v5와 core view 5개 보장에 집중합니다.
+`Parent Task`는 포함 관계, `Depends On`은 선행 관계를 나타냅니다. `Project`가 task JSON에서 누락되거나 `unknown`으로 들어오면 CLI가 명령 실행 cwd의 폴더명으로 보정합니다.
+각 Notion 페이지 본문은 `body_intro`, `요약`, `작업 한눈에`, `영향`, `검증 및 상태`, `다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
 제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status` enum 값은 원문 또는 영어 값을 유지합니다.
 
 ### 5분 셋업
@@ -147,14 +149,24 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
    claude-diary diary-notion init
    ```
    대화형으로 token과 root page URL(또는 ID)을 입력하면 권한 검증 후 config에 저장됩니다.
-5. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
+5. **DB schema와 core views 보장**:
+   ```bash
+   working-diary diary-notion ensure
+   ```
+6. **Codex에서 쓸 경우 skill 설치 또는 갱신**:
+   ```bash
+   claude-diary install --force --codex
+   ```
+7. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
 
 ### 사용법
 
 ```bash
 # 처음 한 번
 claude-diary diary-notion init
-working-diary diary-notion ensure
+working-diary diary-notion ensure --dry-run  # 변경 없이 schema/view 상태 확인
+working-diary diary-notion ensure            # schema v5와 core views 보장
+working-diary diary-notion ensure --year 2026
 
 # 매 세션
 /diary-notion       # Claude Code 세션 안에서
@@ -164,6 +176,22 @@ $diary-notion       # Codex 세션 안에서
 #   기본은 skip (Session ID + Task Index로 멱등성)
 #   --force 로 기존 행 archive 후 재push
 ```
+
+다른 Codex 세션에서 최신 `$diary-notion` 지시문을 쓰려면 repo를 최신화한 뒤 `claude-diary install --force --codex`를 다시 실행하고 새 Codex 세션을 여는 것을 권장합니다.
+
+### Core Views
+
+`working-diary diary-notion ensure`는 현재 연도 또는 `--year`로 지정한 연도 `Entries` DB에 다음 5개 core view를 보장합니다. 기존 작업 row는 생성, 수정, 삭제하지 않습니다.
+
+| View | 용도 | 기준 |
+|------|------|------|
+| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | `Parent Task`, `Depends On`, `Work Period` 표시, `Date desc` |
+| 오늘 작업 | 오늘 기록된 수행분 확인 | `Date = today`, `Date desc`, `Work Period` 표시 |
+| 상태별 | 진행 단계별 작업 확인 | `Status` group_by, `Work Period` 표시 |
+| 목적별 | 작업 성격별 확인 | `Purpose` group_by, `Work Period` 표시 |
+| 프로젝트별 | 프로젝트별 작업 확인 | `Project` group_by, `Work Period` 표시 |
+
+같은 이름의 view가 이미 있고 required 설정을 만족하면 `verified`로 처리합니다. required 설정이 다르면 자동으로 덮어쓰지 않고 conflict로 보고합니다. `작업 계층`의 sub-item UI와 `오늘 작업`의 relative today filter는 Notion API 제약에 따라 best-effort fallback을 사용합니다.
 
 ### DB 컬럼
 
