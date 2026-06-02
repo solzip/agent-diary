@@ -1,4 +1,4 @@
-"""`claude-diary notion push` — push tasks JSON to the Notion hierarchical DB.
+"""`claude-diary diary-notion push` — push tasks JSON to the Notion hierarchical DB.
 
 Driven by the `/diary-notion` slash command or `$diary-notion` Codex skill:
   1. The agent writes `.diary-notion-<id>.json` in cwd
@@ -54,7 +54,7 @@ def cmd_notion_push(args):
     session_id = data.get("session_id") or _fallback_session_id()
     tasks = data.get("tasks") or []
     if not tasks:
-        print("[claude-diary notion push] No tasks to push.")
+        print("[claude-diary diary-notion push] No tasks to push.")
         _cleanup(input_path)
         return
 
@@ -80,10 +80,10 @@ def cmd_notion_push(args):
         try:
             db_id = exporter.ensure_database(year)
             archived = exporter.archive_rows_for_session(db_id, session_id)
-            print("[claude-diary notion push] --force: archived %d existing row(s)" % archived)
+            print("[claude-diary diary-notion push] --force: archived %d existing row(s)" % archived)
         except NotionAuthError as e:
-            print("[claude-diary notion push] Auth error: %s" % e, file=sys.stderr)
-            print("  Check: claude-diary config or run `claude-diary notion init`", file=sys.stderr)
+            print("[claude-diary diary-notion push] Auth error: %s" % e, file=sys.stderr)
+            print("  Check: claude-diary config or run `claude-diary diary-notion init`", file=sys.stderr)
             sys.exit(1)
 
     results = {"pushed": [], "skipped": [], "failed": []}
@@ -212,13 +212,13 @@ def _resolve_credentials(config):
 
 def _read_json(path):
     if not path or not os.path.exists(path):
-        print("[claude-diary notion push] Input file not found: %s" % path, file=sys.stderr)
+        print("[claude-diary diary-notion push] Input file not found: %s" % path, file=sys.stderr)
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError) as e:
-        print("[claude-diary notion push] Failed to read JSON: %s" % e, file=sys.stderr)
+        print("[claude-diary diary-notion push] Failed to read JSON: %s" % e, file=sys.stderr)
         return None
 
 
@@ -326,6 +326,7 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index):
     props = {
         "Name": {"title": [{"text": {"content": title[:2000]}}]},
         "Date": {"date": {"start": date_str}},
+        "Work Period": {"date": _normalize_work_period(task.get("work_period"), date_str)},
         "Project": {"select": {"name": _safe_select(project)}},
         "Purpose": {"select": {"name": _normalize_purpose(task.get("purpose"))}},
         "Categories": {
@@ -351,6 +352,46 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index):
     return props
 
 
+def _normalize_work_period(value, fallback_date):
+    """Return a Notion date object for the actual work period."""
+    if isinstance(value, dict):
+        start = _clean_date(value.get("start") or value.get("date"))
+        end = _clean_date(value.get("end"))
+        if start:
+            result = {"start": start}
+            if end and end != start:
+                result["end"] = end
+            return result
+    elif isinstance(value, str):
+        raw = value.strip()
+        if raw:
+            if ".." in raw:
+                start, end = raw.split("..", 1)
+                result = {"start": _clean_date(start) or fallback_date}
+                end = _clean_date(end)
+                if end and end != result["start"]:
+                    result["end"] = end
+                return result
+            clean = _clean_date(raw)
+            if clean:
+                return {"start": clean}
+    return {"start": fallback_date}
+
+
+def _clean_date(value):
+    """Accept YYYY-MM-DD strings and ignore unsupported date values."""
+    if not value:
+        return ""
+    raw = str(value).strip()
+    if len(raw) >= 10:
+        raw = raw[:10]
+    try:
+        datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        return ""
+    return raw
+
+
 def _safe_select(name):
     """Notion select names cannot contain commas. Replace with '-'."""
     return (name or "").replace(",", "-")[:100] or "unknown"
@@ -370,7 +411,7 @@ def _print_report(results, input_path):
     pushed = len(results["pushed"])
     skipped = len(results["skipped"])
     failed = len(results["failed"])
-    print("[claude-diary notion push] Pushed %d, skipped %d, failed %d" %
+    print("[claude-diary diary-notion push] Pushed %d, skipped %d, failed %d" %
           (pushed, skipped, failed))
     for _, title in results["pushed"]:
         print("  + %s" % title)
@@ -381,7 +422,7 @@ def _print_report(results, input_path):
     if failed > 0:
         print()
         print("Failed tasks preserved in: %s" % input_path)
-        print("Retry: claude-diary notion push --input %s --force" % input_path)
+        print("Retry: claude-diary diary-notion push --input %s --force" % input_path)
 
 
 def _cleanup(input_path):
@@ -394,8 +435,8 @@ def _cleanup(input_path):
 
 
 def _print_setup_hint():
-    print("[claude-diary notion push] Notion hierarchical exporter not configured.",
+    print("[claude-diary diary-notion push] Notion hierarchical exporter not configured.",
           file=sys.stderr)
-    print("  Run: claude-diary notion init", file=sys.stderr)
+    print("  Run: claude-diary diary-notion init", file=sys.stderr)
     print("  Or set CLAUDE_DIARY_NOTION_TOKEN and CLAUDE_DIARY_NOTION_ROOT_PAGE_ID",
           file=sys.stderr)

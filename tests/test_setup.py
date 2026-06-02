@@ -69,6 +69,7 @@ class TestDiaryNotionInstructions:
             "risks",
             "next_steps",
             "support_needed",
+            "work_period",
             "parent_index",
             "depends_on_indices",
         ]
@@ -154,7 +155,7 @@ class TestInstallForce:
         commands_dir = tmp_path / ".claude" / "commands"
         commands_dir.mkdir(parents=True)
         (commands_dir / "diary-notion.md").write_text(
-            "---\nold instructions claude-diary notion push\n", encoding="utf-8"
+            "---\nold instructions claude-diary diary-notion push\n", encoding="utf-8"
         )
         args = MagicMock()
         args.force = True
@@ -177,7 +178,7 @@ class TestInstallAll:
         assert diary.exists()
         assert diary_notion.exists()
         assert "claude-diary write" in diary.read_text(encoding="utf-8")
-        assert "claude-diary notion push" in diary_notion.read_text(encoding="utf-8")
+        assert "claude-diary diary-notion push" in diary_notion.read_text(encoding="utf-8")
 
     def test_upgrade_path_keeps_existing_diary(self, tmp_path):
         """If user already has /diary from old install, /diary-notion still gets added."""
@@ -205,7 +206,7 @@ class TestInstallAllCodexSkills:
         assert diary.exists()
         assert notion.exists()
         assert "working-diary write --input" in diary.read_text(encoding="utf-8")
-        assert "working-diary notion push" in notion.read_text(encoding="utf-8")
+        assert "working-diary diary-notion push" in notion.read_text(encoding="utf-8")
 
 
 class TestUninstallAll:

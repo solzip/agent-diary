@@ -86,6 +86,7 @@ allowed-tools:
      - 한 task에 여러 단계 섞이면 **가장 진행된 단계로** (Testing 통과까지 했으면 Testing)
      - 결정만 했으면 Design, 코드 작성까지 했으면 Implementation, 테스트까지 했으면 Testing,
        머지/배포까지 했으면 Deployed
+   - `work_period`: 실제 작업 기간. 기본은 오늘 날짜 `YYYY-MM-DD`; 여러 날에 걸친 수행분이면 `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` 사용
    - `task_group`: 며칠/여러 세션에 걸치는 큰 작업 단위 식별자 (예: `diary-notion-impl`, `auth-refactor`)
      - 같은 큰 작업의 task들끼리 같은 그룹명 사용 → Notion에서 group view로 묶임
      - 이전 작업의 연속이면 같은 그룹명, 새 작업이면 새 그룹명 (snake-case/kebab-case 권장)
@@ -105,7 +106,7 @@ allowed-tools:
 
 4. **JSON 저장 및 CLI 호출**
    - cwd 에 `.diary-notion-<8자리random>.json` 파일을 Write 도구로 생성
-   - `!claude-diary notion push --input .diary-notion-<8자리>.json` 실행
+   - `!claude-diary diary-notion push --input .diary-notion-<8자리>.json` 실행
    - 종료 후 임시 파일 삭제 (CLI도 try/finally로 삭제하지만 보험)
 
 ## JSON 형식
@@ -132,6 +133,7 @@ allowed-tools:
       "next_steps": ["..."],
       "support_needed": ["..."],
       "status": "Implementation",
+      "work_period": "2026-06-02",
       "task_group": "diary-notion-impl",
       "purpose": "Feature",
       "parent_index": null,
@@ -242,6 +244,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `support_needed`: 0-1 decisions or support needed from others
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
+   - `work_period`: actual work period; use today's `YYYY-MM-DD` by default, or `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for a range
    - `task_group`: stable kebab-case/snake-case group for multi-session work
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy
    - `depends_on_indices`: zero-based indices in this push, or `[]`
@@ -272,6 +275,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
       "support_needed": ["..."],
       "status": "Implementation",
       "purpose": "Feature",
+      "work_period": "2026-06-02",
       "task_group": "working-diary-notion",
       "parent_index": null,
       "depends_on_indices": [],
@@ -288,8 +292,8 @@ Split the current Codex session into task-sized entries and push them to Notion.
 }
 ```
 
-5. Run `working-diary notion push --input .diary-notion-<8-random>.json`.
-6. If `working-diary` is not available, run `claude-diary notion push --input .diary-notion-<8-random>.json`.
+5. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
+6. If `working-diary` is not available, run `claude-diary diary-notion push --input .diary-notion-<8-random>.json`.
 7. Report pushed/skipped/failed tasks from the CLI output.
 
 If there are no task-worthy changes, explain that and do not call the CLI.
@@ -299,13 +303,13 @@ If there are no task-worthy changes, explain that and do not call the CLI.
 SLASH_COMMANDS = {
     # filename: (file content, marker substring used to detect "ours")
     "diary.md": (DIARY_SLASH_COMMAND, "claude-diary write"),
-    "diary-notion.md": (DIARY_NOTION_SLASH_COMMAND, "claude-diary notion push"),
+    "diary-notion.md": (DIARY_NOTION_SLASH_COMMAND, "claude-diary diary-notion push"),
 }
 
 
 CODEX_SKILLS = {
     "diary": (CODEX_DIARY_SKILL, "working-diary write --input"),
-    "diary-notion": (CODEX_DIARY_NOTION_SKILL, "working-diary notion push"),
+    "diary-notion": (CODEX_DIARY_NOTION_SKILL, "working-diary diary-notion push"),
 }
 
 

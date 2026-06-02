@@ -212,12 +212,14 @@ class TestEnsureDatabase:
         exp._cache["years"]["2026"] = "year_page"  # year already cached
 
         mock_req = MagicMock()
-        # Three calls:
+        # Four calls:
         #   1. GET /blocks/year_page (existence check from ensure_year_page cache hit)
-        #   2. POST /databases (create base schema)
-        #   3. PATCH /databases/{id} (Purpose + Status + Task Group + relation extensions)
+        #   2. GET /blocks/year_page/children (find an existing Entries DB)
+        #   3. POST /databases (create base schema)
+        #   4. PATCH /databases/{id} (Purpose + Status + Task Group + relation extensions)
         mock_req.request.side_effect = [
             _make_response(200, {"id": "year_page"}),
+            _make_response(200, {"results": [], "has_more": False}),
             _make_response(200, {"id": "db_xyz"}),
             _make_response(200, {"id": "db_xyz"}),
         ]
@@ -225,8 +227,8 @@ class TestEnsureDatabase:
             db_id = exp.ensure_database(2026)
 
         assert db_id == "db_xyz"
-        # Second call: create POST (base schema only)
-        create_call = mock_req.request.call_args_list[1]
+        # Third call: create POST (base schema only)
+        create_call = mock_req.request.call_args_list[2]
         assert create_call.args[0] == "POST"
         create_body = create_call.kwargs["json"]
         assert create_body["parent"]["page_id"] == "year_page"
@@ -243,19 +245,19 @@ class TestEnsureDatabase:
         assert "Depends On" not in props
         assert "Parent Task" not in props
 
-        # Third call: PATCH to add Purpose + Status + Task Group + relation columns
-        patch_call = mock_req.request.call_args_list[2]
+        # Fourth call: PATCH to add Purpose + Status + Task Group + relation columns
+        patch_call = mock_req.request.call_args_list[3]
         assert patch_call.args[0] == "PATCH"
         assert patch_call.args[1].endswith("/databases/db_xyz")
         patch_body = patch_call.kwargs["json"]
-        for col in ["Purpose", "Status", "Task Group", "Depends On", "Parent Task"]:
+        for col in ["Purpose", "Status", "Task Group", "Depends On", "Parent Task", "Work Period"]:
             assert col in patch_body["properties"]
         relation = patch_body["properties"]["Depends On"]["relation"]
         assert relation["database_id"] == "db_xyz"  # self-reference
         parent_relation = patch_body["properties"]["Parent Task"]["relation"]
         assert parent_relation["database_id"] == "db_xyz"
         # Cache flag recorded so future calls skip the PATCH
-        assert exp._cache["schema_v"]["db_xyz"] == "v4"
+        assert exp._cache["schema_v"]["db_xyz"] == "v5"
 
     def test_existing_database_gets_schema_extension(self, tmp_path):
         """Cache-hit database (older schema) gets current schema columns via PATCH."""
@@ -277,17 +279,48 @@ class TestEnsureDatabase:
         # Second call: PATCH for schema extension on the existing DB
         patch_call = mock_req.request.call_args_list[1]
         assert patch_call.args[0] == "PATCH"
-        for col in ["Purpose", "Status", "Task Group", "Depends On", "Parent Task"]:
+        for col in ["Purpose", "Status", "Task Group", "Depends On", "Parent Task", "Work Period"]:
             assert col in patch_call.kwargs["json"]["properties"]
-        assert exp._cache["schema_v"]["old_db"] == "v4"
+        assert exp._cache["schema_v"]["old_db"] == "v5"
+
+    def test_cache_miss_reuses_existing_entries_database(self, tmp_path):
+        """If cache is empty but Entries already exists, do not create a duplicate DB."""
+        exp = _make_exporter()
+        with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
+            exp.load_cache()
+        exp._cache["years"]["2026"] = "year_page"
+
+        mock_req = MagicMock()
+        mock_req.request.side_effect = [
+            _make_response(200, {"id": "year_page"}),
+            _make_response(200, {
+                "results": [
+                    {
+                        "id": "existing_db",
+                        "type": "child_database",
+                        "child_database": {"title": "Entries"},
+                    },
+                ],
+                "has_more": False,
+            }),
+            _make_response(200, {"id": "existing_db"}),
+        ]
+        with _patch_requests(mock_req):
+            db_id = exp.ensure_database(2026)
+
+        assert db_id == "existing_db"
+        assert exp._cache["databases"]["2026"] == "existing_db"
+        methods = [call_args.args[0] for call_args in mock_req.request.call_args_list]
+        assert "POST" not in methods
+        assert exp._cache["schema_v"]["existing_db"] == "v5"
 
     def test_schema_extension_skipped_when_already_flagged(self, tmp_path):
-        """Once schema_v records the DB at v4, no further PATCH is sent."""
+        """Once schema_v records the DB at v5, no further PATCH is sent."""
         exp = _make_exporter()
         with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
             exp.load_cache()
         exp._cache["databases"]["2026"] = "db_known"
-        exp._cache["schema_v"]["db_known"] = "v4"
+        exp._cache["schema_v"]["db_known"] = "v5"
 
         mock_req = MagicMock()
         mock_req.request.return_value = _make_response(200, {"id": "db_known"})
@@ -299,8 +332,30 @@ class TestEnsureDatabase:
         assert mock_req.request.call_count == 1
         assert mock_req.request.call_args.args[0] == "GET"
 
+    def test_force_schema_patches_even_when_already_flagged(self, tmp_path):
+        """Explicit ensure can force a schema patch even when cache says v5."""
+        exp = _make_exporter()
+        with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
+            exp.load_cache()
+        exp._cache["databases"]["2026"] = "db_known"
+        exp._cache["schema_v"]["db_known"] = "v5"
+
+        mock_req = MagicMock()
+        mock_req.request.side_effect = [
+            _make_response(200, {"id": "db_known"}),
+            _make_response(200, {"id": "db_known"}),
+        ]
+        with _patch_requests(mock_req):
+            db_id = exp.ensure_database(2026, force_schema=True)
+
+        assert db_id == "db_known"
+        assert mock_req.request.call_args_list[1].args[0] == "PATCH"
+        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        assert "Work Period" in patch_body["properties"]
+        assert "Parent Task" in patch_body["properties"]
+
     def test_v3_database_gets_parent_task_upgrade(self, tmp_path):
-        """A DB already marked v3 still gets the v4 Parent Task schema patch."""
+        """A DB already marked v3 still gets Parent Task and Work Period schema patches."""
         exp = _make_exporter()
         with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
             exp.load_cache()
@@ -317,13 +372,13 @@ class TestEnsureDatabase:
 
         assert db_id == "db_v3"
         patch_body = mock_req.request.call_args_list[1].kwargs["json"]
-        assert list(patch_body["properties"].keys()) == ["Parent Task"]
+        assert list(patch_body["properties"].keys()) == ["Parent Task", "Work Period"]
         relation = patch_body["properties"]["Parent Task"]["relation"]
         assert relation["database_id"] == "db_v3"
-        assert exp._cache["schema_v"]["db_v3"] == "v4"
+        assert exp._cache["schema_v"]["db_v3"] == "v5"
 
     def test_v2_database_gets_purpose_and_parent_task_upgrade(self, tmp_path):
-        """A DB already marked v2 still gets Purpose and Parent Task schema patches."""
+        """A DB already marked v2 still gets Purpose, Parent Task, and Work Period patches."""
         exp = _make_exporter()
         with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
             exp.load_cache()
@@ -342,7 +397,29 @@ class TestEnsureDatabase:
         patch_body = mock_req.request.call_args_list[1].kwargs["json"]
         assert "Purpose" in patch_body["properties"]
         assert "Parent Task" in patch_body["properties"]
-        assert exp._cache["schema_v"]["db_v2"] == "v4"
+        assert "Work Period" in patch_body["properties"]
+        assert exp._cache["schema_v"]["db_v2"] == "v5"
+
+    def test_v4_database_gets_work_period_upgrade(self, tmp_path):
+        """A DB already marked v4 still gets the v5 Work Period schema patch."""
+        exp = _make_exporter()
+        with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
+            exp.load_cache()
+        exp._cache["databases"]["2026"] = "db_v4"
+        exp._cache["schema_v"]["db_v4"] = "v4"
+
+        mock_req = MagicMock()
+        mock_req.request.side_effect = [
+            _make_response(200, {"id": "db_v4"}),
+            _make_response(200, {"id": "db_v4"}),
+        ]
+        with _patch_requests(mock_req):
+            db_id = exp.ensure_database(2026)
+
+        assert db_id == "db_v4"
+        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        assert list(patch_body["properties"].keys()) == ["Work Period"]
+        assert exp._cache["schema_v"]["db_v4"] == "v5"
 
 
 class TestFindExistingRow:

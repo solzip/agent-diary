@@ -42,6 +42,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `support_needed`: 0-1 decisions or support needed from others
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
+   - `work_period`: actual work period; use today's `YYYY-MM-DD` by default, or `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for a range
    - `task_group`: stable kebab-case/snake-case group for multi-session work
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy
    - `depends_on_indices`: zero-based indices in this push, or `[]`
@@ -72,6 +73,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
       "support_needed": ["..."],
       "status": "Implementation",
       "purpose": "Feature",
+      "work_period": "2026-06-02",
       "task_group": "working-diary-notion",
       "parent_index": null,
       "depends_on_indices": [],
@@ -88,8 +90,8 @@ Split the current Codex session into task-sized entries and push them to Notion.
 }
 ```
 
-5. Run `working-diary notion push --input .diary-notion-<8-random>.json`.
-6. If `working-diary` is not available, run `claude-diary notion push --input .diary-notion-<8-random>.json`.
+5. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
+6. If `working-diary` is not available, run `claude-diary diary-notion push --input .diary-notion-<8-random>.json`.
 7. Report pushed/skipped/failed tasks from the CLI output.
 
 If there are no task-worthy changes, explain that and do not call the CLI.
