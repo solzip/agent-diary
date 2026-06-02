@@ -80,7 +80,11 @@ Work Period = 실제 작업 기간. 프로젝트/작업 그룹 산출물의 기�
 
 ```bash
 working-diary notion ensure
+working-diary notion ensure --year 2026
+working-diary notion ensure --dry-run
 claude-diary notion ensure
+claude-diary notion ensure --year 2026
+claude-diary notion ensure --dry-run
 ```
 
 역할:
@@ -95,6 +99,8 @@ claude-diary notion ensure
 - 실패해도 `/diary-notion` 또는 `$diary-notion` push 기능에 영향을 주지 않는다.
 - 사용자-facing 명령은 `notion ensure` 하나로 둔다.
 - `views ensure`는 구현 내부의 view 보장 단계 이름으로만 사용하고, 사용자에게 별도 하위 명령으로 노출하지 않는다.
+- `--year`는 대상 연도 페이지/DB를 명시한다.
+- `--dry-run`은 생성/수정 없이 현재 접근 가능한 상태 기준으로 변경 계획만 출력한다.
 
 ### 2.2 MVP Required Core Views
 
@@ -442,18 +448,54 @@ Views:
 Exit: 1
 ```
 
-### 4.3 Force는 후속
+### 4.3 Dry-run과 후속 옵션
 
-2차 MVP에서는 `--force`를 필수로 구현하지 않는다.
+2차 MVP에는 `--year`와 `--dry-run`을 포함한다.
+
+`--dry-run`은 실제 보장이 아니라 계획 출력이다.
+
+`--dry-run`에서 하는 것:
+
+- credential 확인
+- root/year/database 접근 가능 여부 확인
+- schema v5 보강 필요 여부 계산
+- core view 생성/verify 계획 출력
+- conflict 예상 출력
+- 예상 exit code 출력
+
+`--dry-run`에서 하지 않는 것:
+
+- year page 생성
+- database 생성
+- schema 보강
+- view 생성
+- view 수정
+- 기존 row 생성/수정/삭제
+
+DB가 없을 때의 dry-run 출력 예:
+
+```text
+[working-diary notion ensure --dry-run]
+Database: missing
+Plan:
+  + create year page
+  + create Entries DB
+  + ensure schema v5
+  + create 5 core views
+```
 
 후속 옵션:
 
 ```bash
+working-diary notion ensure --plan
+working-diary notion ensure --apply
 working-diary notion ensure --force
 ```
 
 예상 동작:
 
+- `--plan`: dry-run보다 상세한 변경 계획과 drift 해결안을 출력
+- `--apply`: 사용자가 승인한 변경만 적용
 - 시스템이 관리하는 view만 재생성 또는 업데이트
 - 사용자 정의 view는 건드리지 않음
 - 적용 전 변경 계획을 출력
@@ -807,7 +849,11 @@ Warnings:
 
 ```bash
 working-diary notion ensure
+working-diary notion ensure --year 2026
+working-diary notion ensure --dry-run
 claude-diary notion ensure
+claude-diary notion ensure --year 2026
+claude-diary notion ensure --dry-run
 ```
 
 CLI 구조 후보:
@@ -818,6 +864,7 @@ claude_diary.cli.notion_ensure
   ensure_schema()
   ensure_views()
   verify_views()
+  plan_ensure()
 ```
 
 ### Step 3. DB/schema 보장
@@ -862,6 +909,10 @@ src/claude_diary/exporters/notion_views.py
 필수 테스트:
 
 - DB가 없으면 현재 연도 DB와 schema를 보장하는 경로를 호출
+- `--year`가 대상 연도를 지정
+- `--dry-run`은 생성/수정 없이 계획만 출력
+- `--dry-run`은 year page/database/schema/view를 만들지 않음
+- DB가 없는 `--dry-run`은 생성 계획만 출력
 - `ensure_database(year)`가 `database_id`를 반환
 - `database_id`로 `data_source_id`를 조회
 - data source schema로 property name → property id map 생성
@@ -908,6 +959,8 @@ src/claude_diary/exporters/notion_views.py
 2차 MVP 성공 기준:
 
 - `working-diary notion ensure`가 현재 연도 Entries DB와 schema v5를 보장한다.
+- `working-diary notion ensure --year YYYY`가 지정 연도 Entries DB와 schema v5를 보장한다.
+- `working-diary notion ensure --dry-run`이 생성/수정 없이 계획만 출력한다.
 - `Work Period` date range 컬럼을 보장하고 core view에 표시한다.
 - `working-diary notion ensure`가 core view 5개를 자동 보장한다.
 - 같은 이름의 view가 이미 있으면 중복 생성하지 않는다.
