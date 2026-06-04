@@ -133,15 +133,16 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
          └── ...
 ```
 
-한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리합니다. `Project`, `Purpose`, `Task Group`, `Parent Task`, `Sub-items`, `Depends On`, `Work Period`, `Priority`, `Blocked`, `Next Action` 컬럼으로 Notion에서 필터/그룹/관계/운영 상태 조회가 가능합니다.
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리합니다. `Project`, `Purpose`, `Task Group`, native 하위항목 관계, `Depends On`, `Work Period`, `Priority`, `Blocked`, `Next Action` 컬럼으로 Notion에서 필터/그룹/관계/운영 상태 조회가 가능합니다.
 
 현재 구현 기준:
 
 | 항목 | 동작 |
 |------|------|
 | `/diary-notion`, `$diary-notion` | 현재 세션을 작업 row로 분리해 Notion에 push |
-| `working-diary diary-notion ensure` | schema v7, native sub-items, core views 5개, operating views 5개 보장 |
-| `Parent Task` / `Sub-items` | Notion native 하위항목/sub-item을 위한 양방향 포함 관계 |
+| `working-diary diary-notion ensure` | schema v7, native sub-items 연결, core views 5개, operating views 5개 보장 |
+| 하위항목 (native sub-item) | push가 부모 링크를 Notion **native sub-item 관계**(예: `상위 항목`/`하위 항목`)에 기록 → 실제 접기/펼치기 nesting. native 관계가 없으면 기록만 하고 활성화 안내 |
+| `Parent Task` / `Sub-items` (legacy) | 과거에 쓰던 영문 관계. native가 아니라 nesting을 못 구동. `ensure`가 native로 데이터 이전 후 view에서 숨김 |
 | `Depends On` | 하위 작업이 아니라 큰 메인 작업끼리의 선행 연결성 |
 | `Project` | task JSON에 없거나 `unknown`이면 명령 실행 cwd 폴더명으로 보정 |
 | Page body | compact executive body. 결과/작업 한눈에/영향/검증/리스크/부록 순서 |
@@ -171,6 +172,12 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
    claude-diary install --force --codex
    ```
 7. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
+
+> **하위항목(nesting) 1회 활성화** — Notion의 native sub-item 토글은 **UI에서만** 켤 수 있고 API로는 생성·지정할 수 없습니다. `ensure`로 DB가 만들어진 뒤 한 번:
+> 1. Notion에서 그 해의 `Entries` DB 열기
+> 2. 우상단 `⋯` → **Sub-items**(하위 항목) 활성화 → 자기참조 관계 선택/생성
+>
+> 그러면 push·ensure가 그 native 관계를 자동 탐지해 부모-자식을 채우고 `작업 계층` view에서 접기/펼치기로 보여줍니다. 활성화 전에는 작업 기록은 정상이지만 nesting만 빠지고, push가 활성화 안내를 출력합니다.
 
 ### 사용법
 
@@ -202,13 +209,13 @@ working-diary diary-notion push --input .diary-notion-<id>.json --force
 
 | View | 용도 | 기준 |
 |------|------|------|
-| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | `Parent Task` 표시, `Sub-items` 기반 native 하위항목/sub-item, `Depends On` hidden, `Work Period` 표시, `Date desc` |
+| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | native sub-item 관계 기반 접기/펼치기 nesting, native 부모 컬럼 표시, legacy `Parent Task`/`Sub-items`·`Depends On` hidden, `Work Period` 표시, `Date desc` |
 | 오늘 작업 | 오늘 기록된 수행분 확인 | `Date = today`, `Date desc`, `Work Period` 표시 |
 | 상태별 | 진행 단계별 작업 확인 | `Status` group_by, `Work Period` 표시 |
 | 목적별 | 작업 성격별 확인 | `Purpose` group_by, `Work Period` 표시 |
 | 프로젝트별 | 프로젝트별 작업 확인 | `Project` group_by, `Work Period` 표시 |
 
-같은 이름의 view가 이미 있고 required 설정을 만족하면 `verified`로 처리합니다. required 설정이 다르면 `working-diary diary-notion ensure`가 보장 view 기본 설정을 업데이트하고, `--dry-run`에서는 `update planned`로만 표시합니다. `작업 계층`의 sub-item UI와 `오늘 작업`의 relative today filter는 Notion API 제약에 따라 best-effort fallback을 사용합니다.
+같은 이름의 view가 이미 있고 required 설정을 만족하면 `verified`로 처리합니다. required 설정이 다르면 `working-diary diary-notion ensure`가 보장 view 기본 설정을 업데이트하고, `--dry-run`에서는 `update planned`로만 표시합니다. `작업 계층`의 sub-item nesting은 native 관계가 활성화돼 있을 때만 적용되고(없으면 ensure가 경고), `오늘 작업`의 relative today filter는 Notion API 제약에 따라 best-effort fallback을 사용합니다.
 
 ### Operating Views
 
@@ -229,7 +236,7 @@ row는 의미 있는 작업 단위로만 만듭니다. 작은 확인 항목, 긴
 | 기준 | 처리 |
 |------|------|
 | 독립 상태, 검증, 코드 변경, 커밋 근거가 있는 작업 | 별도 row |
-| 메인 작업을 수행하기 위한 세부 작업 | `parent_index` → `Parent Task` / `Sub-items` |
+| 메인 작업을 수행하기 위한 세부 작업 | `parent_index` → native sub-item 관계(부모쪽)에 기록 → `작업 계층`에서 nesting |
 | 큰 메인 작업 간 선행 관계 | `depends_on_indices` → `Depends On` |
 | 전날/이전 세션에서 이어진 작업 | 새 row + 같은 `Task Group` + 필요 시 `Carryover=true` |
 | 다음에 바로 할 일 | `Next Action` |
@@ -247,8 +254,8 @@ row는 의미 있는 작업 단위로만 만듭니다. 작은 확인 항목, 긴
 | Branch | select | task별 branch (group/filter용) |
 | Status | select | Discussion/Design/Implementation/Testing/Deployed |
 | Task Group | select | 며칠/여러 세션에 걸치는 큰 작업 묶음 |
-| Parent Task | relation | 같은 DB의 상위 작업. `Sub-items`와 양방향으로 연결되는 하위항목/sub-item 부모 관계 |
-| Sub-items | relation | 같은 DB의 하위 작업 목록. `작업 계층` view의 native sub-item toggle 기준 |
+| (native sub-item) | relation | UI에서 활성화하는 Notion native 하위항목 관계(locale 이름, 예: `상위 항목`/`하위 항목`). push가 부모쪽에 기록하고 `작업 계층` view의 nesting 토글을 구동. 코드가 이름 하드코딩 없이 자동 탐지 |
+| Parent Task / Sub-items | relation | (legacy) 과거 영문 관계. native가 아니라 nesting 불가. `ensure`가 native로 이전 후 view에서 숨김 |
 | Depends On | relation | 같은 DB의 선행 작업. 하위 작업이 아니라 큰 메인 작업끼리의 연결성에만 사용 |
 | Priority | select | P0/P1/P2/P3. `오늘 우선순위`, `전날 미완료`, `Blocked` view 정렬 기준 |
 | Next Action | rich_text | 다음에 바로 실행할 수 있는 구체적 행동 |
