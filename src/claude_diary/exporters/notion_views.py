@@ -10,6 +10,7 @@ from claude_diary.exporters.notion_hierarchical import (
     NotionAuthError,
     NotionBadRequest,
     NotionNotFound,
+    detect_subitem_relation,
 )
 
 
@@ -319,38 +320,52 @@ class CoreViewsEnsurer:
 
             self._create_view(spec, result)
 
-        self._repair_subitem_links(data_source_id, result, dry_run)
+        self._migrate_subitems_to_native(data_source_id, prop_map, result, dry_run)
         return result
 
-    def _repair_subitem_links(self, data_source_id, result, dry_run):
-        """Re-sync parents whose `Sub-items` lost children pushed before the
-        relation was a proper dual_property. Best-effort: row-query or PATCH
-        failures degrade to warnings, never failing the ensure run."""
+    def _migrate_subitems_to_native(self, data_source_id, prop_map, result, dry_run):
+        """Copy legacy `Parent Task` links into Notion's native sub-item relation.
+
+        Only the native relation drives nesting, so rows pushed via the legacy
+        `Parent Task` relation must be migrated. If the database has no native
+        sub-item relation yet, we warn (the user must enable Sub-items in the UI
+        once). Best-effort: row-query / PATCH failures degrade to warnings and
+        never fail the ensure run.
+        """
+        native = detect_subitem_relation(prop_map)
+        if not native:
+            result.warnings.append(
+                "native Sub-items not enabled: open the database -> ⋯ -> Sub-items "
+                "to turn on nesting, then rerun ensure"
+            )
+            return
+
         try:
             rows = self.client.query_data_source_rows(data_source_id)
         except Exception as e:
-            result.warnings.append("sub-item sync check skipped: %s" % e)
+            result.warnings.append("sub-item migration skipped: %s" % e)
             return
 
-        repairs = _compute_subitem_repairs(rows)
-        if not repairs:
+        migrations = _compute_native_migration(rows, native["parent_name"])
+        if not migrations:
             return
 
         by_id = {row["id"]: row for row in rows if row.get("id")}
+        parent_prop = native["parent_name"]
         if dry_run:
-            for parent_id, _merged, missing in repairs:
+            for child_id, _merged, added in migrations:
                 result.repaired.append(
-                    "%s (+%d planned)" % (_row_title(by_id.get(parent_id, {})), missing)
+                    "%s (+%d planned)" % (_row_title(by_id.get(child_id, {})), added)
                 )
             return
 
-        for parent_id, merged, missing in repairs:
-            title = _row_title(by_id.get(parent_id, {}))
+        for child_id, merged, added in migrations:
+            title = _row_title(by_id.get(child_id, {}))
             try:
-                self.client.update_page_relation(parent_id, "Sub-items", merged)
-                result.repaired.append("%s (+%d)" % (title, missing))
+                self.client.update_page_relation(child_id, parent_prop, merged)
+                result.repaired.append("%s (+%d)" % (title, added))
             except Exception as e:
-                result.warnings.append("sub-item sync failed for %s: %s" % (title, e))
+                result.warnings.append("sub-item migration failed for %s: %s" % (title, e))
 
     def _create_view(self, spec, result):
         payload = _payload_for_spec(spec)
@@ -448,6 +463,23 @@ class CoreViewsEnsurer:
 
 
 def _build_core_view_specs(database_id, data_source_id, prop_map, today):
+    # Only Notion's native sub-item relation (UI-created) drives nesting. When it
+    # is present, point the hierarchy view's subtasks at its child side; when it
+    # is absent the view degrades to a plain table (ensure() warns separately).
+    native = detect_subitem_relation(prop_map)
+    hierarchy_subtasks = None
+    if native and native.get("child_id"):
+        hierarchy_subtasks = {
+            "property_id": native["child_id"],
+            "display_mode": "show",
+            "filter_scope": "parents_and_subitems",
+            "toggle_column_id": _prop_id(prop_map, "Name"),
+        }
+    native_parent = native["parent_name"] if native else "Parent Task"
+    # Hide the legacy Parent Task column only once a native relation supersedes it.
+    hierarchy_hidden = ["Depends On", "Sub-items"]
+    if native:
+        hierarchy_hidden.append("Parent Task")
     return [
         _view_spec(
             "작업 계층",
@@ -456,16 +488,11 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             prop_map,
             visible=[
                 "Name", "Status", "Project", "Purpose", "Task Group",
-                "Parent Task", "Work Period", "Date",
+                native_parent, "Work Period", "Date",
             ],
-            hidden=["Depends On", "Sub-items"],
+            hidden=hierarchy_hidden,
             sorts=[_date_desc_sort()],
-            subtasks={
-                "property_id": _prop_id(prop_map, "Sub-items"),
-                "display_mode": "show",
-                "filter_scope": "parents_and_subitems",
-                "toggle_column_id": _prop_id(prop_map, "Name"),
-            },
+            subtasks=hierarchy_subtasks,
         ),
         _view_spec(
             "오늘 작업",
@@ -917,32 +944,28 @@ def _row_title(row):
     return "".join(part.get("plain_text", "") for part in arr)
 
 
-def _compute_subitem_repairs(rows):
-    """Find parents whose Sub-items relation is missing children.
+def _compute_native_migration(rows, native_parent_name):
+    """Compute legacy→native parent migrations.
 
-    The `Parent Task` side is the source of truth: any child naming a parent
-    must appear in that parent's `Sub-items`. Rows pushed before the relation
-    became a synced dual_property can be missing this reverse link, which hides
-    the native sub-item toggle on the parent. Returns a list of
-    (parent_id, merged_child_ids, missing_count) for parents needing a fix.
+    Each child's legacy `Parent Task` link must be mirrored into the native
+    sub-item parent property (`native_parent_name`) so Notion renders nesting.
+    Returns [(child_id, merged_parent_ids, added_count)] for rows whose native
+    parent relation is missing one or more legacy links. Rows already migrated
+    (or pushed straight to the native relation) yield nothing — idempotent.
     """
     by_id = {row["id"]: row for row in rows if row.get("id")}
-    desired = {}
+    migrations = []
     for row in rows:
         rid = row.get("id")
-        for parent_id in _relation_ids(row, "Parent Task"):
-            if parent_id == rid or parent_id not in by_id:
-                continue
-            desired.setdefault(parent_id, []).append(rid)
-
-    repairs = []
-    for parent_id, children in desired.items():
-        current = _relation_ids(by_id[parent_id], "Sub-items")
+        legacy = [p for p in _relation_ids(row, "Parent Task") if p != rid and p in by_id]
+        if not legacy:
+            continue
+        current = _relation_ids(row, native_parent_name)
         current_set = set(current)
-        missing = [cid for cid in dict.fromkeys(children) if cid not in current_set]
-        if missing:
-            repairs.append((parent_id, current + missing, len(missing)))
-    return repairs
+        added = [pid for pid in dict.fromkeys(legacy) if pid not in current_set]
+        if added:
+            migrations.append((rid, current + added, len(added)))
+    return migrations
 
 
 def _needs_subitems_schema(prop_map):

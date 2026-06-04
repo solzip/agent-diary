@@ -327,6 +327,19 @@ class TestDependsOnWiring:
 
         mock_exp.update_row_relation.assert_called_once_with("row_b", ["row_a"])
 
+    _NATIVE_PROP_MAP = {
+        "Parent item": {
+            "id": "P", "type": "relation",
+            "relation": {"type": "dual_property",
+                         "dual_property": {"synced_property_name": "Sub-item"}},
+        },
+        "Sub-item": {
+            "id": "C", "type": "relation",
+            "relation": {"type": "dual_property",
+                         "dual_property": {"synced_property_name": "Parent item"}},
+        },
+    }
+
     def test_wire_parent_tasks_calls_update_for_children(self, tmp_path):
         input_path = tmp_path / "in.json"
         self._write_json(str(input_path), {
@@ -345,6 +358,7 @@ class TestDependsOnWiring:
 
         mock_exp = MagicMock()
         mock_exp.ensure_database.return_value = "db_xyz"
+        mock_exp.get_database_property_map.return_value = self._NATIVE_PROP_MAP
         mock_exp.find_existing_row.return_value = None
         mock_exp.create_row.side_effect = ["row_a", "row_b", "row_c"]
         mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
@@ -357,14 +371,46 @@ class TestDependsOnWiring:
              pytest.raises(SystemExit):
             cmd_notion_push(self._make_args(str(input_path)))
 
-        parent_calls = mock_exp.update_row_parent.call_args_list
-        assert len(parent_calls) == 2
-        assert parent_calls[0].args == ("row_b", "row_a")
-        assert parent_calls[1].args == ("row_c", "row_b")
-        subitem_calls = mock_exp.update_row_subitems.call_args_list
-        assert len(subitem_calls) == 2
-        assert subitem_calls[0].args == ("row_a", ["row_b"])
-        assert subitem_calls[1].args == ("row_b", ["row_c"])
+        # children are wired into the NATIVE parent relation (single write each)
+        calls = mock_exp.update_row_native_parent.call_args_list
+        assert len(calls) == 2
+        assert calls[0].args == ("row_b", "row_a", "Parent item")
+        assert calls[1].args == ("row_c", "row_b", "Parent item")
+        mock_exp.update_row_parent.assert_not_called()
+        mock_exp.update_row_subitems.assert_not_called()
+
+    def test_wire_parent_tasks_writes_native_parent(self):
+        from claude_diary.cli.notion_push import _wire_parent_tasks
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db"
+        mock_exp.get_database_property_map.return_value = self._NATIVE_PROP_MAP
+        tasks = [{"title": "A"}, {"title": "B", "parent_index": 0}]
+        row_ids = {0: "row_a", 1: "row_b"}
+        failures = _wire_parent_tasks(mock_exp, 2026, tasks, row_ids)
+        mock_exp.update_row_native_parent.assert_called_once_with(
+            "row_b", "row_a", "Parent item"
+        )
+        assert failures == []
+
+    def test_wire_parent_tasks_hint_when_no_native(self, capsys):
+        from claude_diary.cli.notion_push import _wire_parent_tasks
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db"
+        # only the legacy reserved relations exist -> no native relation
+        mock_exp.get_database_property_map.return_value = {
+            "Parent Task": {"id": "x", "type": "relation",
+                            "relation": {"type": "dual_property",
+                                         "dual_property": {"synced_property_name": "Sub-items"}}},
+            "Sub-items": {"id": "y", "type": "relation",
+                          "relation": {"type": "dual_property",
+                                       "dual_property": {"synced_property_name": "Parent Task"}}},
+        }
+        tasks = [{"title": "A"}, {"title": "B", "parent_index": 0}]
+        row_ids = {0: "row_a", 1: "row_b"}
+        failures = _wire_parent_tasks(mock_exp, 2026, tasks, row_ids)
+        mock_exp.update_row_native_parent.assert_not_called()
+        assert failures == []
+        assert "Sub-items" in capsys.readouterr().out
 
     def test_wire_parent_tasks_skips_missing_parent(self):
         from claude_diary.cli.notion_push import _wire_parent_tasks
@@ -374,23 +420,21 @@ class TestDependsOnWiring:
             {"title": "B", "parent_index": 99},
         ]
         row_ids = {0: "row_a", 1: "row_b"}
-        _wire_parent_tasks(mock_exp, tasks, row_ids)
-        mock_exp.update_row_parent.assert_not_called()
-        mock_exp.update_row_subitems.assert_not_called()
+        _wire_parent_tasks(mock_exp, 2026, tasks, row_ids)
+        mock_exp.update_row_native_parent.assert_not_called()
 
     def test_wire_parent_tasks_skips_self_parent(self):
         """A task whose parent_index points at itself must not be wired.
 
         Mirrors the self-reference guard in _wire_depends_on; without it a row
-        would be set as its own Parent Task and own Sub-item.
+        would be set as its own parent.
         """
         from claude_diary.cli.notion_push import _wire_parent_tasks
         mock_exp = MagicMock()
         tasks = [{"title": "A", "parent_index": 0}]
         row_ids = {0: "row_a"}
-        failures = _wire_parent_tasks(mock_exp, tasks, row_ids)
-        mock_exp.update_row_parent.assert_not_called()
-        mock_exp.update_row_subitems.assert_not_called()
+        failures = _wire_parent_tasks(mock_exp, 2026, tasks, row_ids)
+        mock_exp.update_row_native_parent.assert_not_called()
         assert failures == []
 
 
