@@ -114,9 +114,37 @@ For when you want to record an entry mid-session without waiting for the Stop Ho
 
 **Usage:**
 - Inside a Claude Code session: type `/diary` — reads the current cwd's transcript and writes the entry
+- Inside a Codex session: type `$diary` — writes the current conversation/tool context through the same manual diary path
 - Or from the terminal: `claude-diary write`
 
 `claude-diary install` installs `~/.claude/commands/diary.md` so `/diary` works in every project. Re-run it once if you installed before this feature shipped (it's idempotent). `claude-diary uninstall` removes it (preserves user-modified files).
+Codex skills can be installed from the Codex plugin in this repo or with `claude-diary install --codex`.
+
+## Notion Work Diary — `/diary-notion` / `$diary-notion`
+
+Push the current session to a hierarchical Notion database as task-sized rows. Use `/diary-notion` in Claude Code and `$diary-notion` in Codex.
+
+```
+[Notion root page: "Working Diary"]
+ └── 2026 (auto-created)
+     └── Entries (inline DB, auto-created)
+         ├── "Decide Notion DB schema" | Project: claude-diary | Purpose: Planning
+         ├── "Refactor git_info.py"    | Project: claude-diary | Purpose: Refactor
+         └── ...
+```
+
+Rows include filterable/groupable/relational/operating columns for `Project`, `Purpose`, `Task Group`, `Parent Task`, `Sub-items`, `Depends On`, `Branch`, `Status`, `Work Period`, `Priority`, `Blocked`, `Next Action`, `Review Status`, and `Categories`. `Project` is the command cwd folder name; if a task JSON omits it or writes `unknown`, the CLI falls back to the cwd folder. Run `working-diary diary-notion ensure` to create or verify schema v7, native sub-items, 5 core views, and 5 operating views.
+Hierarchy nests through Notion's **native sub-item relation**, which can only be enabled in the Notion UI (locale-named, e.g. `Parent item`/`Sub-item` or `상위 항목`/`하위 항목`): open the year's `Entries` DB → ⋯ menu → Sub-items, once. push then writes each child's parent link into that native relation (auto-detected without hardcoded names), `ensure` points the 작업 계층 view at it and migrates legacy `Parent Task` links over. Until it is enabled, rows are still recorded and push prints a hint; the legacy `Parent Task`/`Sub-items` relation never drove native nesting and is kept hidden. `Depends On` is limited to prerequisite links between large top-level tasks. Do not connect subtasks with dependency relations. `working-diary diary-notion ensure` repairs required core/operating view settings, while `--dry-run` reports update plans without writing. Operating views cover today priority, previous unfinished work, blocked work, review-needed work, and task groups. Each Notion page body stays compact with one top summary callout, checked result items, a work-at-a-glance table, impact bullets, checked verification items, risks/next actions, and appendix toggles. Developer evidence such as code changes, files, commands, Git, and original prompts is hidden in the appendix. Code changes are high-signal summaries, not full diffs; include only behavior, schema, CLI, user workflow, or verification-scope changes.
+Titles and narrative body content are written in Korean. File paths, commands, branches, commit hashes, code identifiers, and `Purpose`/`Status` enum values remain literal or English.
+
+```bash
+claude-diary diary-notion init
+working-diary diary-notion ensure
+/diary-notion       # Claude Code
+$diary-notion       # Codex
+```
+
+Purpose values use stable English labels: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, `General`.
 
 ## Diary Example
 
@@ -177,6 +205,7 @@ export CLAUDE_DIARY_TZ_OFFSET="-5"  # EST (UTC-5)
 
 ```bash
 claude-diary write                        # Write current session diary on demand (also via `/diary` slash command)
+working-diary write                       # Neutral alias for the same CLI
 claude-diary search "keyword"             # Keyword search
 claude-diary filter --project my-app      # Filter by project
 claude-diary trace src/main.py            # File change history

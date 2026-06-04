@@ -499,6 +499,25 @@ class TestMain:
             main()
         mock_cmd.assert_called_once()
 
+    @patch("claude_diary.cli.cmd_notion_ensure")
+    def test_main_dispatches_diary_notion_ensure(self, mock_cmd, capsys):
+        with patch("sys.argv", ["claude-diary", "diary-notion", "ensure", "--year", "2026", "--dry-run"]):
+            main()
+        mock_cmd.assert_called_once()
+        args = mock_cmd.call_args.args[0]
+        assert args.action == "ensure"
+        assert args.year == 2026
+        assert args.dry_run is True
+
+    @patch("claude_diary.cli.cmd_notion_ensure")
+    def test_main_keeps_notion_ensure_alias(self, mock_cmd, capsys):
+        with patch("sys.argv", ["claude-diary", "notion", "ensure", "--dry-run"]):
+            main()
+        mock_cmd.assert_called_once()
+        args = mock_cmd.call_args.args[0]
+        assert args.action == "ensure"
+        assert args.dry_run is True
+
 
 # ── cmd_trace tests ──
 
@@ -894,10 +913,11 @@ class TestCmdInit:
     @patch("claude_diary.cli.ensure_diary_dir")
     @patch("claude_diary.cli.load_config")
     def test_init_basic(self, mock_config, mock_ensure, mock_save, mock_path,
-                        base_config, capsys):
+                        base_config, tmp_path, capsys):
         mock_config.return_value = base_config
         # settings.json doesn't exist
-        with patch("os.path.exists", return_value=False):
+        with patch("os.path.exists", return_value=False), \
+             patch("os.path.expanduser", return_value=str(tmp_path)):
             args = Namespace(team_repo=None)
             cmd_init(args)
         captured = capsys.readouterr()
