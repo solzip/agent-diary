@@ -281,6 +281,15 @@ row는 의미 있는 작업 단위로만 만듭니다. 작은 확인 항목, 긴
 - `config.json`은 절대 git에 커밋/공유하지 마세요 (token이 평문 저장됨)
 - 사용자 프로젝트 `.gitignore`에 `.diary-notion-*.json` 추가 권장 (임시 파일 보호망)
 
+### 자주 겪는 문제
+
+| 증상 | 원인 / 해결 |
+|------|-------------|
+| 하위항목 토글/nesting이 안 보임 | native sub-item 관계가 아직 없음. 그 해의 `Entries` DB에서 **⋯ → Sub-items 1회 활성화**(자기참조 관계 선택/생성). 활성화 전에는 작업 기록은 정상이고 push가 안내만 출력하며, 활성화 후 `ensure` 한 번이면 기존 `Parent Task` 데이터도 native로 이전 |
+| 기존 행의 Status/Purpose/Task Group이 비어 있음 | 이 필드 로직 이전 버전으로 push된 **legacy 데이터**. 새 push부터 채워짐 — `Purpose`는 항상(기본 `General`), `Status`/`Task Group`은 에이전트 JSON에 값이 있을 때. 과거 행은 원본 JSON이 없어 자동 backfill 불가 |
+| 새 연도 DB로 넘어가면 nesting이 다시 안 됨 | Notion은 해마다 새 `Entries` DB를 만들고 native sub-item은 DB마다 별도 활성화가 필요. 새 DB에서 위 ⋯ → Sub-items를 1회 더 켜면 됨 |
+| 갱신한 `$diary-notion`/`$diary` 지시문이 반영 안 됨 | `claude-diary install --force --codex` 후 **새 Codex 세션**을 열어야 적용 (실행 중 세션은 로드된 스킬을 유지). `/diary-notion` 슬래시 명령을 직접 수정했다면 install이 덮어쓰기를 건너뛰므로, 최신본이 필요하면 수동 갱신 |
+
 ## 일지 예시
 
 ```markdown
