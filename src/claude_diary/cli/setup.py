@@ -35,6 +35,16 @@ allowed-tools:
 
 현재 세션의 transcript와 git 정보를 분석하여 Notion 업무일지 DB에 push.
 
+## 현재 구현 계약
+
+- `/diary-notion`은 작업 row push 전용. 사용자가 명시적으로 요청하지 않는 한 schema/view ensure를 실행하지 말 것
+- `working-diary diary-notion ensure`는 schema v7, native 하위항목, core view 5개, operating view 5개를 보장하는 별도 정비 명령
+- 포함 관계는 `parent_index`로 Notion native 하위항목에 기록. native 관계가 아직 활성화돼 있지 않으면 row는 그대로 push하고 하위항목 활성화가 필요함을 보고할 것
+- legacy `Parent Task` / `Sub-items`는 호환용 데이터로만 취급하고 JSON에서 직접 지정하지 말 것
+- `Depends On`은 큰 최상위 메인 작업끼리의 선행 연결에만 사용하고, 하위 작업에는 절대 종속성을 쓰지 말 것
+- `project`에 `"unknown"`을 쓰지 말 것 — 비우거나 생략하면 CLI가 명령 실행 cwd 폴더명으로 보정
+- 페이지 본문은 compact executive body로 렌더링됨: 상단 요약, 결과 체크리스트, 작업 한눈에 표, 영향, 검증, 리스크/다음 액션, 부록
+
 ## 단계
 
 1. **컨텍스트 수집**
@@ -52,6 +62,7 @@ allowed-tools:
    - 단순 확인 항목, 긴 SQL/JS/메모/참고 링크는 별도 row가 아니라 본문 근거로 남길 것
    - `parent_index`는 포함 관계와 Notion 하위항목에 사용하고, 하위 작업을 종속성으로 표현하지 말 것
    - `depends_on_indices`는 큰 메인 작업끼리의 선행 연결성에만 사용할 것
+   - 전날/이전 세션에서 이어진 미완료 작업은 같은 `task_group` + `carryover=true`로 새 row 생성
 
 3. **각 task별 추출**
    - 언어 정책:
