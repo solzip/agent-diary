@@ -24,9 +24,9 @@ working-diary init
   <img src="docs/demo.svg" alt="claude-diary demo" width="680">
 </p>
 
-## How It Works
+## Common Core Summary
 
-Claude Code can write automatic diaries through its Stop Hook, and both Claude Code and Codex can write manual or Notion diaries on demand.
+Working Diary keeps each agent's input flow separate, then sends the actual write operation through the same core CLI. Markdown diary writing, Notion task-row push, Git enrichment, secret scanning, and formatting are handled by the common core.
 
 ```
 Claude Code session ends
@@ -55,6 +55,38 @@ Claude Code automatic diaries are created when sessions end. Codex records only 
 |-------|------------|--------------|-------------------|-----------------|
 | Claude Code | Stop Hook | `/diary` | `/diary-notion` | `working-diary install --force` |
 | Codex | - | `$diary` | `$diary-notion` | `working-diary install --force --codex` |
+
+## Claude Code vs Codex Flow
+
+### Claude Code
+
+Claude Code supports both **automatic diaries and manual diaries**.
+
+```text
+Claude Code session ends
+  -> Stop Hook runs automatically
+  -> transcript is parsed
+  -> tasks, files, commands, and Git info are extracted
+  -> ~/working-diary/2026-03-24.md
+
+Inside a Claude Code session
+  -> /diary        : project-organized Markdown manual diary
+  -> /diary-notion : task rows in the Notion work database
+```
+
+Install or refresh it with `working-diary install --force`. This registers the Claude Code Stop Hook and installs or updates the `/diary` and `/diary-notion` slash commands.
+
+### Codex
+
+Codex currently has **no automatic hook**. It records work only when you invoke a skill.
+
+```text
+Inside a Codex session
+  -> $diary        : write the current conversation/tool activity to a Markdown manual diary
+  -> $diary-notion : split the current session into task rows and push them to Notion
+```
+
+Install or refresh it with `working-diary install --force --codex`. This keeps the Claude Code setup and also installs or updates the Codex `$diary` and `$diary-notion` skills. Already-running Codex sessions keep the skills they loaded at startup, so open a new Codex session after refreshing.
 
 ## Supported Platforms
 
@@ -168,6 +200,8 @@ working-diary diary-notion ensure
 $diary-notion       # Codex
 ```
 
+When `working-diary diary-notion push --input ...` records any failed task, it exits with code `1` and preserves the input JSON for retry. Fully successful or already-skipped pushes exit with code `0`.
+
 Purpose values use stable English labels: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, `General`.
 
 ## Diary Example
@@ -210,6 +244,8 @@ Purpose values use stable English labels: `Feature`, `Bugfix`, `Refactor`, `Docs
 | `CLAUDE_DIARY_DIR` | Auto diary storage path | `~/working-diary` |
 | `CLAUDE_DIARY_MANUAL_DIR` | Manual diary (`/diary`) storage path | `~/working-diary/manual` |
 | `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` (KST) |
+| `CLAUDE_DIARY_NOTION_TOKEN` | Notion integration token, prioritized over config for `diary-notion push` | - |
+| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID, prioritized over config for `diary-notion push` | - |
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
@@ -225,22 +261,45 @@ export CLAUDE_DIARY_TZ_OFFSET="-5"  # EST (UTC-5)
 [Environment]::SetEnvironmentVariable("CLAUDE_DIARY_DIR", "$env:USERPROFILE\working-diary", "User")
 ```
 
+**Windows UTF-8 output:**
+If Korean text or emoji looks garbled in PowerShell, switch the session output to UTF-8 before reading docs or running commands that print diary text:
+
+```powershell
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+```
+
 ## CLI Commands
 
 ```bash
+working-diary init                        # Initialize config
+working-diary install --force             # Install/refresh Claude Code hook + slash commands
+working-diary install --force --codex     # Install/refresh Claude Code + Codex skills
+working-diary uninstall                   # Remove Claude Code hook/slash commands
+working-diary uninstall --codex           # Also remove Codex skills
 claude-diary write                        # Write current session diary on demand (also via `/diary` slash command)
 working-diary write                       # Neutral alias for the same CLI
+working-diary diary-notion init           # Configure Notion token/root page
+working-diary diary-notion ensure         # Ensure Notion schema/views
+working-diary diary-notion push --input .diary-notion-<id>.json
+working-diary notion push --input .diary-notion-<id>.json   # diary-notion alias
 claude-diary search "keyword"             # Keyword search
 claude-diary filter --project my-app      # Filter by project
 claude-diary trace src/main.py            # File change history
 claude-diary stats                        # Terminal dashboard
 claude-diary weekly                       # Weekly summary
 claude-diary dashboard                    # HTML dashboard
+claude-diary dashboard --serve --port 8787
 claude-diary audit                        # Security audit log
 claude-diary audit --verify               # Source code integrity check
 claude-diary config                       # View settings
+claude-diary config --set lang=en         # Update settings
+claude-diary reindex                      # Rebuild search index
+claude-diary delete --last                # Delete the last session entry
 claude-diary team stats                   # Team statistics
 claude-diary team weekly                  # Team weekly report
+claude-diary team monthly --month 2026-06
+claude-diary team init --repo <url> --name <name>
 ```
 
 ## Features

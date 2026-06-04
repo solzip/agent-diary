@@ -1,464 +1,336 @@
-# 📓 Working Diary
+# Working Diary
 
-**Claude Code와 Codex 작업 내용을 하나의 일지로 기록합니다.**
+Claude Code와 Codex 작업 세션을 Markdown 일지 또는 Notion 업무일지로 기록하는 CLI 도구입니다.
 
 [![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/working-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/solzip/working-diary)
+[![Core Dependencies: 0](https://img.shields.io/badge/core%20dependencies-0-brightgreen)](https://github.com/solzip/working-diary)
 
-> **[English](README.en.md)** | 한국어
+> [English](README.en.md) | 한국어
+>
+> 커뮤니티 프로젝트입니다. Anthropic 또는 OpenAI의 공식 프로젝트가 아닙니다.
 
-> ⚠️ This is a community project, not officially affiliated with Anthropic or OpenAI.
+## 한눈에 보기
 
-AI 개발 세션마다 수많은 작업이 이뤄집니다 — 기능 구현, 파일 수정, 버그 수정, 의사결정. 하지만 세션이 끝나면 그 맥락은 사라집니다. **Working Diary**는 Claude Code와 Codex 작업을 마크다운 일지 또는 Notion 업무일지로 구조화해 남깁니다.
+Working Diary는 AI 코딩 세션에서 사라지기 쉬운 작업 맥락을 남깁니다.
 
-패키지 이름과 기존 CLI인 `claude-diary`는 호환을 위해 유지합니다. 새 문서와 사용자-facing 명령은 중립 alias인 `working-diary`를 우선 사용합니다.
+- 사용자가 요청한 작업
+- 생성/수정된 파일
+- 실행한 주요 명령
+- Git branch, commit, diff 통계
+- 작업 요약과 오류
+- Notion 업무 DB용 task row
+
+패키지 이름은 호환성을 위해 `claude-diary`를 유지합니다. 사용자 문서에서는 중립 alias인 `working-diary`를 우선 사용합니다.
 
 ```bash
 pip install claude-diary
 working-diary init
 ```
 
-<p align="center">
-  <img src="docs/demo.svg" alt="claude-diary 데모" width="680">
-</p>
+## 에이전트별 사용 방식
 
-## 어떻게 동작하나요?
-
-Claude Code에서는 Stop Hook으로 세션 종료 시 자동 일지를 만들고, `/diary` 또는 `/diary-notion`으로 즉시 기록할 수도 있습니다. Codex에서는 `$diary`, `$diary-notion` skill이 현재 세션 컨텍스트를 정리해 같은 core CLI로 전달합니다.
-
-```
-Claude Code 세션 종료
-        │
-        ├─ Stop Hook 자동 실행
-        │
-        ▼
-  트랜스크립트 분석 → 작업 내용, 파일, 명령어, Git 정보 추출
-        │
-        └─ ~/working-diary/2026-03-24.md
-
-Claude Code / Codex 세션 중
-        │
-        ├─ /diary 또는 $diary
-        │     └─ 프로젝트별 마크다운 수동 일지
-        │
-        └─ /diary-notion 또는 $diary-notion
-              └─ Notion 작업 DB에 task row push
-```
-
-Claude Code 자동 일지는 설정 후 세션 종료마다 생성됩니다. Codex는 자동 hook이 아니라 skill 명령을 입력했을 때 기록합니다.
-
-## 지원 에이전트
-
-| 에이전트 | 자동 일지 | 수동 일지 | Notion 업무일지 | 설치/갱신 |
-|----------|-----------|-----------|-----------------|-----------|
+| 에이전트 | 자동 기록 | 수동 Markdown | Notion 업무일지 | 설치/갱신 |
+|----------|-----------|---------------|-----------------|-----------|
 | Claude Code | Stop Hook | `/diary` | `/diary-notion` | `working-diary install --force` |
-| Codex | - | `$diary` | `$diary-notion` | `working-diary install --force --codex` |
+| Codex | 없음 | `$diary` | `$diary-notion` | `working-diary install --force --codex` |
 
-## 지원 환경
+### Claude Code
 
-| 플랫폼 | Python | 자동 일지 | 주간 요약 | Cron |
-|--------|--------|-----------|-----------|------|
-| macOS | python3 | ✅ | ✅ | ✅ |
-| Linux | python3 | ✅ | ✅ | ✅ |
-| Windows (Git Bash) | python | ✅ | ✅ | ❌ (Task Scheduler 사용) |
+Claude Code는 세션 종료 시 자동 기록할 수 있습니다.
 
-## 기록되는 내용
-
-| 항목 | 설명 |
-|------|------|
-| 📋 작업 요청 | 사용자가 AI 에이전트에게 요청한 내용 |
-| 📄 생성된 파일 | 새로 만들어진 파일 목록 |
-| ✏️ 수정된 파일 | 편집된 파일 목록 |
-| ⚡ 주요 명령어 | 실행된 중요 shell 명령어 |
-| 📝 작업 요약 | AI가 수행한 작업의 요약 |
-| ⚠️ 이슈 | 발생한 오류나 문제 |
-
-## 설치
-
-### 방법 1: pip (권장)
-
-```bash
-pip install claude-diary
-working-diary init
+```text
+Claude Code 세션 종료
+  -> Stop Hook 실행
+  -> transcript 분석
+  -> 작업, 파일, 명령, Git 정보 추출
+  -> ~/working-diary/YYYY-MM-DD.md
 ```
 
-### 방법 2: Claude Code 플러그인
+세션 중 바로 기록할 수도 있습니다.
 
-```bash
-# Claude Code 안에서
-/plugin marketplace add https://github.com/solzip/working-diary
-/plugin install working-diary
+```text
+/diary         -> Markdown 수동 일지
+/diary-notion  -> Notion 업무 DB에 task row push
 ```
 
-### 방법 3: 수동 설치
+설치 또는 갱신:
 
 ```bash
-git clone https://github.com/solzip/working-diary.git
-cd working-diary/working-diary-system
-./install.sh
+working-diary install --force
 ```
 
-설치 후 자동으로:
-- Stop Hook 등록 (세션 종료마다 자동 실행)
-- `~/working-diary/` 디렉토리 생성
-- 설정 파일 생성
+이 명령은 Claude Code Stop Hook과 `/diary`, `/diary-notion` slash command를 설치하거나 갱신합니다.
 
-Codex skill까지 같이 쓰려면 한 번 더 갱신합니다.
+### Codex
+
+Codex는 자동 hook을 사용하지 않습니다. 사용자가 skill을 호출할 때만 기록합니다.
+
+```text
+$diary         -> 현재 대화/도구 사용 내역을 Markdown 수동 일지로 기록
+$diary-notion  -> 현재 세션을 task row로 나누어 Notion에 push
+```
+
+설치 또는 갱신:
 
 ```bash
 working-diary install --force --codex
 ```
 
-## 디렉토리 구조
+실행 중인 Codex 세션은 이미 로드한 skill을 유지합니다. 갱신 후에는 새 Codex 세션을 여는 것을 권장합니다.
 
-```
-~/working-diary/
-├── 2026-03-15.md          ← 일일 작업일지
-├── 2026-03-16.md
-├── 2026-03-17.md
-├── .session_counts.json    ← 내부 카운트 (자동)
-├── .gitignore
-└── weekly/
-    ├── W11_2026-03-09.md   ← 주간 요약 리포트
-    └── W12_2026-03-16.md
-```
+## 설치
 
-## 수동 일지 — `/diary` / `$diary`
-
-세션 종료를 기다리지 않고 작업 도중 즉시 일지를 남기고 싶을 때 사용합니다. 자동 일지(Stop Hook)와 **공존**하며, 별도 경로에 프로젝트별로 정리됩니다.
-
-```
-~/working-diary/manual/
-└── 2026-04-29/
-    └── my-project/
-        └── 2026-04-29.md      ← 같은 날 같은 프로젝트면 append
-```
-
-**사용법:**
-- Claude Code 세션에서 `/diary` 입력 → 현재 cwd의 transcript를 읽고 기록
-- Codex 세션에서 `$diary` 입력 → 현재 대화/도구 사용 내역을 JSON으로 정리해 같은 경로에 기록
-- 또는 터미널에서 `working-diary write`
-
-`working-diary install` 시 `~/.claude/commands/diary.md`가 함께 설치되어 모든 프로젝트에서 `/diary` 사용 가능. 이미 설치한 적 있다면 한 번 더 실행해서 slash command를 갱신하세요. `working-diary uninstall` 시 함께 제거됩니다 (사용자가 수정한 파일은 보존).
-Codex skill은 repo의 Codex plugin으로 설치하거나 `working-diary install --codex`로 `~/.codex/skills`에 설치할 수 있습니다.
-
-## Notion 업무일지 — `/diary-notion` / `$diary-notion`
-
-현재 세션을 **작업 단위로 분리**해 Notion DB에 push합니다. Claude Code에서는 `/diary-notion`, Codex에서는 `$diary-notion`을 사용합니다. 별도 LLM API 키 없이 현재 에이전트 세션 컨텍스트로 동작하며, Notion 무료 플랜에서도 동작.
-
-`main` 기준 구현은 **공통 core**와 **agent surface**로 나뉩니다. 공통 core는 CLI, Notion exporter, schema/view 보장, formatter, 멱등 push 로직을 담당하고, agent surface는 Claude Code slash command와 Codex skill 지시문만 담당합니다. 그래서 `/diary-notion`과 `$diary-notion`은 같은 `diary-notion push/ensure` core를 사용하지만, 각 에이전트에 맞는 입력 계약은 별도로 관리합니다.
-
-```
-[Notion 루트 페이지: "Working Diary"]
- └── 📄 2026 (자동 생성)
-     └── 🗄️ Entries (인라인 DB, 자동 생성)
-         ├── "Notion DB 컬럼 스키마 결정"   | Project: working-diary | Branch: feat/notion
-         ├── "git_info.py 리팩토링"          | Project: working-diary | Purpose: Refactor
-         └── ...
-```
-
-한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리합니다. `Project`, `Purpose`, `Task Group`, native 하위항목 관계, `Depends On`, `Work Period`, `Priority`, `Blocked`, `Next Action` 컬럼으로 Notion에서 필터/그룹/관계/운영 상태 조회가 가능합니다.
-
-현재 구현 기준:
-
-| 항목 | 동작 |
-|------|------|
-| 공통 core (`main`) | `working-diary diary-notion push/ensure`, schema/view, formatter, Notion exporter 로직 |
-| Claude Code surface | `/diary-notion` slash command. 같은 core를 호출하되 Claude Code 세션 컨텍스트 기준으로 task JSON 생성 |
-| Codex surface | `$diary-notion` skill. 같은 core를 호출하되 Codex 세션 컨텍스트 기준으로 task JSON 생성 |
-| `/diary-notion`, `$diary-notion` | 현재 세션을 작업 row로 분리해 Notion에 push |
-| `working-diary diary-notion ensure` | schema v7, native sub-items 연결, core views 5개, operating views 5개 보장 |
-| 하위항목 (native sub-item) | push가 부모 링크를 Notion **native sub-item 관계**(예: `상위 항목`/`하위 항목`)에 기록 → 실제 접기/펼치기 nesting. native 관계가 없으면 기록만 하고 활성화 안내 |
-| `Parent Task` / `Sub-items` (legacy) | 과거에 쓰던 영문 관계. native가 아니라 nesting을 못 구동. `ensure`가 native로 데이터 이전 후 view에서 숨김 |
-| `Depends On` | 하위 작업이 아니라 큰 메인 작업끼리의 선행 연결성 |
-| `Project` | task JSON에 없거나 `unknown`이면 명령 실행 cwd 폴더명으로 보정 |
-| Page body | compact executive body. 결과/작업 한눈에/영향/검증/리스크/부록 순서 |
-
-`$diary-notion`과 `/diary-notion`은 작업 row push에 집중합니다. DB schema와 view 정리는 `working-diary diary-notion ensure`로 분리되어 있어, view API 문제가 작업 기록 실패로 바로 이어지지 않습니다. 기능 변경은 가능하면 공통 core에 두고, 에이전트별 차이는 `src/claude_diary/cli/setup.py`의 slash command/skill 계약과 `skills/diary-notion/SKILL.md`에만 둡니다.
-
-각 Notion 페이지 본문은 `body_intro` 핵심 callout 1개, `결과` 체크리스트, `작업 한눈에` 표, `영향` bullet, `검증` 체크리스트, `리스크 / 다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
-
-제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status`, `Priority`, `Review Status` enum 값은 원문 또는 영어 값을 유지합니다.
-
-### 5분 셋업
-
-1. **Notion Integration 토큰 발급** — https://www.notion.so/my-integrations → "New integration" → 토큰 복사 (`secret_...`)
-2. **Notion에 루트 페이지 생성** — 이름 자유 (예: "Working Diary")
-3. **그 페이지를 Integration에 공유** — 페이지 우상단 ⋯ → "Connections" → 만든 Integration 추가
-4. **셋업 명령 실행**:
-   ```bash
-   claude-diary diary-notion init
-   ```
-   대화형으로 token과 root page URL(또는 ID)을 입력하면 권한 검증 후 config에 저장됩니다.
-5. **DB schema와 core/operating views 보장**:
-   ```bash
-   working-diary diary-notion ensure
-   ```
-6. **Claude Code/Codex 지시문 설치 또는 갱신**:
-   ```bash
-   # Claude Code: /diary, /diary-notion slash command 갱신
-   working-diary install --force
-
-   # Codex까지 같이 쓸 경우: slash command + $diary, $diary-notion skill 갱신
-   working-diary install --force --codex
-   ```
-7. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
-
-> **하위항목(nesting) 1회 활성화** — Notion의 native sub-item 토글은 **UI에서만** 켤 수 있고 API로는 생성·지정할 수 없습니다. `ensure`로 DB가 만들어진 뒤 한 번:
-> 1. Notion에서 그 해의 `Entries` DB 열기
-> 2. 우상단 `⋯` → **Sub-items**(하위 항목) 활성화 → 자기참조 관계 선택/생성
->
-> 그러면 push·ensure가 그 native 관계를 자동 탐지해 부모-자식을 채우고 `작업 계층` view에서 접기/펼치기로 보여줍니다. 활성화 전에는 작업 기록은 정상이지만 nesting만 빠지고, push가 활성화 안내를 출력합니다.
-
-### 사용법
+### pip 설치
 
 ```bash
-# 처음 한 번
-claude-diary diary-notion init
-working-diary diary-notion ensure --dry-run  # 변경 없이 schema/view 상태 확인
-working-diary diary-notion ensure            # schema v7, native sub-items, core/operating views 보장
-working-diary diary-notion ensure --year 2026
+pip install claude-diary
+working-diary init
+```
 
-# 매 세션
-/diary-notion       # Claude Code 세션 안에서
-$diary-notion       # Codex 세션 안에서
+Notion 연동까지 사용할 경우:
 
-# 수동 push가 필요한 경우
+```bash
+pip install "claude-diary[notion]"
+working-diary init
+```
+
+### Claude Code 플러그인 설치
+
+Claude Code 안에서 실행합니다.
+
+```bash
+/plugin marketplace add https://github.com/solzip/working-diary
+/plugin install working-diary
+```
+
+### 소스에서 설치
+
+```bash
+git clone https://github.com/solzip/working-diary.git
+cd working-diary
+pip install -e .
+working-diary init
+working-diary install --force
+```
+
+## 저장 위치
+
+자동 일지는 날짜별 파일에 append됩니다.
+
+```text
+~/working-diary/
+  2026-03-15.md
+  2026-03-16.md
+  .session_counts.json
+  weekly/
+    W11_2026-03-09.md
+```
+
+수동 일지는 자동 일지와 분리되어 프로젝트별로 저장됩니다.
+
+```text
+~/working-diary/manual/
+  2026-04-29/
+    my-project/
+      2026-04-29.md
+```
+
+## Markdown 일지
+
+Claude Code:
+
+```text
+/diary
+```
+
+Codex:
+
+```text
+$diary
+```
+
+터미널:
+
+```bash
+working-diary write
+```
+
+Claude Code의 `/diary`는 현재 프로젝트의 transcript를 찾아 `working-diary write` core로 기록합니다. Codex의 `$diary`는 현재 대화/도구 사용 내역을 JSON으로 정리한 뒤 같은 core를 호출합니다.
+
+## Notion 업무일지
+
+`/diary-notion`과 `$diary-notion`은 현재 세션을 task 단위로 나누어 Notion DB에 push합니다.
+
+```text
+Notion root page
+  2026
+    Entries
+      "Notion DB 스키마 정리" | Project: working-diary | Purpose: Planning
+      "push 멱등성 보강"      | Project: working-diary | Purpose: Refactor
+```
+
+Notion page body는 짧게 유지합니다. 결과, 작업 한눈에, 영향, 검증, 리스크/다음 액션을 먼저 보여주고, 파일/명령/Git/원문 요청은 접힌 부록에 넣습니다.
+
+### Notion 처음 설정
+
+1. https://www.notion.so/my-integrations 에서 Integration을 만들고 토큰을 복사합니다.
+2. Notion에 루트 페이지를 만듭니다. 예: `Working Diary`
+3. 루트 페이지를 Integration에 공유합니다.
+4. 설정을 저장합니다.
+
+```bash
+working-diary diary-notion init
+```
+
+5. 연도별 `Entries` DB와 schema/view를 보장합니다.
+
+```bash
+working-diary diary-notion ensure
+```
+
+6. 세션에서 기록합니다.
+
+```text
+/diary-notion   # Claude Code
+$diary-notion   # Codex
+```
+
+### Notion sub-item
+
+작업 계층 접기/펼치기는 Notion의 native Sub-items 기능을 사용합니다. 이 기능은 Notion UI에서 한 번 켜야 합니다.
+
+1. 해당 연도의 `Entries` DB를 엽니다.
+2. 우상단 `...` 메뉴에서 `Sub-items`를 활성화합니다.
+3. 다시 `working-diary diary-notion ensure`를 실행합니다.
+
+Sub-items가 아직 없어도 row 기록은 정상 동작합니다. 다만 계층 nesting만 표시되지 않고, push 명령이 안내를 출력합니다.
+
+### Notion push 동작
+
+```bash
 working-diary diary-notion push --input .diary-notion-<id>.json
-
-# 같은 세션 다시 push:
-#   기본은 skip (Session ID + Task Index로 멱등성)
-#   --force 로 기존 행 archive 후 재push
 working-diary diary-notion push --input .diary-notion-<id>.json --force
 ```
 
-다른 세션에서 최신 지시문을 쓰려면 repo를 최신화한 뒤 다시 설치하세요. Claude Code만 쓰면 `working-diary install --force`, Codex까지 쓰면 `working-diary install --force --codex`를 실행합니다. 실행 중인 Codex 세션은 이미 로드한 skill을 유지하므로 새 Codex 세션을 여는 것을 권장합니다.
+- 기본 push는 `Session ID + Task Index`로 이미 기록된 row를 skip합니다.
+- `--force`는 같은 세션의 기존 row를 archive한 뒤 다시 push합니다.
+- 실패한 task가 하나라도 있으면 exit code `1`로 종료하고 입력 JSON을 보존합니다.
+- 전체 성공 또는 이미 push된 task만 skip된 경우 exit code `0`으로 종료합니다.
 
-### Core Views
+## CLI
 
-`working-diary diary-notion ensure`는 현재 연도 또는 `--year`로 지정한 연도 `Entries` DB에 다음 5개 core view를 보장합니다. 기존 작업 row는 생성, 수정, 삭제하지 않습니다.
+```bash
+working-diary init
+working-diary install --force
+working-diary install --force --codex
+working-diary uninstall
+working-diary uninstall --codex
 
-| View | 용도 | 기준 |
-|------|------|------|
-| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | native sub-item 관계 기반 접기/펼치기 nesting, native 부모 컬럼 표시, legacy `Parent Task`/`Sub-items`·`Depends On` hidden, `Work Period` 표시, `Date desc` |
-| 오늘 작업 | 오늘 기록된 수행분 확인 | `Date = today`, `Date desc`, `Work Period` 표시 |
-| 상태별 | 진행 단계별 작업 확인 | `Status` group_by, `Work Period` 표시 |
-| 목적별 | 작업 성격별 확인 | `Purpose` group_by, `Work Period` 표시 |
-| 프로젝트별 | 프로젝트별 작업 확인 | `Project` group_by, `Work Period` 표시 |
+working-diary write
+working-diary diary-notion init
+working-diary diary-notion ensure
+working-diary diary-notion ensure --dry-run
+working-diary diary-notion push --input .diary-notion-<id>.json
+working-diary notion push --input .diary-notion-<id>.json
 
-같은 이름의 view가 이미 있고 required 설정을 만족하면 `verified`로 처리합니다. required 설정이 다르면 `working-diary diary-notion ensure`가 보장 view 기본 설정을 업데이트하고, `--dry-run`에서는 `update planned`로만 표시합니다. `작업 계층`의 sub-item nesting은 native 관계가 활성화돼 있을 때만 적용되고(없으면 ensure가 경고), `오늘 작업`의 relative today filter는 Notion API 제약에 따라 best-effort fallback을 사용합니다.
+working-diary search "키워드"
+working-diary filter --project my-app
+working-diary trace src/main.py
+working-diary stats
+working-diary weekly
+working-diary dashboard
+working-diary dashboard --serve --port 8787
+working-diary audit
+working-diary audit --verify
+working-diary config
+working-diary config --set lang=en
+working-diary migrate
+working-diary reindex
+working-diary delete --last
 
-### Operating Views
-
-최고모델 기준에서는 core view 5개를 유지하면서, 오늘 실행과 막힘 관리를 위한 operating view 5개도 같은 `ensure` 명령으로 보장합니다.
-
-| View | 용도 | 기준 |
-|------|------|------|
-| 오늘 우선순위 | 오늘 처리할 작업을 우선순위대로 확인 | `Date = today`, `Blocked = false`, `Priority asc`, `Date desc` |
-| 전날 미완료 | 이전 기록일에서 완료되지 않은 작업 확인 | `Date before today`, `Status != Deployed`, `Priority asc` |
-| Blocked | 외부 결정/권한/정보 때문에 막힌 작업 확인 | `Blocked = true`, `Block Reason` 표시 |
-| 리뷰 필요 | 검토가 필요한 작업 확인 | `Review Status = Needs Review` |
-| 작업 그룹별 | 여러 날/세션에 걸친 큰 작업 흐름 확인 | `Task Group` group_by |
-
-### 작업 row 분리 기준
-
-row는 의미 있는 작업 단위로만 만듭니다. 작은 확인 항목, 긴 SQL/JS 조각, 참고 링크, 단순 메모는 별도 row가 아니라 page body 부록에 남깁니다.
-
-| 기준 | 처리 |
-|------|------|
-| 독립 상태, 검증, 코드 변경, 커밋 근거가 있는 작업 | 별도 row |
-| 메인 작업을 수행하기 위한 세부 작업 | `parent_index` → native sub-item 관계(부모쪽)에 기록 → `작업 계층`에서 nesting |
-| 큰 메인 작업 간 선행 관계 | `depends_on_indices` → `Depends On` |
-| 전날/이전 세션에서 이어진 작업 | 새 row + 같은 `Task Group` + 필요 시 `Carryover=true` |
-| 다음에 바로 할 일 | `Next Action` |
-| 외부 결정/권한/정보 없이는 못 하는 일 | `Blocked=true` + `Block Reason` |
-
-### DB 컬럼
-
-| 컬럼 | 타입 | 비고 |
-|------|------|------|
-| Name | title | 에이전트가 뽑은 task 제목 (명사구) |
-| Date | date | |
-| Work Period | date | 실제 작업 기간. 프로젝트/작업 그룹 기간 계산 재료 |
-| Project | select | cwd 폴더명. group/filter용. task JSON에서 누락되거나 `unknown`이면 CLI가 명령 실행 cwd로 보정 |
-| Purpose | select | Feature/Bugfix/Refactor/Docs/Test/Infra/Planning/Research/Review/Release/Support/Maintenance/General |
-| Branch | select | task별 branch (group/filter용) |
-| Status | select | Discussion/Design/Implementation/Testing/Deployed |
-| Task Group | select | 며칠/여러 세션에 걸치는 큰 작업 묶음 |
-| (native sub-item) | relation | UI에서 활성화하는 Notion native 하위항목 관계(locale 이름, 예: `상위 항목`/`하위 항목`). push가 부모쪽에 기록하고 `작업 계층` view의 nesting 토글을 구동. 코드가 이름 하드코딩 없이 자동 탐지 |
-| Parent Task / Sub-items | relation | (legacy) 과거 영문 관계. native가 아니라 nesting 불가. `ensure`가 native로 이전 후 view에서 숨김 |
-| Depends On | relation | 같은 DB의 선행 작업. 하위 작업이 아니라 큰 메인 작업끼리의 연결성에만 사용 |
-| Priority | select | P0/P1/P2/P3. `오늘 우선순위`, `전날 미완료`, `Blocked` view 정렬 기준 |
-| Next Action | rich_text | 다음에 바로 실행할 수 있는 구체적 행동 |
-| Blocked | checkbox | 외부 결정/권한/정보 없이는 진행할 수 없는 작업 표시 |
-| Block Reason | rich_text | 막힌 원인 |
-| Carryover | checkbox | 전날 또는 이전 세션 미완료 작업을 오늘 이어서 처리한 row 표시 |
-| Review Status | select | Needs Review/Reviewed/Deferred |
-| Last Reviewed | date | 실제 검토일 |
-| Categories | multi_select | design/refactor/bugfix/... 자유 라벨 |
-| Files | number | 수정+생성 파일 수 |
-| Commits | number | task별 commit 수 |
-| Lines | number | 추가+삭제 합 |
-| Session ID, Task Index | (hidden 권장) | 멱등성 키 |
-
-자세한 설계와 구현 기록:
-
-- [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md)
-- [`docs/02-design/features/diary-notion-views.design.md`](docs/02-design/features/diary-notion-views.design.md)
-- [`docs/04-report/diary-notion-phase-2/README.md`](docs/04-report/diary-notion-phase-2/README.md)
-
-### 주의
-
-- `config.json`은 절대 git에 커밋/공유하지 마세요 (token이 평문 저장됨)
-- 사용자 프로젝트 `.gitignore`에 `.diary-notion-*.json` 추가 권장 (임시 파일 보호망)
-
-### 자주 겪는 문제
-
-| 증상 | 원인 / 해결 |
-|------|-------------|
-| 하위항목 토글/nesting이 안 보임 | native sub-item 관계가 아직 없음. 그 해의 `Entries` DB에서 **⋯ → Sub-items 1회 활성화**(자기참조 관계 선택/생성). 활성화 전에는 작업 기록은 정상이고 push가 안내만 출력하며, 활성화 후 `ensure` 한 번이면 기존 `Parent Task` 데이터도 native로 이전 |
-| 기존 행의 Status/Purpose/Task Group이 비어 있음 | 이 필드 로직 이전 버전으로 push된 **legacy 데이터**. 새 push부터 채워짐 — `Purpose`는 항상(기본 `General`), `Status`/`Task Group`은 에이전트 JSON에 값이 있을 때. 과거 행은 원본 JSON이 없어 자동 backfill 불가 |
-| 새 연도 DB로 넘어가면 nesting이 다시 안 됨 | Notion은 해마다 새 `Entries` DB를 만들고 native sub-item은 DB마다 별도 활성화가 필요. 새 DB에서 위 ⋯ → Sub-items를 1회 더 켜면 됨 |
-| 갱신한 `/diary-notion` 지시문이 반영 안 됨 | `working-diary install --force`로 slash command를 갱신. 단, 사용자가 직접 수정한 slash command는 보호를 위해 덮어쓰지 않으므로 최신본이 필요하면 수동 갱신 |
-| 갱신한 `$diary-notion`/`$diary` skill이 반영 안 됨 | `working-diary install --force --codex` 후 **새 Codex 세션**을 열어야 적용. 실행 중 세션은 이미 로드된 skill을 유지 |
-| Codex와 Claude Code 변경을 어디에 둬야 할지 헷갈림 | 공통 동작은 `main`의 CLI/exporter/formatter/test에 두고, agent별 지시문 차이만 Codex skill 또는 Claude slash command 계약에 둠 |
-
-## 일지 예시
-
-```markdown
-# 📓 작업일지 — 2026-03-17 (화요일)
-
-> 이 파일은 Claude Code Stop Hook에 의해 자동 생성됩니다.
-> 각 세션이 종료될 때마다 작업 내용이 자동으로 기록됩니다.
-
----
-
-### ⏰ 09:32:15 | 📁 `ai-chatbot`
-
-**📋 작업 요청:**
-  1. WebSocket 핸들러에 circuit breaker 패턴 구현해줘
-  2. 에러 코드 정의서 업데이트
-
-**📄 생성된 파일:**
-  - `.../handler/CircuitBreakerHandler.java`
-
-**✏️ 수정된 파일:**
-  - `.../config/WebSocketConfig.java`
-  - `.../constant/ErrorCode.java`
-
-**⚡ 주요 명령어:**
-  - `./gradlew test`
-  - `./gradlew bootRun`
-
-**📝 작업 요약:**
-  - Circuit breaker 패턴이 WebSocket 핸들러에 구현 완료
-  - 3단계 상태 전환(CLOSED→OPEN→HALF_OPEN) 로직 추가
+working-diary team stats
+working-diary team weekly
+working-diary team monthly --month 2026-06
+working-diary team init --repo <url> --name <name>
+working-diary team add-member --name <name> --role member
 ```
 
-## 환경변수 설정
+기존 CLI도 계속 지원합니다.
+
+```bash
+claude-diary write
+claude-diary diary-notion ensure
+```
+
+## 설정
 
 | 환경변수 | 설명 | 기본값 |
 |----------|------|--------|
-| `CLAUDE_DIARY_LANG` | 일지 언어 (`ko` 또는 `en`) | `ko` |
+| `CLAUDE_DIARY_LANG` | 일지 언어. `ko` 또는 `en` | `ko` |
 | `CLAUDE_DIARY_DIR` | 자동 일지 저장 경로 | `~/working-diary` |
-| `CLAUDE_DIARY_MANUAL_DIR` | 수동 일지(`/diary`) 저장 경로 | `~/working-diary/manual` |
-| `CLAUDE_DIARY_TZ_OFFSET` | UTC 오프셋 | `9` (KST) |
+| `CLAUDE_DIARY_MANUAL_DIR` | 수동 일지 저장 경로 | `~/working-diary/manual` |
+| `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` |
+| `CLAUDE_DIARY_NOTION_TOKEN` | Notion token. config보다 우선 | - |
+| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID. config보다 우선 | - |
+| `CLAUDE_DIARY_SKIP` | `1`, `true`, `yes`이면 현재 세션 기록 skip | - |
 
-```bash
-# ~/.bashrc 또는 ~/.zshrc에 추가
-export CLAUDE_DIARY_LANG="ko"
-export CLAUDE_DIARY_DIR="$HOME/working-diary"
-export CLAUDE_DIARY_TZ_OFFSET="9"
-```
+PowerShell에서 한글이나 이모지가 깨져 보이면 현재 세션 출력 인코딩을 UTF-8로 바꿉니다.
 
-**Windows 환경변수 설정:**
 ```powershell
-# PowerShell (영구 설정)
-[Environment]::SetEnvironmentVariable("CLAUDE_DIARY_LANG", "ko", "User")
-[Environment]::SetEnvironmentVariable("CLAUDE_DIARY_DIR", "$env:USERPROFILE\working-diary", "User")
-```
-
-## CLI 명령어
-
-```bash
-working-diary write                       # 현재 세션 작업일지를 즉시 기록 (`/diary`, `$diary`로도 호출)
-working-diary diary-notion ensure         # Notion schema/view 보장
-working-diary diary-notion push --input .diary-notion-<id>.json
-working-diary search "키워드"             # 키워드 검색
-working-diary filter --project my-app     # 프로젝트 필터
-working-diary trace src/main.py           # 파일 변경 이력
-working-diary stats                       # 터미널 대시보드
-working-diary weekly                      # 주간 요약 생성
-working-diary dashboard                   # HTML 대시보드
-working-diary audit                       # 보안 감사 로그
-working-diary audit --verify              # 소스 코드 무결성 검증
-working-diary config                      # 설정 확인
-working-diary team stats                  # 팀 통계
-working-diary team weekly                 # 팀 주간 리포트
-
-# 기존 호환 CLI도 계속 지원
-claude-diary write
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
 ```
 
 ## 주요 기능
 
-| 기능 | 설명 |
-|------|------|
-| 자동 카테고리 | feature/bugfix/refactor/docs/test/config/style 자동 분류 |
-| Git 연동 | 브랜치, 커밋, 변경량 (+/- lines) 자동 기록 |
-| 시크릿 스캔 | 패스워드, API 키, 토큰 자동 마스킹 (11+ 패턴) |
-| 검색 인덱스 | 수개월 일지에서도 빠른 검색 |
-| 5개 Exporter | Notion, Slack, Discord, Obsidian, GitHub 연동 |
-| HTML 대시보드 | GitHub 잔디 히트맵, 오프라인 차트 (CDN 없음) |
-| 보안 감사 | audit 로그, SHA-256 checksum 변조 감지 |
-| 팀 모드 | 접근 제어, Git 중앙 repo, 팀 리포트 |
+- 자동 카테고리 분류
+- Git branch, commit, diff stat 기록
+- secret scan과 masking
+- 검색 인덱스
+- Notion, Slack, Discord, Obsidian, GitHub exporter
+- HTML dashboard
+- audit log와 source checksum 검증
+- team mode
 
-## 요구사항
+## 문제 해결
 
-- Python 3.8+ (`python3` or `python`)
-- Claude Code (자동 Stop Hook 사용 시)
-- Codex (수동 skill `$diary`, `$diary-notion` 사용 시)
-- 외부 의존성 없음 (코어), API 토큰 불필요
+| 증상 | 확인할 것 |
+|------|-----------|
+| `/diary` 또는 `/diary-notion`이 최신 지시문을 쓰지 않음 | `working-diary install --force`로 slash command를 갱신 |
+| `$diary` 또는 `$diary-notion`이 최신 지시문을 쓰지 않음 | `working-diary install --force --codex` 후 새 Codex 세션 시작 |
+| Notion push가 인증 오류를 냄 | Integration token, root page ID, page 공유 상태 확인 |
+| Notion 하위항목 nesting이 안 보임 | `Entries` DB에서 Notion UI의 Sub-items를 한 번 활성화 |
+| push 재시도 시 중복이 걱정됨 | 기본 push는 같은 `Session ID + Task Index`를 skip. 다시 쓰려면 `--force` 사용 |
+| PowerShell에서 글자가 깨짐 | 위 UTF-8 출력 설정 적용 |
 
-## 팁
+## 개발
 
-**CLAUDE.md에 추가하면 더 좋은 일지가 생성됩니다:**
-
-```markdown
-## 작업일지
-- 세션 종료 시 작업 내용이 자동 기록됩니다
-- 작업 완료/구현/수정 시 명확한 요약을 출력해주세요
+```bash
+pip install -e ".[dev,notion]"
+python -m pytest -q
+python -m ruff check .
 ```
-
-## FAQ
-
-**"git log로 충분하지 않나요?"**
-
-git log는 *커밋한 것*을 기록합니다. claude-diary는 *시도한 것, 요청한 것, 디버깅한 것*을 기록합니다 — 커밋 없이 끝난 세션도 포함해서요. "JWT 인증 구현해줘" 같은 원래 요청, 실행한 명령어, 발생한 에러, 소요 시간까지. 커밋 이력과 실제 하루 사이의 빈 공간을 채워줍니다.
-
-**"Cursor / Windsurf / Copilot에서도 되나요?"**
-
-아직은 Claude Code 전용입니다 (Stop Hook 기반). 하지만 핵심 파이프라인은 `session_id + transcript + cwd`만 있으면 되기 때문에, 다른 AI IDE 지원은 구조적으로 어렵지 않습니다. 아래 로드맵을 참고하세요.
-
-**"JSON 인덱스 말고 SQLite는요?"**
-
-현재 JSON 인덱스는 단순하고 의존성이 없습니다. SQLite는 Python 표준 라이브러리에 포함되어 있어 여전히 의존성 0을 유지하면서, 전문 검색과 수개월 데이터 쿼리 성능을 개선할 수 있습니다. v5.0에서 계획 중입니다.
 
 ## 로드맵
 
-| Phase | 목표 | 버전 | 상태 |
-|-------|------|------|------|
-| **A** | 개인 생산성 도구 (카테고리, Git, CLI, 플러그인, 대시보드) | v2.0.0 | ✅ 완료 |
-| **B** | 오픈소스 커뮤니티 (보안, 테스트 420+개, CI/CD) | v3.0.0 | ✅ 완료 |
-| **C** | 팀/회사 도구 (접근 제어, Git 중앙 repo, 팀 리포트) | v4.0.0 | ✅ 완료 |
-| **D** | 배포 (플러그인, PyPI, 마켓플레이스) | v4.1.0 | ✅ 완료 |
-| **E** | 멀티 IDE 지원 (Cursor, Windsurf, VS Code 확장) | v5.0.0 | 📋 예정 |
-| **F** | SQLite 인덱스 + 전문 검색 + 분석 API | v5.1.0 | 📋 예정 |
+현재 README는 사용 가능한 기능을 중심으로 유지하고, 상세 설계와 진행 기록은 `docs/`에 둡니다.
 
-자세한 내용은 [`docs/plans/`](docs/plans/) 디렉토리를 참고하세요.
+| 구분 | 내용 |
+|------|------|
+| 현재 안정화 | Claude Code Stop Hook, Codex skill, Markdown 일지, Notion task row push, schema/view ensure |
+| 다음 개선 | Windows 설치/출력 경험 정리, Notion sub-item 안내 개선, CI/lint 범위 점진 확대 |
+| 검토 중 | SQLite 기반 검색 인덱스, Cursor/Windsurf/VS Code 같은 다른 AI IDE 연동 |
+
+## 문서
+
+- [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
+- [Notion views design](docs/02-design/features/diary-notion-views.design.md)
+- [Distribution plan](docs/plans/phase-d-distribution.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
 
 ## 라이선스
 
-MIT License — [LICENSE](LICENSE)
+MIT
