@@ -33,6 +33,7 @@ dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 
 [project.scripts]
 claude-diary = "claude_diary.cli:main"
+working-diary = "claude_diary.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/solzip/claude-code-hooks-diary"

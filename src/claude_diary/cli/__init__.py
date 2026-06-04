@@ -20,6 +20,30 @@ from claude_diary.cli.team import cmd_team
 from claude_diary.cli.maintenance import cmd_reindex, cmd_audit, cmd_delete, cmd_dashboard
 from claude_diary.cli.setup import cmd_install, cmd_uninstall
 from claude_diary.cli.write import cmd_write
+from claude_diary.cli.notion_push import cmd_notion_push
+from claude_diary.cli.notion_init import cmd_notion_init
+from claude_diary.cli.notion_ensure import cmd_notion_ensure
+
+
+def cmd_notion(args):
+    """Dispatch `diary-notion|notion <action>` to the right command."""
+    if args.action == "push":
+        cmd_notion_push(args)
+    elif args.action == "init":
+        cmd_notion_init(args)
+    elif args.action == "ensure":
+        cmd_notion_ensure(args)
+
+
+def _add_diary_notion_parser(sub, name):
+    p_notion = sub.add_parser(name, help="Notion hierarchical work diary integration")
+    p_notion.add_argument("action", choices=["init", "push", "ensure"], help="Action to perform")
+    p_notion.add_argument("--input", help="JSON input file (push only)")
+    p_notion.add_argument("--force", action="store_true",
+                          help="Archive prior rows for the session before pushing (push only)")
+    p_notion.add_argument("--year", type=int, help="Target year (ensure only)")
+    p_notion.add_argument("--dry-run", action="store_true",
+                          help="Print the Notion schema/view plan without writing (ensure only)")
 
 
 def main():
@@ -107,11 +131,22 @@ def main():
     p_dashboard.add_argument("--months", type=int, default=3, help="Months of data (default: 3)")
 
     # install / uninstall
-    sub.add_parser("install", help="Register claude-diary hook in Claude Code")
-    sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
+    p_install = sub.add_parser("install", help="Register claude-diary hook in Claude Code")
+    p_install.add_argument("--force", action="store_true",
+                           help="Overwrite slash command files (preserves user-modified ones)")
+    p_install.add_argument("--codex", action="store_true",
+                           help="Also install Codex skills under ~/.codex/skills")
+    p_uninstall = sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
+    p_uninstall.add_argument("--codex", action="store_true",
+                             help="Also remove Codex skills installed by claude-diary")
 
     # write (manual diary — for /diary slash command)
-    sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")
+    p_write = sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")
+    p_write.add_argument("--input", help="JSON input file for agent-authored diary entries")
+
+    # notion (hierarchical Notion DB integration — for /diary-notion slash command)
+    _add_diary_notion_parser(sub, "diary-notion")
+    _add_diary_notion_parser(sub, "notion")
 
     args = parser.parse_args()
 
@@ -136,6 +171,8 @@ def main():
         "install": cmd_install,
         "uninstall": cmd_uninstall,
         "write": cmd_write,
+        "diary-notion": cmd_notion,
+        "notion": cmd_notion,
     }
 
     fn = commands.get(args.command)

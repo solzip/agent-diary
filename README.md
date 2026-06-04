@@ -114,9 +114,181 @@ cd claude-code-hooks-diary/working-diary-system
 
 **사용법:**
 - Claude Code 세션에서 `/diary` 입력 → 현재 cwd의 transcript를 읽고 기록
+- Codex 세션에서 `$diary` 입력 → 현재 대화/도구 사용 내역을 JSON으로 정리해 같은 경로에 기록
 - 또는 터미널에서 `claude-diary write`
 
 `claude-diary install` 시 `~/.claude/commands/diary.md`가 함께 설치되어 모든 프로젝트에서 `/diary` 사용 가능. 이미 설치한 적 있다면 한 번 더 실행해서 슬래시 커맨드만 추가하세요 (멱등). `claude-diary uninstall` 시 함께 제거됩니다 (사용자가 수정한 파일은 보존).
+Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install --codex`로 `~/.codex/skills`에 설치할 수 있습니다.
+
+## Notion 업무일지 — `/diary-notion` / `$diary-notion`
+
+현재 세션을 **작업 단위로 분리**해 Notion DB에 push합니다. Claude Code에서는 `/diary-notion`, Codex에서는 `$diary-notion`을 사용합니다. 별도 LLM API 키 없이 현재 에이전트 세션 컨텍스트로 동작하며, Notion 무료 플랜에서도 동작.
+
+```
+[Notion 루트 페이지: "Working Diary"]
+ └── 📄 2026 (자동 생성)
+     └── 🗄️ Entries (인라인 DB, 자동 생성)
+         ├── "Notion DB 컬럼 스키마 결정"   | Project: claude-diary | Branch: feat/notion
+         ├── "git_info.py 리팩토링"          | Project: claude-diary | Purpose: Refactor
+         └── ...
+```
+
+한 세션의 의논/구현이 의미 단위로 N개 행으로 분리되어 들어갑니다. branch가 바뀌면 무조건 새 task로 분리합니다. `Project`, `Purpose`, `Task Group`, native 하위항목 관계, `Depends On`, `Work Period`, `Priority`, `Blocked`, `Next Action` 컬럼으로 Notion에서 필터/그룹/관계/운영 상태 조회가 가능합니다.
+
+현재 구현 기준:
+
+| 항목 | 동작 |
+|------|------|
+| `/diary-notion`, `$diary-notion` | 현재 세션을 작업 row로 분리해 Notion에 push |
+| `working-diary diary-notion ensure` | schema v7, native sub-items 연결, core views 5개, operating views 5개 보장 |
+| 하위항목 (native sub-item) | push가 부모 링크를 Notion **native sub-item 관계**(예: `상위 항목`/`하위 항목`)에 기록 → 실제 접기/펼치기 nesting. native 관계가 없으면 기록만 하고 활성화 안내 |
+| `Parent Task` / `Sub-items` (legacy) | 과거에 쓰던 영문 관계. native가 아니라 nesting을 못 구동. `ensure`가 native로 데이터 이전 후 view에서 숨김 |
+| `Depends On` | 하위 작업이 아니라 큰 메인 작업끼리의 선행 연결성 |
+| `Project` | task JSON에 없거나 `unknown`이면 명령 실행 cwd 폴더명으로 보정 |
+| Page body | compact executive body. 결과/작업 한눈에/영향/검증/리스크/부록 순서 |
+
+`$diary-notion`과 `/diary-notion`은 작업 row push에 집중합니다. DB schema와 view 정리는 `working-diary diary-notion ensure`로 분리되어 있어, view API 문제가 작업 기록 실패로 바로 이어지지 않습니다.
+
+각 Notion 페이지 본문은 `body_intro` 핵심 callout 1개, `결과` 체크리스트, `작업 한눈에` 표, `영향` bullet, `검증` 체크리스트, `리스크 / 다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
+
+제목과 설명형 본문은 한국어로 기록하고, 파일 경로/명령어/branch/commit hash/코드 식별자 및 `Purpose`, `Status`, `Priority`, `Review Status` enum 값은 원문 또는 영어 값을 유지합니다.
+
+### 5분 셋업
+
+1. **Notion Integration 토큰 발급** — https://www.notion.so/my-integrations → "New integration" → 토큰 복사 (`secret_...`)
+2. **Notion에 루트 페이지 생성** — 이름 자유 (예: "Working Diary")
+3. **그 페이지를 Integration에 공유** — 페이지 우상단 ⋯ → "Connections" → 만든 Integration 추가
+4. **셋업 명령 실행**:
+   ```bash
+   claude-diary diary-notion init
+   ```
+   대화형으로 token과 root page URL(또는 ID)을 입력하면 권한 검증 후 config에 저장됩니다.
+5. **DB schema와 core/operating views 보장**:
+   ```bash
+   working-diary diary-notion ensure
+   ```
+6. **Codex에서 쓸 경우 skill 설치 또는 갱신**:
+   ```bash
+   claude-diary install --force --codex
+   ```
+7. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
+
+> **하위항목(nesting) 1회 활성화** — Notion의 native sub-item 토글은 **UI에서만** 켤 수 있고 API로는 생성·지정할 수 없습니다. `ensure`로 DB가 만들어진 뒤 한 번:
+> 1. Notion에서 그 해의 `Entries` DB 열기
+> 2. 우상단 `⋯` → **Sub-items**(하위 항목) 활성화 → 자기참조 관계 선택/생성
+>
+> 그러면 push·ensure가 그 native 관계를 자동 탐지해 부모-자식을 채우고 `작업 계층` view에서 접기/펼치기로 보여줍니다. 활성화 전에는 작업 기록은 정상이지만 nesting만 빠지고, push가 활성화 안내를 출력합니다.
+
+### 사용법
+
+```bash
+# 처음 한 번
+claude-diary diary-notion init
+working-diary diary-notion ensure --dry-run  # 변경 없이 schema/view 상태 확인
+working-diary diary-notion ensure            # schema v7, native sub-items, core/operating views 보장
+working-diary diary-notion ensure --year 2026
+
+# 매 세션
+/diary-notion       # Claude Code 세션 안에서
+$diary-notion       # Codex 세션 안에서
+
+# 수동 push가 필요한 경우
+working-diary diary-notion push --input .diary-notion-<id>.json
+
+# 같은 세션 다시 push:
+#   기본은 skip (Session ID + Task Index로 멱등성)
+#   --force 로 기존 행 archive 후 재push
+working-diary diary-notion push --input .diary-notion-<id>.json --force
+```
+
+다른 Codex 세션에서 최신 `$diary-notion` 지시문을 쓰려면 repo를 최신화한 뒤 `claude-diary install --force --codex`를 다시 실행하고 새 Codex 세션을 여는 것을 권장합니다.
+
+### Core Views
+
+`working-diary diary-notion ensure`는 현재 연도 또는 `--year`로 지정한 연도 `Entries` DB에 다음 5개 core view를 보장합니다. 기존 작업 row는 생성, 수정, 삭제하지 않습니다.
+
+| View | 용도 | 기준 |
+|------|------|------|
+| 작업 계층 | 메인 작업과 하위 작업 관계 확인 | native sub-item 관계 기반 접기/펼치기 nesting, native 부모 컬럼 표시, legacy `Parent Task`/`Sub-items`·`Depends On` hidden, `Work Period` 표시, `Date desc` |
+| 오늘 작업 | 오늘 기록된 수행분 확인 | `Date = today`, `Date desc`, `Work Period` 표시 |
+| 상태별 | 진행 단계별 작업 확인 | `Status` group_by, `Work Period` 표시 |
+| 목적별 | 작업 성격별 확인 | `Purpose` group_by, `Work Period` 표시 |
+| 프로젝트별 | 프로젝트별 작업 확인 | `Project` group_by, `Work Period` 표시 |
+
+같은 이름의 view가 이미 있고 required 설정을 만족하면 `verified`로 처리합니다. required 설정이 다르면 `working-diary diary-notion ensure`가 보장 view 기본 설정을 업데이트하고, `--dry-run`에서는 `update planned`로만 표시합니다. `작업 계층`의 sub-item nesting은 native 관계가 활성화돼 있을 때만 적용되고(없으면 ensure가 경고), `오늘 작업`의 relative today filter는 Notion API 제약에 따라 best-effort fallback을 사용합니다.
+
+### Operating Views
+
+최고모델 기준에서는 core view 5개를 유지하면서, 오늘 실행과 막힘 관리를 위한 operating view 5개도 같은 `ensure` 명령으로 보장합니다.
+
+| View | 용도 | 기준 |
+|------|------|------|
+| 오늘 우선순위 | 오늘 처리할 작업을 우선순위대로 확인 | `Date = today`, `Blocked = false`, `Priority asc`, `Date desc` |
+| 전날 미완료 | 이전 기록일에서 완료되지 않은 작업 확인 | `Date before today`, `Status != Deployed`, `Priority asc` |
+| Blocked | 외부 결정/권한/정보 때문에 막힌 작업 확인 | `Blocked = true`, `Block Reason` 표시 |
+| 리뷰 필요 | 검토가 필요한 작업 확인 | `Review Status = Needs Review` |
+| 작업 그룹별 | 여러 날/세션에 걸친 큰 작업 흐름 확인 | `Task Group` group_by |
+
+### 작업 row 분리 기준
+
+row는 의미 있는 작업 단위로만 만듭니다. 작은 확인 항목, 긴 SQL/JS 조각, 참고 링크, 단순 메모는 별도 row가 아니라 page body 부록에 남깁니다.
+
+| 기준 | 처리 |
+|------|------|
+| 독립 상태, 검증, 코드 변경, 커밋 근거가 있는 작업 | 별도 row |
+| 메인 작업을 수행하기 위한 세부 작업 | `parent_index` → native sub-item 관계(부모쪽)에 기록 → `작업 계층`에서 nesting |
+| 큰 메인 작업 간 선행 관계 | `depends_on_indices` → `Depends On` |
+| 전날/이전 세션에서 이어진 작업 | 새 row + 같은 `Task Group` + 필요 시 `Carryover=true` |
+| 다음에 바로 할 일 | `Next Action` |
+| 외부 결정/권한/정보 없이는 못 하는 일 | `Blocked=true` + `Block Reason` |
+
+### DB 컬럼
+
+| 컬럼 | 타입 | 비고 |
+|------|------|------|
+| Name | title | 에이전트가 뽑은 task 제목 (명사구) |
+| Date | date | |
+| Work Period | date | 실제 작업 기간. 프로젝트/작업 그룹 기간 계산 재료 |
+| Project | select | cwd 폴더명. group/filter용. task JSON에서 누락되거나 `unknown`이면 CLI가 명령 실행 cwd로 보정 |
+| Purpose | select | Feature/Bugfix/Refactor/Docs/Test/Infra/Planning/Research/Review/Release/Support/Maintenance/General |
+| Branch | select | task별 branch (group/filter용) |
+| Status | select | Discussion/Design/Implementation/Testing/Deployed |
+| Task Group | select | 며칠/여러 세션에 걸치는 큰 작업 묶음 |
+| (native sub-item) | relation | UI에서 활성화하는 Notion native 하위항목 관계(locale 이름, 예: `상위 항목`/`하위 항목`). push가 부모쪽에 기록하고 `작업 계층` view의 nesting 토글을 구동. 코드가 이름 하드코딩 없이 자동 탐지 |
+| Parent Task / Sub-items | relation | (legacy) 과거 영문 관계. native가 아니라 nesting 불가. `ensure`가 native로 이전 후 view에서 숨김 |
+| Depends On | relation | 같은 DB의 선행 작업. 하위 작업이 아니라 큰 메인 작업끼리의 연결성에만 사용 |
+| Priority | select | P0/P1/P2/P3. `오늘 우선순위`, `전날 미완료`, `Blocked` view 정렬 기준 |
+| Next Action | rich_text | 다음에 바로 실행할 수 있는 구체적 행동 |
+| Blocked | checkbox | 외부 결정/권한/정보 없이는 진행할 수 없는 작업 표시 |
+| Block Reason | rich_text | 막힌 원인 |
+| Carryover | checkbox | 전날 또는 이전 세션 미완료 작업을 오늘 이어서 처리한 row 표시 |
+| Review Status | select | Needs Review/Reviewed/Deferred |
+| Last Reviewed | date | 실제 검토일 |
+| Categories | multi_select | design/refactor/bugfix/... 자유 라벨 |
+| Files | number | 수정+생성 파일 수 |
+| Commits | number | task별 commit 수 |
+| Lines | number | 추가+삭제 합 |
+| Session ID, Task Index | (hidden 권장) | 멱등성 키 |
+
+자세한 설계와 구현 기록:
+
+- [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md)
+- [`docs/02-design/features/diary-notion-views.design.md`](docs/02-design/features/diary-notion-views.design.md)
+- [`docs/04-report/diary-notion-phase-2/README.md`](docs/04-report/diary-notion-phase-2/README.md)
+
+### 주의
+
+- `config.json`은 절대 git에 커밋/공유하지 마세요 (token이 평문 저장됨)
+- 사용자 프로젝트 `.gitignore`에 `.diary-notion-*.json` 추가 권장 (임시 파일 보호망)
+
+### 자주 겪는 문제
+
+| 증상 | 원인 / 해결 |
+|------|-------------|
+| 하위항목 토글/nesting이 안 보임 | native sub-item 관계가 아직 없음. 그 해의 `Entries` DB에서 **⋯ → Sub-items 1회 활성화**(자기참조 관계 선택/생성). 활성화 전에는 작업 기록은 정상이고 push가 안내만 출력하며, 활성화 후 `ensure` 한 번이면 기존 `Parent Task` 데이터도 native로 이전 |
+| 기존 행의 Status/Purpose/Task Group이 비어 있음 | 이 필드 로직 이전 버전으로 push된 **legacy 데이터**. 새 push부터 채워짐 — `Purpose`는 항상(기본 `General`), `Status`/`Task Group`은 에이전트 JSON에 값이 있을 때. 과거 행은 원본 JSON이 없어 자동 backfill 불가 |
+| 새 연도 DB로 넘어가면 nesting이 다시 안 됨 | Notion은 해마다 새 `Entries` DB를 만들고 native sub-item은 DB마다 별도 활성화가 필요. 새 DB에서 위 ⋯ → Sub-items를 1회 더 켜면 됨 |
+| 갱신한 `$diary-notion`/`$diary` 지시문이 반영 안 됨 | `claude-diary install --force --codex` 후 **새 Codex 세션**을 열어야 적용 (실행 중 세션은 로드된 스킬을 유지). `/diary-notion` 슬래시 명령을 직접 수정했다면 install이 덮어쓰기를 건너뛰므로, 최신본이 필요하면 수동 갱신 |
 
 ## 일지 예시
 
@@ -177,6 +349,7 @@ export CLAUDE_DIARY_TZ_OFFSET="9"
 
 ```bash
 claude-diary write                        # 현재 세션 작업일지를 즉시 기록 (`/diary` 슬래시 커맨드로도 호출)
+working-diary write                       # 동일한 CLI의 중립 alias
 claude-diary search "키워드"              # 키워드 검색
 claude-diary filter --project my-app      # 프로젝트 필터
 claude-diary trace src/main.py            # 파일 변경 이력
