@@ -1,20 +1,23 @@
-# 📓 Claude Code Working Diary
+# 📓 Working Diary
 
-**Claude Code 작업 내용, 자동으로 기록됩니다.**
+**Claude Code와 Codex 작업 내용을 하나의 일지로 기록합니다.**
 
-[![CI](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml)
+[![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/working-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/solzip/claude-code-hooks-diary)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/solzip/working-diary)
 
 > **[English](README.en.md)** | 한국어
 
-> ⚠️ This is a community project, not officially affiliated with Anthropic.
+> ⚠️ This is a community project, not officially affiliated with Anthropic or OpenAI.
 
-Claude Code 세션마다 수많은 작업이 이뤄집니다 — 기능 구현, 파일 수정, 버그 수정. 하지만 세션이 끝나면 그 맥락은 사라집니다. **claude-diary**가 이 모든 것을 자동으로 기록합니다.
+AI 개발 세션마다 수많은 작업이 이뤄집니다 — 기능 구현, 파일 수정, 버그 수정, 의사결정. 하지만 세션이 끝나면 그 맥락은 사라집니다. **Working Diary**는 Claude Code와 Codex 작업을 마크다운 일지 또는 Notion 업무일지로 구조화해 남깁니다.
+
+패키지 이름과 기존 CLI인 `claude-diary`는 호환을 위해 유지합니다. 새 문서와 사용자-facing 명령은 중립 alias인 `working-diary`를 우선 사용합니다.
 
 ```bash
-pip install claude-diary && claude-diary init  # 이게 끝입니다.
+pip install claude-diary
+working-diary init
 ```
 
 <p align="center">
@@ -23,20 +26,35 @@ pip install claude-diary && claude-diary init  # 이게 끝입니다.
 
 ## 어떻게 동작하나요?
 
+Claude Code에서는 Stop Hook으로 세션 종료 시 자동 일지를 만들고, `/diary` 또는 `/diary-notion`으로 즉시 기록할 수도 있습니다. Codex에서는 `$diary`, `$diary-notion` skill이 현재 세션 컨텍스트를 정리해 같은 core CLI로 전달합니다.
+
 ```
 Claude Code 세션 종료
         │
-        ▼
-  Stop Hook 자동 실행
+        ├─ Stop Hook 자동 실행
         │
         ▼
   트랜스크립트 분석 → 작업 내용, 파일, 명령어, Git 정보 추출
         │
-        ▼
-  ~/working-diary/2026-03-24.md  ← 일지 자동 생성
+        └─ ~/working-diary/2026-03-24.md
+
+Claude Code / Codex 세션 중
+        │
+        ├─ /diary 또는 $diary
+        │     └─ 프로젝트별 마크다운 수동 일지
+        │
+        └─ /diary-notion 또는 $diary-notion
+              └─ Notion 작업 DB에 task row push
 ```
 
-설정 없이 바로 동작합니다. 세션이 끝날 때마다 Hook이 자동 실행되어 구조화된 마크다운 일지를 생성합니다.
+Claude Code 자동 일지는 설정 후 세션 종료마다 생성됩니다. Codex는 자동 hook이 아니라 skill 명령을 입력했을 때 기록합니다.
+
+## 지원 에이전트
+
+| 에이전트 | 자동 일지 | 수동 일지 | Notion 업무일지 | 설치/갱신 |
+|----------|-----------|-----------|-----------------|-----------|
+| Claude Code | Stop Hook | `/diary` | `/diary-notion` | `working-diary install --force` |
+| Codex | - | `$diary` | `$diary-notion` | `working-diary install --force --codex` |
 
 ## 지원 환경
 
@@ -50,7 +68,7 @@ Claude Code 세션 종료
 
 | 항목 | 설명 |
 |------|------|
-| 📋 작업 요청 | 사용자가 Claude에게 요청한 내용 |
+| 📋 작업 요청 | 사용자가 AI 에이전트에게 요청한 내용 |
 | 📄 생성된 파일 | 새로 만들어진 파일 목록 |
 | ✏️ 수정된 파일 | 편집된 파일 목록 |
 | ⚡ 주요 명령어 | 실행된 중요 shell 명령어 |
@@ -63,22 +81,22 @@ Claude Code 세션 종료
 
 ```bash
 pip install claude-diary
-claude-diary init
+working-diary init
 ```
 
 ### 방법 2: Claude Code 플러그인
 
 ```bash
 # Claude Code 안에서
-/plugin marketplace add https://github.com/solzip/claude-code-hooks-diary
+/plugin marketplace add https://github.com/solzip/working-diary
 /plugin install working-diary
 ```
 
 ### 방법 3: 수동 설치
 
 ```bash
-git clone https://github.com/solzip/claude-code-hooks-diary.git
-cd claude-code-hooks-diary/working-diary-system
+git clone https://github.com/solzip/working-diary.git
+cd working-diary/working-diary-system
 ./install.sh
 ```
 
@@ -86,6 +104,12 @@ cd claude-code-hooks-diary/working-diary-system
 - Stop Hook 등록 (세션 종료마다 자동 실행)
 - `~/working-diary/` 디렉토리 생성
 - 설정 파일 생성
+
+Codex skill까지 같이 쓰려면 한 번 더 갱신합니다.
+
+```bash
+working-diary install --force --codex
+```
 
 ## 디렉토리 구조
 
@@ -101,35 +125,37 @@ cd claude-code-hooks-diary/working-diary-system
     └── W12_2026-03-16.md
 ```
 
-## 수동 일지 — `/diary` 슬래시 커맨드
+## 수동 일지 — `/diary` / `$diary`
 
 세션 종료를 기다리지 않고 작업 도중 즉시 일지를 남기고 싶을 때 사용합니다. 자동 일지(Stop Hook)와 **공존**하며, 별도 경로에 프로젝트별로 정리됩니다.
 
 ```
 ~/working-diary/manual/
 └── 2026-04-29/
-    └── claude-code-hooks-diary/
+    └── my-project/
         └── 2026-04-29.md      ← 같은 날 같은 프로젝트면 append
 ```
 
 **사용법:**
 - Claude Code 세션에서 `/diary` 입력 → 현재 cwd의 transcript를 읽고 기록
 - Codex 세션에서 `$diary` 입력 → 현재 대화/도구 사용 내역을 JSON으로 정리해 같은 경로에 기록
-- 또는 터미널에서 `claude-diary write`
+- 또는 터미널에서 `working-diary write`
 
-`claude-diary install` 시 `~/.claude/commands/diary.md`가 함께 설치되어 모든 프로젝트에서 `/diary` 사용 가능. 이미 설치한 적 있다면 한 번 더 실행해서 슬래시 커맨드만 추가하세요 (멱등). `claude-diary uninstall` 시 함께 제거됩니다 (사용자가 수정한 파일은 보존).
-Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install --codex`로 `~/.codex/skills`에 설치할 수 있습니다.
+`working-diary install` 시 `~/.claude/commands/diary.md`가 함께 설치되어 모든 프로젝트에서 `/diary` 사용 가능. 이미 설치한 적 있다면 한 번 더 실행해서 slash command를 갱신하세요. `working-diary uninstall` 시 함께 제거됩니다 (사용자가 수정한 파일은 보존).
+Codex skill은 repo의 Codex plugin으로 설치하거나 `working-diary install --codex`로 `~/.codex/skills`에 설치할 수 있습니다.
 
 ## Notion 업무일지 — `/diary-notion` / `$diary-notion`
 
 현재 세션을 **작업 단위로 분리**해 Notion DB에 push합니다. Claude Code에서는 `/diary-notion`, Codex에서는 `$diary-notion`을 사용합니다. 별도 LLM API 키 없이 현재 에이전트 세션 컨텍스트로 동작하며, Notion 무료 플랜에서도 동작.
 
+`main` 기준 구현은 **공통 core**와 **agent surface**로 나뉩니다. 공통 core는 CLI, Notion exporter, schema/view 보장, formatter, 멱등 push 로직을 담당하고, agent surface는 Claude Code slash command와 Codex skill 지시문만 담당합니다. 그래서 `/diary-notion`과 `$diary-notion`은 같은 `diary-notion push/ensure` core를 사용하지만, 각 에이전트에 맞는 입력 계약은 별도로 관리합니다.
+
 ```
 [Notion 루트 페이지: "Working Diary"]
  └── 📄 2026 (자동 생성)
      └── 🗄️ Entries (인라인 DB, 자동 생성)
-         ├── "Notion DB 컬럼 스키마 결정"   | Project: claude-diary | Branch: feat/notion
-         ├── "git_info.py 리팩토링"          | Project: claude-diary | Purpose: Refactor
+         ├── "Notion DB 컬럼 스키마 결정"   | Project: working-diary | Branch: feat/notion
+         ├── "git_info.py 리팩토링"          | Project: working-diary | Purpose: Refactor
          └── ...
 ```
 
@@ -139,6 +165,9 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
 
 | 항목 | 동작 |
 |------|------|
+| 공통 core (`main`) | `working-diary diary-notion push/ensure`, schema/view, formatter, Notion exporter 로직 |
+| Claude Code surface | `/diary-notion` slash command. 같은 core를 호출하되 Claude Code 세션 컨텍스트 기준으로 task JSON 생성 |
+| Codex surface | `$diary-notion` skill. 같은 core를 호출하되 Codex 세션 컨텍스트 기준으로 task JSON 생성 |
 | `/diary-notion`, `$diary-notion` | 현재 세션을 작업 row로 분리해 Notion에 push |
 | `working-diary diary-notion ensure` | schema v7, native sub-items 연결, core views 5개, operating views 5개 보장 |
 | 하위항목 (native sub-item) | push가 부모 링크를 Notion **native sub-item 관계**(예: `상위 항목`/`하위 항목`)에 기록 → 실제 접기/펼치기 nesting. native 관계가 없으면 기록만 하고 활성화 안내 |
@@ -147,7 +176,7 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
 | `Project` | task JSON에 없거나 `unknown`이면 명령 실행 cwd 폴더명으로 보정 |
 | Page body | compact executive body. 결과/작업 한눈에/영향/검증/리스크/부록 순서 |
 
-`$diary-notion`과 `/diary-notion`은 작업 row push에 집중합니다. DB schema와 view 정리는 `working-diary diary-notion ensure`로 분리되어 있어, view API 문제가 작업 기록 실패로 바로 이어지지 않습니다.
+`$diary-notion`과 `/diary-notion`은 작업 row push에 집중합니다. DB schema와 view 정리는 `working-diary diary-notion ensure`로 분리되어 있어, view API 문제가 작업 기록 실패로 바로 이어지지 않습니다. 기능 변경은 가능하면 공통 core에 두고, 에이전트별 차이는 `src/claude_diary/cli/setup.py`의 slash command/skill 계약과 `skills/diary-notion/SKILL.md`에만 둡니다.
 
 각 Notion 페이지 본문은 `body_intro` 핵심 callout 1개, `결과` 체크리스트, `작업 한눈에` 표, `영향` bullet, `검증` 체크리스트, `리스크 / 다음 액션`, `부록` 순서로 생성됩니다. 코드 변경·파일·명령어·Git·원문 요청은 접힌 부록(toggle)에 기록합니다. 코드 변경은 full diff가 아니라 동작/스키마/CLI/사용자 흐름/검증 범위를 바꾼 주요 변경만 남깁니다.
 
@@ -167,9 +196,13 @@ Codex skill은 repo의 Codex plugin으로 설치하거나 `claude-diary install 
    ```bash
    working-diary diary-notion ensure
    ```
-6. **Codex에서 쓸 경우 skill 설치 또는 갱신**:
+6. **Claude Code/Codex 지시문 설치 또는 갱신**:
    ```bash
-   claude-diary install --force --codex
+   # Claude Code: /diary, /diary-notion slash command 갱신
+   working-diary install --force
+
+   # Codex까지 같이 쓸 경우: slash command + $diary, $diary-notion skill 갱신
+   working-diary install --force --codex
    ```
 7. **세션에서 `/diary-notion` 또는 `$diary-notion` 입력** — 작업 분리 + Notion push 자동 실행
 
@@ -201,7 +234,7 @@ working-diary diary-notion push --input .diary-notion-<id>.json
 working-diary diary-notion push --input .diary-notion-<id>.json --force
 ```
 
-다른 Codex 세션에서 최신 `$diary-notion` 지시문을 쓰려면 repo를 최신화한 뒤 `claude-diary install --force --codex`를 다시 실행하고 새 Codex 세션을 여는 것을 권장합니다.
+다른 세션에서 최신 지시문을 쓰려면 repo를 최신화한 뒤 다시 설치하세요. Claude Code만 쓰면 `working-diary install --force`, Codex까지 쓰면 `working-diary install --force --codex`를 실행합니다. 실행 중인 Codex 세션은 이미 로드한 skill을 유지하므로 새 Codex 세션을 여는 것을 권장합니다.
 
 ### Core Views
 
@@ -288,7 +321,9 @@ row는 의미 있는 작업 단위로만 만듭니다. 작은 확인 항목, 긴
 | 하위항목 토글/nesting이 안 보임 | native sub-item 관계가 아직 없음. 그 해의 `Entries` DB에서 **⋯ → Sub-items 1회 활성화**(자기참조 관계 선택/생성). 활성화 전에는 작업 기록은 정상이고 push가 안내만 출력하며, 활성화 후 `ensure` 한 번이면 기존 `Parent Task` 데이터도 native로 이전 |
 | 기존 행의 Status/Purpose/Task Group이 비어 있음 | 이 필드 로직 이전 버전으로 push된 **legacy 데이터**. 새 push부터 채워짐 — `Purpose`는 항상(기본 `General`), `Status`/`Task Group`은 에이전트 JSON에 값이 있을 때. 과거 행은 원본 JSON이 없어 자동 backfill 불가 |
 | 새 연도 DB로 넘어가면 nesting이 다시 안 됨 | Notion은 해마다 새 `Entries` DB를 만들고 native sub-item은 DB마다 별도 활성화가 필요. 새 DB에서 위 ⋯ → Sub-items를 1회 더 켜면 됨 |
-| 갱신한 `$diary-notion`/`$diary` 지시문이 반영 안 됨 | `claude-diary install --force --codex` 후 **새 Codex 세션**을 열어야 적용 (실행 중 세션은 로드된 스킬을 유지). `/diary-notion` 슬래시 명령을 직접 수정했다면 install이 덮어쓰기를 건너뛰므로, 최신본이 필요하면 수동 갱신 |
+| 갱신한 `/diary-notion` 지시문이 반영 안 됨 | `working-diary install --force`로 slash command를 갱신. 단, 사용자가 직접 수정한 slash command는 보호를 위해 덮어쓰지 않으므로 최신본이 필요하면 수동 갱신 |
+| 갱신한 `$diary-notion`/`$diary` skill이 반영 안 됨 | `working-diary install --force --codex` 후 **새 Codex 세션**을 열어야 적용. 실행 중 세션은 이미 로드된 skill을 유지 |
+| Codex와 Claude Code 변경을 어디에 둬야 할지 헷갈림 | 공통 동작은 `main`의 CLI/exporter/formatter/test에 두고, agent별 지시문 차이만 Codex skill 또는 Claude slash command 계약에 둠 |
 
 ## 일지 예시
 
@@ -348,19 +383,23 @@ export CLAUDE_DIARY_TZ_OFFSET="9"
 ## CLI 명령어
 
 ```bash
-claude-diary write                        # 현재 세션 작업일지를 즉시 기록 (`/diary` 슬래시 커맨드로도 호출)
-working-diary write                       # 동일한 CLI의 중립 alias
-claude-diary search "키워드"              # 키워드 검색
-claude-diary filter --project my-app      # 프로젝트 필터
-claude-diary trace src/main.py            # 파일 변경 이력
-claude-diary stats                        # 터미널 대시보드
-claude-diary weekly                       # 주간 요약 생성
-claude-diary dashboard                    # HTML 대시보드
-claude-diary audit                        # 보안 감사 로그
-claude-diary audit --verify               # 소스 코드 무결성 검증
-claude-diary config                       # 설정 확인
-claude-diary team stats                   # 팀 통계
-claude-diary team weekly                  # 팀 주간 리포트
+working-diary write                       # 현재 세션 작업일지를 즉시 기록 (`/diary`, `$diary`로도 호출)
+working-diary diary-notion ensure         # Notion schema/view 보장
+working-diary diary-notion push --input .diary-notion-<id>.json
+working-diary search "키워드"             # 키워드 검색
+working-diary filter --project my-app     # 프로젝트 필터
+working-diary trace src/main.py           # 파일 변경 이력
+working-diary stats                       # 터미널 대시보드
+working-diary weekly                      # 주간 요약 생성
+working-diary dashboard                   # HTML 대시보드
+working-diary audit                       # 보안 감사 로그
+working-diary audit --verify              # 소스 코드 무결성 검증
+working-diary config                      # 설정 확인
+working-diary team stats                  # 팀 통계
+working-diary team weekly                 # 팀 주간 리포트
+
+# 기존 호환 CLI도 계속 지원
+claude-diary write
 ```
 
 ## 주요 기능
@@ -379,7 +418,8 @@ claude-diary team weekly                  # 팀 주간 리포트
 ## 요구사항
 
 - Python 3.8+ (`python3` or `python`)
-- Claude Code (hooks 지원 버전)
+- Claude Code (자동 Stop Hook 사용 시)
+- Codex (수동 skill `$diary`, `$diary-notion` 사용 시)
 - 외부 의존성 없음 (코어), API 토큰 불필요
 
 ## 팁
