@@ -2,7 +2,7 @@
 
 > **Summary**: 개인 생산성 도구로의 진화 — 코어 리팩토링, 기록 풍부화, CLI, 플러그인
 >
-> **Project**: claude-code-hooks-diary
+> **Project**: working-diary
 > **Version**: 2.0.0
 > **Date**: 2026-03-17
 > **Status**: Draft

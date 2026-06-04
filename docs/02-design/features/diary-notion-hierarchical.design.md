@@ -2,7 +2,7 @@
 
 > **Summary**: 슬래시 커맨드로 현재 세션을 작업 단위로 분리하여 Notion DB에 push (업무일지 자동화)
 >
-> **Project**: claude-code-hooks-diary
+> **Project**: working-diary
 > **Date**: 2026-05-26
 > **Status**: Draft (설계 의논 중)
 
@@ -233,7 +233,7 @@
       "parent_index": null,
       "depends_on_indices": [],
       "categories": ["design", "notion"],
-      "project": "claude-code-hooks-diary",
+      "project": "working-diary",
       "user_prompts": ["DB 구조 의논하자", "name에는 날짜 말고..."],
       "files_modified": ["src/claude_diary/exporters/notion.py"],
       "files_created": [],

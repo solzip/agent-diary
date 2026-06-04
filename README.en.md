@@ -1,20 +1,23 @@
-# 📓 Claude Code Working Diary
+# 📓 Working Diary
 
-**Your Claude Code sessions, automatically documented.**
+**Record Claude Code and Codex work sessions in one diary.**
 
-[![CI](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml)
+[![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/working-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/solzip/claude-code-hooks-diary)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/solzip/working-diary)
 
 > [한국어](README.md) | **English**
 
-> ⚠️ This is a community project, not officially affiliated with Anthropic.
+> ⚠️ This is a community project, not officially affiliated with Anthropic or OpenAI.
 
-Every Claude Code session you run is full of valuable work — tasks completed, files changed, bugs fixed. But when the session ends, that context disappears. **claude-diary** captures it all automatically.
+Every AI development session is full of valuable work: tasks completed, files changed, bugs fixed, decisions made. But when the session ends, that context disappears. **Working Diary** records Claude Code and Codex work as structured Markdown diaries or Notion work logs.
+
+The package name and legacy CLI `claude-diary` remain for compatibility. New docs prefer the neutral `working-diary` alias.
 
 ```bash
-pip install claude-diary && claude-diary init  # That's it. You're done.
+pip install claude-diary
+working-diary init
 ```
 
 <p align="center">
@@ -23,20 +26,35 @@ pip install claude-diary && claude-diary init  # That's it. You're done.
 
 ## How It Works
 
+Claude Code can write automatic diaries through its Stop Hook, and both Claude Code and Codex can write manual or Notion diaries on demand.
+
 ```
 Claude Code session ends
         │
-        ▼
-  Stop Hook fires automatically
+        ├─ Stop Hook fires automatically
         │
         ▼
   Parses transcript → extracts tasks, files, commands, git info
         │
-        ▼
-  ~/working-diary/2026-03-24.md  ← auto-generated diary entry
+        └─ ~/working-diary/2026-03-24.md
+
+Claude Code / Codex session in progress
+        │
+        ├─ /diary or $diary
+        │     └─ project-organized Markdown diary
+        │
+        └─ /diary-notion or $diary-notion
+              └─ task rows in a Notion work database
 ```
 
-Zero config needed. Every session end triggers the hook, analyzes what you did, and appends a structured Markdown entry to today's diary.
+Claude Code automatic diaries are created when sessions end. Codex records only when you invoke `$diary` or `$diary-notion`.
+
+## Supported Agents
+
+| Agent | Auto Diary | Manual Diary | Notion Work Diary | Install/Refresh |
+|-------|------------|--------------|-------------------|-----------------|
+| Claude Code | Stop Hook | `/diary` | `/diary-notion` | `working-diary install --force` |
+| Codex | - | `$diary` | `$diary-notion` | `working-diary install --force --codex` |
 
 ## Supported Platforms
 
@@ -50,7 +68,7 @@ Zero config needed. Every session end triggers the hook, analyzes what you did, 
 
 | Item | Description |
 |------|-------------|
-| 📋 Task Requests | What the user asked Claude to do |
+| 📋 Task Requests | What the user asked the AI agent to do |
 | 📄 Files Created | List of newly created files |
 | ✏️ Files Modified | List of edited files |
 | ⚡ Key Commands | Important shell commands executed |
@@ -63,22 +81,22 @@ Zero config needed. Every session end triggers the hook, analyzes what you did, 
 
 ```bash
 pip install claude-diary
-claude-diary init
+working-diary init
 ```
 
 ### Option 2: Claude Code Plugin
 
 ```bash
 # Inside Claude Code
-/plugin marketplace add https://github.com/solzip/claude-code-hooks-diary
+/plugin marketplace add https://github.com/solzip/working-diary
 /plugin install working-diary
 ```
 
 ### Option 3: Manual Install
 
 ```bash
-git clone https://github.com/solzip/claude-code-hooks-diary.git
-cd claude-code-hooks-diary/working-diary-system
+git clone https://github.com/solzip/working-diary.git
+cd working-diary/working-diary-system
 ./install.sh
 ```
 
@@ -86,6 +104,12 @@ After installation:
 - Stop Hook registered (auto-runs on session end)
 - `~/working-diary/` directory created
 - Config file generated
+
+To also use Codex skills:
+
+```bash
+working-diary install --force --codex
+```
 
 ## Directory Structure
 
@@ -101,24 +125,24 @@ After installation:
     └── W12_2026-03-16.md
 ```
 
-## Manual Diary — `/diary` Slash Command
+## Manual Diary — `/diary` / `$diary`
 
 For when you want to record an entry mid-session without waiting for the Stop Hook. **Coexists** with the auto diary and lives at a separate, project-organized path.
 
 ```
 ~/working-diary/manual/
 └── 2026-04-29/
-    └── claude-code-hooks-diary/
+    └── my-project/
         └── 2026-04-29.md      ← appended on subsequent calls within the same day/project
 ```
 
 **Usage:**
 - Inside a Claude Code session: type `/diary` — reads the current cwd's transcript and writes the entry
 - Inside a Codex session: type `$diary` — writes the current conversation/tool context through the same manual diary path
-- Or from the terminal: `claude-diary write`
+- Or from the terminal: `working-diary write`
 
-`claude-diary install` installs `~/.claude/commands/diary.md` so `/diary` works in every project. Re-run it once if you installed before this feature shipped (it's idempotent). `claude-diary uninstall` removes it (preserves user-modified files).
-Codex skills can be installed from the Codex plugin in this repo or with `claude-diary install --codex`.
+`working-diary install` installs `~/.claude/commands/diary.md` so `/diary` works in every project. Re-run it when you need to refresh slash commands. `working-diary uninstall` removes it (preserves user-modified files).
+Codex skills can be installed from the Codex plugin in this repo or with `working-diary install --codex`.
 
 ## Notion Work Diary — `/diary-notion` / `$diary-notion`
 
@@ -128,8 +152,8 @@ Push the current session to a hierarchical Notion database as task-sized rows. U
 [Notion root page: "Working Diary"]
  └── 2026 (auto-created)
      └── Entries (inline DB, auto-created)
-         ├── "Decide Notion DB schema" | Project: claude-diary | Purpose: Planning
-         ├── "Refactor git_info.py"    | Project: claude-diary | Purpose: Refactor
+         ├── "Decide Notion DB schema" | Project: working-diary | Purpose: Planning
+         ├── "Refactor git_info.py"    | Project: working-diary | Purpose: Refactor
          └── ...
 ```
 
@@ -138,7 +162,7 @@ Hierarchy nests through Notion's **native sub-item relation**, which can only be
 Titles and narrative body content are written in Korean. File paths, commands, branches, commit hashes, code identifiers, and `Purpose`/`Status` enum values remain literal or English.
 
 ```bash
-claude-diary diary-notion init
+working-diary diary-notion init
 working-diary diary-notion ensure
 /diary-notion       # Claude Code
 $diary-notion       # Codex

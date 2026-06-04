@@ -2,7 +2,7 @@
 
 > **Analysis Type**: Gap Analysis (Design vs Implementation)
 >
-> **Project**: claude-code-hooks-diary
+> **Project**: working-diary
 > **Version**: 2.0.0
 > **Analyst**: Claude (gap-detector)
 > **Date**: 2026-03-17
