@@ -91,6 +91,10 @@ class TestDiaryNotionInstructions:
         assert "Write `title`, `body_intro`" in codex_content
         assert "in Korean" in codex_content
         assert "Notion task database record" in codex_content
+        assert "Current Implementation Contract" in codex_content
+        assert "schema v7" in codex_content
+        assert "native sub-items" in codex_content
+        assert "Never write `\"unknown\"` as `project`" in codex_content
 
 
 class TestInstallSlashCommandSingle:
