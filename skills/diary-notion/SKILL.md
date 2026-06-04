@@ -7,14 +7,26 @@ description: Push the current Codex work session to the hierarchical Notion work
 
 Split the current Codex session into task-sized entries and push them to Notion.
 
+## Current Implementation Contract
+
+- `$diary-notion` is a row push workflow only. Do not run schema/view ensure unless the user explicitly asks for it.
+- `working-diary diary-notion ensure` is the separate maintenance command that guarantees schema v7, native sub-items, 5 core views, and 5 operating views.
+- Use Notion native sub-items for containment by setting `parent_index`. If the native relation is not enabled in Notion, still push the rows and report that sub-item activation is needed.
+- Treat legacy `Parent Task` / `Sub-items` as compatibility data only. Do not target them directly in JSON.
+- Use `Depends On` only for prerequisite links between large top-level main tasks. Never use dependencies for child tasks.
+- Never write `"unknown"` as `project`; omit it or leave it blank so the CLI falls back to the command cwd folder name.
+- Page bodies render as compact executive bodies: top summary, result checklist, work-at-a-glance table, impact, verification, risks/next action, and appendix.
+
 ## Workflow
 
 1. Review the current conversation, tool calls, git branch, and relevant git commits.
 2. Split work into task-sized database rows. Branch changes are hard task boundaries; within a branch, split by semantic work unit.
    - Create a row for work that has its own status, evidence, code/test output, or can block another task
    - Keep tiny check items, raw notes, long SQL/JS snippets, and reference links inside the page body evidence instead of making them separate rows
+   - Create a separate row only when the work has an independent status, verification/evidence, code change, commit, blocker, or follow-up owner
    - Use `parent_index` for containment hierarchy and Notion sub-items; do not model subtasks with dependencies
    - Use `depends_on_indices` only for prerequisite links between large top-level tasks
+   - Mark continued work from an earlier day/session as a new row with the same `task_group` and `carryover=true` when it is still unfinished
 3. For each task, produce:
    - Language policy:
      - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, and `block_reason` in Korean
