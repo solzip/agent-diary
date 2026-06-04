@@ -128,7 +128,7 @@ def cmd_notion_push(args):
     if not results["failed"]:
         _cleanup(input_path)
 
-    sys.exit(1 if auth_failed else 0)
+    sys.exit(1 if results["failed"] else 0)
 
 
 def _wire_depends_on(exporter, tasks, row_ids):

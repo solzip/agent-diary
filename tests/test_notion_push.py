@@ -736,9 +736,10 @@ class TestCmdNotionPush:
              patch("claude_diary.cli.notion_push.NotionHierarchicalExporter",
                    return_value=mock_exp), \
              patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"), \
-             pytest.raises(SystemExit):
+             pytest.raises(SystemExit) as exc:
             cmd_notion_push(_make_args(str(input_path)))
 
+        assert exc.value.code == 1
         # B was still attempted after A failed
         assert mock_exp.create_row.call_count == 2
         # File preserved because of partial failure
