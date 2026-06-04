@@ -95,6 +95,11 @@ class TestDiaryNotionInstructions:
         assert "schema v7" in codex_content
         assert "native sub-items" in codex_content
         assert "Never write `\"unknown\"` as `project`" in codex_content
+        # Claude /diary-notion slash command carries the implementation contract
+        assert "현재 구현 계약" in DIARY_NOTION_SLASH_COMMAND
+        assert "schema v7" in DIARY_NOTION_SLASH_COMMAND
+        assert "native 하위항목" in DIARY_NOTION_SLASH_COMMAND
+        assert "carryover=true" in DIARY_NOTION_SLASH_COMMAND
 
 
 class TestInstallSlashCommandSingle:
