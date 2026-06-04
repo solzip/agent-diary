@@ -31,6 +31,7 @@ from claude_diary.exporters.notion_hierarchical import (
     NotionAuthError,
     NotionBadRequest,
     NotionNotFound,
+    detect_subitem_relation,
 )
 
 logger = get_logger("claude_diary.cli.notion_push")
@@ -116,7 +117,7 @@ def cmd_notion_push(args):
 
     # Pass 2: wire up relation fields now that all row_ids are known.
     relation_failures = _wire_depends_on(exporter, tasks, row_ids)
-    relation_failures += _wire_parent_tasks(exporter, tasks, row_ids)
+    relation_failures += _wire_parent_tasks(exporter, year, tasks, row_ids)
     for idx, title, reason in relation_failures:
         results["failed"].append((idx, title, "relation: %s" % reason))
 
@@ -167,45 +168,65 @@ def _wire_depends_on(exporter, tasks, row_ids):
     return failures
 
 
-def _wire_parent_tasks(exporter, tasks, row_ids):
-    """Pass 2: set Parent Task relations for task containment.
+def _wire_parent_tasks(exporter, year, tasks, row_ids):
+    """Pass 2: wire task containment into Notion's NATIVE sub-item relation.
 
-    `parent_index` is a single zero-based task index in the same push. It is
-    deliberately separate from `depends_on_indices`: parent means containment,
-    depends-on means execution order.
+    `parent_index` is a single zero-based task index in the same push, separate
+    from `depends_on_indices` (containment vs execution order).
+
+    Only Notion's native sub-item relation drives the expand/collapse nesting,
+    and it can only be created via the Notion UI. We detect it and write each
+    child's parent link into its parent side (one write per child; Notion syncs
+    the child-listing side). If the database has no native sub-item relation yet,
+    containment is skipped with a one-time hint — rows are still recorded.
     """
-    failures = []
-    parent_to_children = {}
+    pairs = []  # (child_idx, parent_idx), self-reference guarded
     for idx, task in enumerate(tasks):
         parent_idx = _get_parent_index(task)
-        if parent_idx is None:
+        if parent_idx is None or parent_idx == idx:
             continue
-        if parent_idx == idx:
-            continue  # a task cannot contain itself (mirrors depends_on guard)
-        my_row = row_ids.get(idx)
-        parent_row = row_ids.get(parent_idx)
-        if not my_row or not parent_row:
-            continue
-        try:
-            exporter.update_row_parent(my_row, parent_row)
-            parent_to_children.setdefault(parent_idx, []).append(idx)
-        except Exception as e:
-            failures.append((idx, task.get("title") or "(untitled)", "parent_task: %s" % e))
+        if idx in row_ids and parent_idx in row_ids:
+            pairs.append((idx, parent_idx))
+    if not pairs:
+        return []
 
-    for parent_idx, child_indices in parent_to_children.items():
-        parent_row = row_ids.get(parent_idx)
-        child_rows = [row_ids[idx] for idx in child_indices if idx in row_ids]
-        if not parent_row or not child_rows:
-            continue
+    try:
+        db_id = exporter.ensure_database(year)
+        native = detect_subitem_relation(exporter.get_database_property_map(db_id))
+    except Exception as e:
+        return [
+            (idx, tasks[idx].get("title") or "(untitled)", "subitem detect: %s" % e)
+            for idx, _ in pairs
+        ]
+
+    if not native:
+        _print_enable_subitems_hint(len(pairs))
+        return []
+
+    parent_prop = native["parent_name"]
+    failures = []
+    for child_idx, parent_idx in pairs:
         try:
-            exporter.update_row_subitems(parent_row, child_rows)
+            exporter.update_row_native_parent(
+                row_ids[child_idx], row_ids[parent_idx], parent_prop
+            )
         except Exception as e:
             failures.append((
-                parent_idx,
-                tasks[parent_idx].get("title") or "(untitled)",
-                "subitems: %s" % e,
+                child_idx,
+                tasks[child_idx].get("title") or "(untitled)",
+                "sub-item: %s" % e,
             ))
     return failures
+
+
+def _print_enable_subitems_hint(count):
+    """Tell the user how to turn on native sub-items (a one-time UI action)."""
+    print(
+        "[claude-diary diary-notion push] %d task(s) have a parent, but this "
+        "database has no native Sub-items relation yet — nesting skipped." % count
+    )
+    print("  Enable it once in Notion: open the database -> ⋯ menu -> Sub-items,")
+    print("  then re-run push or `working-diary diary-notion ensure` to nest them.")
 
 
 def _get_parent_index(task):

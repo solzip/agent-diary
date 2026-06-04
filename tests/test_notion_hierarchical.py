@@ -10,7 +10,63 @@ from claude_diary.exporters.notion_hierarchical import (
     NotionNotFound,
     NotionBadRequest,
     SCHEMA_VERSION,
+    detect_subitem_relation,
 )
+
+
+def _dual(synced, prop_id="id"):
+    return {
+        "id": prop_id,
+        "type": "relation",
+        "relation": {
+            "type": "dual_property",
+            "dual_property": {"synced_property_name": synced},
+        },
+    }
+
+
+class TestDetectSubitemRelation:
+    def test_finds_korean_native_pair(self):
+        props = {
+            "Parent Task": _dual("Sub-items", "Tush"),
+            "Sub-items": _dual("Parent Task", "subs"),
+            "Depends On": {"id": "d", "type": "relation",
+                           "relation": {"type": "single_property"}},
+            "상위 항목": _dual("하위 항목", "pid"),
+            "하위 항목": _dual("상위 항목", "cid"),
+        }
+        native = detect_subitem_relation(props)
+        assert native["parent_name"] == "상위 항목"
+        assert native["parent_id"] == "pid"
+        assert native["child_name"] == "하위 항목"
+        assert native["child_id"] == "cid"
+
+    def test_finds_english_native_pair(self):
+        props = {
+            "Parent item": _dual("Sub-item", "P"),
+            "Sub-item": _dual("Parent item", "C"),
+        }
+        native = detect_subitem_relation(props)
+        assert native["parent_name"] == "Parent item"
+        assert native["child_name"] == "Sub-item"
+
+    def test_none_when_only_reserved_relations(self):
+        props = {
+            "Parent Task": _dual("Sub-items", "Tush"),
+            "Sub-items": _dual("Parent Task", "subs"),
+        }
+        assert detect_subitem_relation(props) is None
+
+    def test_none_when_no_relations(self):
+        assert detect_subitem_relation({"Name": {"id": "title", "type": "title"}}) is None
+        assert detect_subitem_relation({}) is None
+
+    def test_ignores_single_property_relations(self):
+        props = {
+            "Depends On": {"id": "d", "type": "relation",
+                           "relation": {"type": "single_property"}},
+        }
+        assert detect_subitem_relation(props) is None
 
 
 def _make_response(status, json_body=None, headers=None):

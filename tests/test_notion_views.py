@@ -11,7 +11,7 @@ from claude_diary.exporters.notion_views import (
     CoreViewsEnsurer,
     NotionViewsClient,
     _build_core_view_specs,
-    _compute_subitem_repairs,
+    _compute_native_migration,
     _payload_for_spec,
     _update_payload_for_spec,
 )
@@ -57,6 +57,30 @@ def _prop_map():
                     "synced_property_name": "Parent Task",
                     "synced_property_id": "parent_id",
                 }
+            },
+        },
+        # Notion's native sub-item relation (UI-created, locale-named). This is
+        # the pair that actually drives nesting and that detection must find.
+        "Parent item": {
+            "id": "parent_item_id",
+            "type": "relation",
+            "relation": {
+                "type": "dual_property",
+                "dual_property": {
+                    "synced_property_name": "Sub-item",
+                    "synced_property_id": "sub_item_id",
+                },
+            },
+        },
+        "Sub-item": {
+            "id": "sub_item_id",
+            "type": "relation",
+            "relation": {
+                "type": "dual_property",
+                "dual_property": {
+                    "synced_property_name": "Parent item",
+                    "synced_property_id": "parent_item_id",
+                },
             },
         },
         "Depends On": {"id": "depends_id", "type": "relation"},
@@ -198,9 +222,11 @@ class TestCoreViewsEnsurer:
         by_name = {payload["name"]: payload for payload in client.created_payloads}
         hierarchy = by_name["작업 계층"]
         hierarchy_config = hierarchy["configuration"]
-        assert hierarchy_config["subtasks"]["property_id"] == "subitems_id"
-        assert _visible(hierarchy, "parent_id") is True
-        assert _visible(hierarchy, "subitems_id") is False
+        # subtasks must point at the NATIVE child relation, not the legacy one
+        assert hierarchy_config["subtasks"]["property_id"] == "sub_item_id"
+        assert _visible(hierarchy, "parent_item_id") is True   # native parent shown
+        assert _visible(hierarchy, "parent_id") is False       # legacy Parent Task hidden
+        assert _visible(hierarchy, "subitems_id") is False     # legacy Sub-items hidden
         assert _visible(hierarchy, "depends_id") is False
         assert _visible(hierarchy, "work_period_id") is True
         assert _visible(hierarchy, "session_id") is False
@@ -340,7 +366,8 @@ class TestCoreViewsEnsurer:
         assert result.updated == ["작업 계층"]
         view_id, payload = client.updated_payloads[0]
         assert view_id == "작업 계층_id"
-        assert payload["configuration"]["subtasks"]["property_id"] == "subitems_id"
+        # corrected to the NATIVE child relation, not the legacy Sub-items
+        assert payload["configuration"]["subtasks"]["property_id"] == "sub_item_id"
 
     def test_missing_required_property_fails_before_create(self):
         prop_map = dict(_prop_map())
@@ -455,74 +482,65 @@ def _visible(payload, property_id):
     return None
 
 
-def _row(rid, title="t", parent=None, subitems=None):
+def _row(rid, title="t", parent_task=None, native_parent=None):
     props = {"Name": {"title": [{"plain_text": title}]}}
-    if parent is not None:
-        props["Parent Task"] = {"relation": [{"id": parent}]}
-    props["Sub-items"] = {"relation": [{"id": s} for s in (subitems or [])]}
+    if parent_task is not None:
+        props["Parent Task"] = {"relation": [{"id": parent_task}]}
+    if native_parent is not None:
+        props["Parent item"] = {"relation": [{"id": native_parent}]}
     return {"id": rid, "properties": props}
 
 
-class TestComputeSubitemRepairs:
-    def test_missing_reverse_link_is_repaired(self):
+class TestComputeNativeMigration:
+    def test_legacy_parent_migrated_to_native(self):
         rows = [
-            _row("p", "parent", subitems=[]),
-            _row("c1", "child1", parent="p"),
-            _row("c2", "child2", parent="p"),
+            _row("p", "parent"),
+            _row("c1", "child1", parent_task="p"),
+            _row("c2", "child2", parent_task="p"),
         ]
-        repairs = _compute_subitem_repairs(rows)
-        assert len(repairs) == 1
-        parent_id, merged, missing = repairs[0]
-        assert parent_id == "p"
-        assert set(merged) == {"c1", "c2"}
-        assert missing == 2
+        m = _compute_native_migration(rows, "Parent item")
+        assert len(m) == 2
+        by_child = {cid: (merged, added) for cid, merged, added in m}
+        assert by_child["c1"] == (["p"], 1)
+        assert by_child["c2"] == (["p"], 1)
 
-    def test_already_consistent_needs_no_repair(self):
+    def test_already_native_needs_no_migration(self):
         rows = [
-            _row("p", "parent", subitems=["c1"]),
-            _row("c1", "child1", parent="p"),
+            _row("p", "parent"),
+            _row("c1", "child1", parent_task="p", native_parent="p"),
         ]
-        assert _compute_subitem_repairs(rows) == []
+        assert _compute_native_migration(rows, "Parent item") == []
 
-    def test_partial_link_only_adds_missing(self):
-        rows = [
-            _row("p", "parent", subitems=["c1"]),
-            _row("c1", "child1", parent="p"),
-            _row("c2", "child2", parent="p"),
-        ]
-        repairs = _compute_subitem_repairs(rows)
-        assert len(repairs) == 1
-        _pid, merged, missing = repairs[0]
-        assert merged == ["c1", "c2"]  # existing kept, missing appended
-        assert missing == 1
+    def test_row_pushed_straight_to_native_is_skipped(self):
+        rows = [_row("p", "parent"), _row("c1", "child1", native_parent="p")]
+        assert _compute_native_migration(rows, "Parent item") == []
 
     def test_self_reference_ignored(self):
-        rows = [_row("p", "parent", parent="p", subitems=[])]
-        assert _compute_subitem_repairs(rows) == []
+        rows = [_row("p", "parent", parent_task="p")]
+        assert _compute_native_migration(rows, "Parent item") == []
 
     def test_dangling_parent_ignored(self):
-        rows = [_row("c1", "child1", parent="ghost")]
-        assert _compute_subitem_repairs(rows) == []
+        rows = [_row("c1", "child1", parent_task="ghost")]
+        assert _compute_native_migration(rows, "Parent item") == []
 
 
-class TestEnsureRepairsSubitems:
+class TestEnsureMigratesSubitems:
     def _seed(self):
         return [
-            _row("p", "parent", subitems=[]),
-            _row("c1", "child1", parent="p"),
-            _row("c2", "child2", parent="p"),
+            _row("p", "parent"),
+            _row("c1", "child1", parent_task="p"),
+            _row("c2", "child2", parent_task="p"),
         ]
 
-    def test_ensure_patches_broken_parent(self):
+    def test_ensure_migrates_legacy_to_native(self):
         client = FakeViewsClient(views=_matching_views(), rows=self._seed())
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
         assert result.ok()
-        assert len(client.relation_updates) == 1
-        page_id, prop, ids = client.relation_updates[0]
-        assert page_id == "p"
-        assert prop == "Sub-items"
-        assert set(ids) == {"c1", "c2"}
-        assert any("parent" in entry and "+2" in entry for entry in result.repaired)
+        assert len(client.relation_updates) == 2
+        for _page_id, prop, ids in client.relation_updates:
+            assert prop == "Parent item"  # native parent side
+            assert ids == ["p"]
+        assert {pid for pid, _, _ in client.relation_updates} == {"c1", "c2"}
 
     def test_dry_run_reports_but_does_not_patch(self):
         client = FakeViewsClient(views=_matching_views(), rows=self._seed())
@@ -530,15 +548,24 @@ class TestEnsureRepairsSubitems:
         assert client.relation_updates == []
         assert any("planned" in entry for entry in result.repaired)
 
-    def test_no_rows_no_repair(self):
+    def test_no_rows_no_migration(self):
         client = FakeViewsClient(views=_matching_views(), rows=[])
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
         assert result.repaired == []
         assert client.relation_updates == []
 
+    def test_native_missing_warns_and_skips(self):
+        pm = _prop_map()
+        del pm["Parent item"]
+        del pm["Sub-item"]
+        client = FakeViewsClient(prop_map=pm, rows=self._seed())
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+        assert client.relation_updates == []
+        assert any("native Sub-items not enabled" in w for w in result.warnings)
+
     def test_query_failure_degrades_to_warning(self):
         client = FakeViewsClient(views=_matching_views())
         client.query_data_source_rows = MagicMock(side_effect=RuntimeError("boom"))
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
-        assert result.ok()  # repair failure must not fail the ensure run
-        assert any("sub-item sync check skipped" in w for w in result.warnings)
+        assert result.ok()  # migration failure must not fail the ensure run
+        assert any("sub-item migration skipped" in w for w in result.warnings)
