@@ -2,7 +2,7 @@
 
 > **Summary**: AI 코딩 세션, Git, Notion 작업 DB, 로컬 작업 메모를 연결해 기록, 구조화, 조회, 운영, 리뷰까지 지원하는 개인 업무 운영 시스템의 최종 방향
 >
-> **Project**: claude-code-hooks-diary
+> **Project**: working-diary
 > **Date**: 2026-06-01
 > **Status**: Vision Draft
 

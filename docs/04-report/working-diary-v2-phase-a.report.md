@@ -2,7 +2,7 @@
 
 > **Summary**: Successfully completed Phase A of the Working Diary v2.0 personal productivity tool, delivering a refactored pip package with CLI, plugin architecture, and enriched diary entries. 88% → 95% design match after iteration.
 >
-> **Project**: claude-code-hooks-diary
+> **Project**: working-diary
 > **Feature**: Working Diary v2.0 Phase A
 > **Owner**: Sol
 > **Duration**: 2026-03-17 (single sprint, 4 sub-phases)
@@ -313,4 +313,3 @@ The design document provides comprehensive architecture including:
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
 | 1.0 | 2026-03-17 | Phase A completion report with 4 sprints, 95% design match | Sol + Claude |
-

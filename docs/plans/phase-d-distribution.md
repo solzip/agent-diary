@@ -68,7 +68,7 @@
     "name": "solzip",
     "url": "https://github.com/solzip"
   },
-  "repository": "https://github.com/solzip/claude-code-hooks-diary",
+  "repository": "https://github.com/solzip/working-diary",
   "license": "MIT",
   "keywords": ["diary", "productivity", "hooks", "work-log", "automation"],
   "engines": {
@@ -103,7 +103,7 @@
 
 ```bash
 # 1. 마켓플레이스 추가
-/plugin marketplace add https://github.com/solzip/claude-code-hooks-diary
+/plugin marketplace add https://github.com/solzip/working-diary
 
 # 2. 플러그인 설치
 /plugin install working-diary
@@ -153,8 +153,8 @@
 - [ ] Social preview 이미지 (1280×640)
 - [ ] Badges 추가 (README):
   - ![PyPI](https://img.shields.io/pypi/v/claude-diary)
-  - ![CI](https://github.com/solzip/claude-code-hooks-diary/actions/workflows/ci.yml/badge.svg)
-  - ![License](https://img.shields.io/github/license/solzip/claude-code-hooks-diary)
+  - ![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)
+  - ![License](https://img.shields.io/github/license/solzip/working-diary)
   - ![Python](https://img.shields.io/pypi/pyversions/claude-diary)
 
 #### 3.3.2 GIF 데모

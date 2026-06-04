@@ -47,7 +47,7 @@ That's it. Every Claude Code session now auto-generates entries like this:
 
 **Coming next:** Cursor/Windsurf/VS Code support (v5.0), SQLite full-text search (v5.1)
 
-GitHub: https://github.com/solzip/claude-code-hooks-diary
+GitHub: https://github.com/solzip/working-diary
 
 MIT licensed, Python 3.8+, zero dependencies. Feedback welcome!
 
@@ -70,7 +70,7 @@ Every session → structured Markdown diary. Automatically.
 pip install claude-diary && claude-diary init
 ```
 
-GitHub: https://github.com/solzip/claude-code-hooks-diary
+GitHub: https://github.com/solzip/working-diary
 
 #ClaudeCode #DevTools #Productivity
 
@@ -95,7 +95,7 @@ Key design decisions:
 
 CLI includes search, filter, file trace, stats dashboard, weekly summaries, and team mode with RBAC.
 
-https://github.com/solzip/claude-code-hooks-diary
+https://github.com/solzip/working-diary
 
 ---
 
@@ -115,6 +115,6 @@ claude-diary init
 
 Features: auto-categorization, secret masking, HTML dashboard, weekly summaries, Notion/Slack/Discord export, team mode.
 
-Zero dependencies, MIT licensed: https://github.com/solzip/claude-code-hooks-diary
+Zero dependencies, MIT licensed: https://github.com/solzip/working-diary
 
 Would love to hear if this is useful for anyone else!

@@ -2,7 +2,7 @@
 
 > **Summary**: 1차에서 만든 Notion 작업 DB 구조를 실제 업무 관리 화면으로 탐색할 수 있도록 core views와 최고모델 운영 view를 자동 보장한다.
 >
-> **Project**: claude-code-hooks-diary
+> **Project**: working-diary
 > **Date**: 2026-06-02
 > **Status**: Draft (설계 의논 중)
 
@@ -379,7 +379,7 @@ Group by Project
 
 활용:
 
-- `claude-code-hooks-diary`, `flow-chatbot`, `zelotek` 등 여러 작업이 섞여도 프로젝트별 흐름을 확인한다.
+- `working-diary`, `flow-chatbot`, `zelotek` 등 여러 작업이 섞여도 프로젝트별 흐름을 확인한다.
 - 최종 Multi-project OS의 기본 진입점이 된다.
 - 프로젝트별 기간 계산은 2차 MVP에서 하지 않고, `Work Period` 표시만 보장한다.
 
