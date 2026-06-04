@@ -36,7 +36,7 @@ def _is_git_repo(cwd):
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
@@ -48,7 +48,7 @@ def _get_branch(cwd):
     try:
         result = subprocess.run(
             ["git", "branch", "--show-current"],
-            cwd=cwd, capture_output=True, text=True, timeout=5
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         return result.stdout.strip() or "HEAD"
     except Exception:
@@ -63,7 +63,7 @@ def _get_recent_commits(cwd, since=None):
 
     try:
         result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True, timeout=5
+            cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         commits = []
         for line in result.stdout.strip().split("\n"):
@@ -78,6 +78,100 @@ def _get_recent_commits(cwd, since=None):
         return commits[:10]
     except Exception:
         return []
+
+
+def get_branch_for_commit(cwd, commit_hash):
+    """Return the (first) branch containing the given commit.
+
+    Used by /diary-notion to label each task with its branch. Falls back to
+    HEAD branch when `git branch --contains` returns nothing (detached HEAD,
+    commit not in any branch, etc).
+    """
+    if not cwd or not commit_hash:
+        return get_head_branch(cwd)
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--contains", commit_hash, "--format=%(refname:short)"],
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
+        )
+        for line in result.stdout.strip().split("\n"):
+            line = line.strip().lstrip("* ").strip()
+            if line and not line.startswith("("):
+                return line
+    except Exception:
+        pass
+    return get_head_branch(cwd)
+
+
+def get_head_branch(cwd):
+    """Return current HEAD branch, or empty string if detached/unknown."""
+    if not cwd:
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
+        )
+        branch = result.stdout.strip()
+        if branch and branch != "HEAD":
+            return branch
+    except Exception:
+        pass
+    return ""
+
+
+def get_commit_info(cwd, commit_hash):
+    """Return {hash, short_hash, message} for a commit, or None if not found."""
+    if not cwd or not commit_hash:
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "log", "-n", "1", "--format=%H%x09%h%x09%s", commit_hash],
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
+        )
+        line = result.stdout.strip()
+        if not line:
+            return None
+        parts = line.split("\t")
+        if len(parts) < 3:
+            return None
+        return {"hash": parts[0], "short_hash": parts[1], "message": parts[2]}
+    except Exception:
+        return None
+
+
+def get_diff_stat_for_commits(cwd, commit_hashes):
+    """Sum diff stats across the given commits.
+
+    Returns {"added": int, "deleted": int, "files": int}. Files count is
+    a sum-of-touched (may double-count if a file changed in multiple commits).
+    """
+    total = {"added": 0, "deleted": 0, "files": 0}
+    if not cwd or not commit_hashes:
+        return total
+    import re
+    for h in commit_hashes:
+        try:
+            result = subprocess.run(
+                ["git", "show", "--stat", "--format=", h],
+                cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
+            )
+            lines = result.stdout.strip().split("\n")
+            if not lines:
+                continue
+            summary = lines[-1]
+            f = re.search(r'(\d+) files? changed', summary)
+            a = re.search(r'(\d+) insertions?', summary)
+            d = re.search(r'(\d+) deletions?', summary)
+            if f:
+                total["files"] += int(f.group(1))
+            if a:
+                total["added"] += int(a.group(1))
+            if d:
+                total["deleted"] += int(d.group(1))
+        except Exception:
+            continue
+    return total
 
 
 def get_diff_stat(cwd, since=None):
@@ -98,7 +192,7 @@ def get_diff_stat(cwd, since=None):
         import re
         cmd = ["git", "diff", "--stat", "HEAD"]
         result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True, timeout=5
+            cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
         )
         lines = result.stdout.strip().split("\n")
         if lines:

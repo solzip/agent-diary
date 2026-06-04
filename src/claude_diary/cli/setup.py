@@ -22,11 +22,351 @@ allowed-tools:
 !`claude-diary write`
 """
 
+DIARY_NOTION_SLASH_COMMAND = """\
+---
+description: 현재 세션을 작업 단위로 분리해 Notion 업무일지 DB에 push
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+---
 
-def _get_slash_command_path():
-    """Return path to ~/.claude/commands/diary.md."""
+# /diary-notion
+
+현재 세션의 transcript와 git 정보를 분석하여 Notion 업무일지 DB에 push.
+
+## 단계
+
+1. **컨텍스트 수집**
+   - 이 세션의 user 메시지, 어시스턴트 응답, 호출한 도구 검토
+   - `git log` 로 이 세션 중 만든 commit 조회
+
+2. **작업 단위 분리 (Branch 경계 → Semantic-first)**
+   - **branch 경계 최우선**: 세션 중 `git switch` 로 branch가 바뀌면 무조건 새 task
+   - 같은 branch 안에서는 **의미 단위로 분리** (사고 흐름 = task)
+   - 한 commit이 여러 의미 단위에 걸치면 양쪽 task에 같은 hash 매핑
+   - 큰 commit("fix: 5건 개선" 같은) 한 번에 묶지 말고 의미별로 분리
+   - 짧은 follow-up("ㅇㅇ", "맞아") 은 직전 task에 흡수
+   - **commit이 0개인 의논 세션도 정상** — 의미 단위로 task N개 생성
+   - 독립 상태/근거/코드 변경/검증 결과가 있거나 다른 작업을 막는 일만 row로 만들 것
+   - 단순 확인 항목, 긴 SQL/JS/메모/참고 링크는 별도 row가 아니라 본문 근거로 남길 것
+   - `parent_index`는 포함 관계와 Notion 하위항목에 사용하고, 하위 작업을 종속성으로 표현하지 말 것
+   - `depends_on_indices`는 큰 메인 작업끼리의 선행 연결성에만 사용할 것
+
+3. **각 task별 추출**
+   - 언어 정책:
+     - `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, `block_reason` 같은 설명형 필드는 반드시 한국어로 작성
+     - `status`, `purpose` enum 값은 지정된 영어 값을 그대로 사용
+     - 파일 경로, 명령어, branch, commit hash, 코드 식별자, 함수/클래스명은 원문 그대로 유지
+     - `user_prompts`는 사용자가 말한 원문을 증거로 보존
+   - `title`: 30~50자 명사구. 시제/주어/prefix/마침표 없음
+     - ✅ "Notion DB 컬럼 스키마 결정", "git_info.py 리팩토링"
+     - ❌ "오늘 DB 의논했다", "[설계] DB 컬럼"
+   - `body_intro`: 1~3문장, 200~500자, 평어체, 결과 중심
+     - transcript에 없는 내용 추가 금지 (추측 X)
+     - markdown 강조(`**굵게**`, `` `코드` ` ` ) 사용 OK
+   - Notion 작업 DB 기록처럼 작성. 상단은 짧게, 구조는 DB relation으로, 원자료는 본문 부록에 접어두는 기준
+   - 본문 렌더링 기준:
+     - `body_intro`는 최상단 핵심 요약 callout 1개로만 사용
+     - `summary_hints`는 여러 callout이 아니라 checked 결과 항목으로 렌더링되므로 최종 결과만 작성
+     - `work_context`, `work_scope`, `approach`, `outcome`은 `작업 한눈에` 표로 렌더링되므로 각각 짧게 작성
+     - `verification`에는 최종 검증 상태를 우선 작성하고, 중간 명령 이력은 부록 근거로 이동
+     - `risks`는 하나의 warning callout으로 합쳐지므로 간결하게 작성
+   - `summary_hints`: 작업 결과/의미 요약 최대 3개. 단순 파일 나열이 아니라 무엇이 달라졌는지 기록
+   - `key_changes`: 개발자가 이 일지만 봐도 흐름을 이해할 수 있는 주요 변경사항 최대 3개
+   - `work_context`: 왜 이 작업을 시작했는지 0~1개
+   - `work_scope`: 무엇을 바꿨는지 0~1개
+   - `approach`: 어떻게 해결했는지 0~1개
+   - `outcome`: 결과가 무엇인지 0~1개
+   - `impact`: 사용자/운영/제품/개발 품질 영향 0~3개
+   - `code_change_highlights`: 실제 코드 변화 중 중요한 것만 0~3개
+     - 파일/함수/명령 단위 + 동작상 의미를 함께 기록
+     - full diff, 단순 포맷팅, import 정리, 문구 수정, fixture 보정은 제외
+     - 동작/스키마/CLI/사용자 흐름/검증 범위가 바뀐 코드는 포함
+   - `decisions`: 사용자가 결정했거나 구현 중 확정한 선택지/트레이드오프 0~3개
+   - `implementation_notes`: 코드 변경 요약에 넣기 애매한 제약/호환성/마이그레이션 메모 0~4개
+   - `verification`: 실행한 테스트, 검증 결과, 검증하지 못한 이유 0~3개
+   - `risks`: 주의사항, 남은 리스크, 운영/사용 시 헷갈릴 수 있는 점 0~2개
+   - `next_steps`: 남은 작업이나 후속 단계 0~2개
+   - `support_needed`: 필요한 결정/지원이 있으면 0~1개
+   - `status`: 5단계 중 하나 — `Discussion` / `Design` / `Implementation` / `Testing` / `Deployed`
+     - 한 task에 여러 단계 섞이면 **가장 진행된 단계로** (Testing 통과까지 했으면 Testing)
+     - 결정만 했으면 Design, 코드 작성까지 했으면 Implementation, 테스트까지 했으면 Testing,
+       머지/배포까지 했으면 Deployed
+   - `work_period`: 실제 작업 기간. 기본은 오늘 날짜 `YYYY-MM-DD`; 여러 날에 걸친 수행분이면 `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` 사용
+   - `priority`: `P0`, `P1`, `P2`, `P3` 중 하나. 오늘 바로 처리해야 하면 `P1`, 긴급/차단 해소가 최우선이면 `P0`, 일반 후속이면 `P2`, 낮은 우선순위면 `P3`
+   - `next_action`: 다음에 바로 실행할 수 있는 구체적 행동 0~1개
+   - `blocked`: 외부 결정/권한/정보 없이는 진행할 수 없을 때만 `true`
+   - `block_reason`: `blocked`가 `true`이면 원인을 한국어로 작성
+   - `carryover`: 전날 또는 이전 세션의 미완료 작업을 오늘 이어서 처리한 row이면 `true`
+   - `review_status`: 검토가 필요하면 `Needs Review`, 검토 완료면 `Reviewed`, 뒤로 미루면 `Deferred`
+   - `last_reviewed`: 실제로 검토한 날짜가 있으면 `YYYY-MM-DD`
+   - `task_group`: 며칠/여러 세션에 걸치는 큰 작업 단위 식별자 (예: `diary-notion-impl`, `auth-refactor`)
+     - 같은 큰 작업의 task들끼리 같은 그룹명 사용 → Notion에서 group view로 묶임
+     - 이전 작업의 연속이면 같은 그룹명, 새 작업이면 새 그룹명 (snake-case/kebab-case 권장)
+   - `purpose`: 목적별 1차 분류. 아래 영어 enum 중 하나만 사용
+     - `Feature` / `Bugfix` / `Refactor` / `Docs` / `Test` / `Infra`
+     - `Planning` / `Research` / `Review` / `Release` / `Support` / `Maintenance` / `General`
+     - 불확실하면 `General`
+   - `parent_index`: 이 task가 다른 task의 하위 작업이면 부모 task의 **같은 push 내 인덱스**. 최상위 task면 `null`
+     - 포함 관계와 Notion 하위항목에만 사용. 예: "상품 목록 포커싱"의 parent는 "로컬 테스트 진행"
+   - `depends_on_indices`: 이 task가 선행을 의존하는 다른 task의 **같은 push 내 인덱스 배열** (예: `[0, 1]`)
+     - 같은 JSON 안의 tasks 배열 순서 (0-base) 기준
+     - 하위 작업이 아니라 큰 메인 작업끼리의 선행 연결성에만 사용. 없으면 빈 배열 `[]`
+   - `categories`: 1~3개 (design/refactor/bugfix/test/docs/infra/discussion 등 자유 라벨)
+   - `project`: 현재 명령 실행 cwd의 폴더명. `"unknown"`을 쓰지 말 것. 확실하지 않으면 생략하거나 빈 값으로 두면 CLI가 cwd에서 보정함
+   - `user_prompts`, `files_modified`, `files_created`, `commands_run`, `errors`
+   - `commit_hashes`: 이 task에 해당하는 commit (0개도 OK)
+
+4. **JSON 저장 및 CLI 호출**
+   - cwd 에 `.diary-notion-<8자리random>.json` 파일을 Write 도구로 생성
+   - `!claude-diary diary-notion push --input .diary-notion-<8자리>.json` 실행
+   - 종료 후 임시 파일 삭제 (CLI도 try/finally로 삭제하지만 보험)
+
+## JSON 형식
+
+```json
+{
+  "session_id": "<현재 세션 ID>",
+  "tasks": [
+    {
+      "title": "...",
+      "body_intro": "...",
+      "summary_hints": ["..."],
+      "key_changes": ["..."],
+      "work_context": ["..."],
+      "work_scope": ["..."],
+      "approach": ["..."],
+      "outcome": ["..."],
+      "impact": ["..."],
+      "code_change_highlights": ["..."],
+      "decisions": ["..."],
+      "implementation_notes": ["..."],
+      "verification": ["..."],
+      "risks": ["..."],
+      "next_steps": ["..."],
+      "support_needed": ["..."],
+      "status": "Implementation",
+      "work_period": "2026-06-02",
+      "priority": "P1",
+      "next_action": "...",
+      "blocked": false,
+      "block_reason": "",
+      "carryover": false,
+      "review_status": "Needs Review",
+      "last_reviewed": "2026-06-02",
+      "task_group": "diary-notion-impl",
+      "purpose": "Feature",
+      "parent_index": null,
+      "depends_on_indices": [0, 1],
+      "categories": ["..."],
+      "project": "<cwd folder name>",
+      "user_prompts": ["..."],
+      "files_modified": ["..."],
+      "files_created": ["..."],
+      "commands_run": ["..."],
+      "commit_hashes": ["..."],
+      "errors": ["..."]
+    }
+  ]
+}
+```
+
+## 빈 결과
+
+`tasks` 가 0개라면 사용자에게 이유 설명 후 CLI 호출 없이 종료.
+
+## 보고
+
+CLI 출력을 사용자에게 그대로 보여주고 어떤 task가 push/skip/fail 되었는지 간략 요약.
+"""
+
+
+CODEX_DIARY_SKILL = """\
+---
+name: diary
+description: Write the current Codex work session to the manual working diary. Use when the user invokes $diary or asks Codex to record the current work session as a Markdown diary entry, including prompts, files, commands, summaries, errors, categories, and git metadata.
+---
+
+# Diary
+
+Record the current Codex session as a manual Markdown work diary entry.
+
+## Workflow
+
+1. Summarize the current conversation and tool activity into one diary entry.
+2. Use the current cwd folder name as `project`.
+3. Create `.diary-<8-random>.json` in cwd with this shape:
+
+```json
+{
+  "session_id": "<current session id or manual-codex>",
+  "project": "<cwd folder name>",
+  "user_prompts": ["..."],
+  "files_modified": ["..."],
+  "files_created": ["..."],
+  "commands_run": ["..."],
+  "summary_hints": ["..."],
+  "errors": ["..."],
+  "categories": ["feature"]
+}
+```
+
+4. Run `working-diary write --input .diary-<8-random>.json`.
+5. If `working-diary` is not available, run `claude-diary write --input .diary-<8-random>.json`.
+6. Report the CLI result. The CLI removes the temp file after a successful write.
+
+Only include content visible in the current conversation or tool history. Do not invent work.
+"""
+
+
+CODEX_DIARY_NOTION_SKILL = """\
+---
+name: diary-notion
+description: Push the current Codex work session to the hierarchical Notion working diary DB. Use when the user invokes $diary-notion or asks Codex to record the current session in Notion by project, purpose, task group, status, priority, sub-items, dependencies, blockers, next actions, files, commands, and commits.
+---
+
+# Diary Notion
+
+Split the current Codex session into task-sized entries and push them to Notion.
+
+## Workflow
+
+1. Review the current conversation, tool calls, git branch, and relevant git commits.
+2. Split work into task-sized database rows. Branch changes are hard task boundaries; within a branch, split by semantic work unit.
+   - Create a row for work that has its own status, evidence, code/test output, or can block another task
+   - Keep tiny check items, raw notes, long SQL/JS snippets, and reference links inside the page body evidence instead of making them separate rows
+   - Use `parent_index` for containment hierarchy and Notion sub-items; do not model subtasks with dependencies
+   - Use `depends_on_indices` only for prerequisite links between large top-level tasks
+3. For each task, produce:
+   - Language policy:
+     - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, and `block_reason` in Korean
+     - Keep `status` and `purpose` as the exact English enum values below
+     - Preserve file paths, commands, branches, commit hashes, code identifiers, function names, and class names as written
+     - Preserve `user_prompts` in the user's original wording as evidence
+   - `title`: concise Korean noun phrase, no prefix or period
+   - `body_intro`: 1-3 factual Korean sentences based only on observed work
+   - Write it like a Notion task database record: compact top summary, structured relations in DB properties, and raw evidence hidden in the page body appendix
+   - Body rendering policy:
+     - Use `body_intro` as the only top summary callout
+     - Treat `summary_hints` as checked result items, not repeated callouts
+     - Keep `work_context`, `work_scope`, `approach`, and `outcome` short because they render as a compact "work at a glance" table
+     - Put final verification state in `verification`; move intermediate command history to appendix evidence
+     - Keep risks concise; multiple risks are combined into one warning callout
+   - `summary_hints`: up to 3 outcome-focused result items that explain what changed and why it matters
+   - `key_changes`: up to 3 major behavior/schema/workflow changes a developer can understand without opening the diff
+   - `work_context`: 0-1 bullet explaining why this work started
+   - `work_scope`: 0-1 bullet explaining what changed
+   - `approach`: 0-1 bullet explaining how it was solved
+   - `outcome`: 0-1 bullet explaining the resulting state
+   - `impact`: 0-3 user, operations, product, or engineering-quality impacts
+   - `code_change_highlights`: 0-3 important code changes only
+     - Include file/function/command scope plus runtime or developer-facing meaning
+     - Exclude full diffs, formatting-only edits, import cleanup, wording-only edits, and fixture-only noise
+     - Include changes to behavior, schema, CLI flow, user workflow, or verification scope
+   - `decisions`: 0-3 decisions or tradeoffs made by the user or settled during implementation
+   - `implementation_notes`: 0-4 constraints, compatibility notes, migrations, or details that do not fit code highlights
+   - `verification`: 0-3 tests/checks run, results, or explicit reasons checks were not run
+   - `risks`: 0-2 cautions, remaining risks, or usage/operation notes
+   - `next_steps`: 0-2 remaining follow-ups
+   - `support_needed`: 0-1 decisions or support needed from others
+   - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
+   - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
+   - `work_period`: actual work period; use today's `YYYY-MM-DD` by default, or `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for a range
+   - `priority`: one of `P0`, `P1`, `P2`, `P3`; use `P0` for urgent/blocking work, `P1` for today's highest priority, `P2` for normal follow-up, and `P3` for low priority
+   - `next_action`: 0-1 concrete Korean action that can be started next
+   - `blocked`: `true` only when the task cannot continue without external decision, permission, or information
+   - `block_reason`: Korean reason when `blocked` is `true`
+   - `carryover`: `true` when this row continues unfinished work from a previous day/session
+   - `review_status`: `Needs Review`, `Reviewed`, or `Deferred`
+   - `last_reviewed`: `YYYY-MM-DD` when this work was actually reviewed
+   - `task_group`: stable kebab-case/snake-case group for multi-session work
+   - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy and Notion sub-items
+   - `depends_on_indices`: zero-based indices in this push, or `[]`
+     - Use this only when a top-level main task cannot proceed before another top-level main task is done
+     - Do not use this for child/subtask rows; use `parent_index` instead
+   - `project`: current command cwd folder/repository name. Never write `"unknown"`; if you are not sure, omit the field or leave it empty so the CLI falls back to cwd.
+   - `categories`, `user_prompts`, `files_modified`, `files_created`, `commands_run`, `commit_hashes`, `errors`
+4. Create `.diary-notion-<8-random>.json` in cwd:
+
+```json
+{
+  "session_id": "<current session id or codex-manual>",
+  "tasks": [
+    {
+      "title": "...",
+      "body_intro": "...",
+      "summary_hints": ["..."],
+      "key_changes": ["..."],
+      "work_context": ["..."],
+      "work_scope": ["..."],
+      "approach": ["..."],
+      "outcome": ["..."],
+      "impact": ["..."],
+      "code_change_highlights": ["..."],
+      "decisions": ["..."],
+      "implementation_notes": ["..."],
+      "verification": ["..."],
+      "risks": ["..."],
+      "next_steps": ["..."],
+      "support_needed": ["..."],
+      "status": "Implementation",
+      "purpose": "Feature",
+      "work_period": "2026-06-02",
+      "priority": "P1",
+      "next_action": "...",
+      "blocked": false,
+      "block_reason": "",
+      "carryover": false,
+      "review_status": "Needs Review",
+      "last_reviewed": "2026-06-02",
+      "task_group": "working-diary-notion",
+      "parent_index": null,
+      "depends_on_indices": [],
+      "categories": ["feature"],
+      "project": "<cwd folder name>",
+      "user_prompts": ["..."],
+      "files_modified": ["..."],
+      "files_created": ["..."],
+      "commands_run": ["..."],
+      "commit_hashes": ["..."],
+      "errors": ["..."]
+    }
+  ]
+}
+```
+
+5. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
+6. If `working-diary` is not available, run `claude-diary diary-notion push --input .diary-notion-<8-random>.json`.
+7. Report pushed/skipped/failed tasks from the CLI output.
+
+If there are no task-worthy changes, explain that and do not call the CLI.
+"""
+
+
+SLASH_COMMANDS = {
+    # filename: (file content, marker substring used to detect "ours")
+    "diary.md": (DIARY_SLASH_COMMAND, "claude-diary write"),
+    "diary-notion.md": (DIARY_NOTION_SLASH_COMMAND, "claude-diary diary-notion push"),
+}
+
+
+CODEX_SKILLS = {
+    "diary": (CODEX_DIARY_SKILL, "working-diary write --input"),
+    "diary-notion": (CODEX_DIARY_NOTION_SKILL, "working-diary diary-notion push"),
+}
+
+
+def _get_slash_command_path(filename="diary.md"):
+    """Return path to ~/.claude/commands/<filename>."""
     home = os.path.expanduser("~")
-    return os.path.join(home, ".claude", "commands", "diary.md")
+    return os.path.join(home, ".claude", "commands", filename)
+
+
+def _get_codex_skill_path(skill_name):
+    """Return path to ~/.codex/skills/<skill_name>/SKILL.md."""
+    home = os.path.expanduser("~")
+    return os.path.join(home, ".codex", "skills", skill_name, "SKILL.md")
 
 
 def _get_claude_settings_path():
@@ -74,7 +414,11 @@ def _find_existing_hook(settings):
 
 
 def cmd_install(args):
-    """Register claude-diary Stop hook + /diary slash command."""
+    """Register claude-diary Stop hook + all slash commands.
+
+    With --force, overwrite existing slash command files (useful after a
+    claude-diary upgrade that changed slash command instructions).
+    """
     settings_path = _get_claude_settings_path()
     settings = _load_claude_settings(settings_path)
 
@@ -89,44 +433,83 @@ def cmd_install(args):
         _save_claude_settings(settings_path, settings)
         hook_status = "installed"
 
+    force = getattr(args, "force", False) is True
+    install_codex = getattr(args, "codex", False) is True
     # Slash command install runs unconditionally — fixes upgrade path for
-    # users who installed before /diary was a feature.
-    slash_path = _get_slash_command_path()
-    slash_status = _install_slash_command(slash_path)
+    # users who installed before a given slash command was a feature.
+    slash_statuses = _install_all_slash_commands(force=force)
+    codex_statuses = _install_all_codex_skills(force=force) if install_codex else {}
 
     print("claude-diary install:")
     print("  Hook: %s (%s)" % (HOOK_COMMAND, hook_status))
     print("  Settings: %s" % settings_path)
-    print("  Slash command: %s (%s)" % (slash_path, slash_status))
+    for filename, (path, status) in slash_statuses.items():
+        print("  Slash command %s: %s (%s)" % (filename, path, status))
+    for skill_name, (path, status) in codex_statuses.items():
+        print("  Codex skill $%s: %s (%s)" % (skill_name, path, status))
     print()
     print("Stop Hook auto-writes a diary entry on session exit.")
-    print("Type /diary inside any session to write a manual entry on demand.")
+    print("Type /diary to write a manual entry, or /diary-notion to push to Notion.")
+    if install_codex:
+        print("In Codex, use $diary or $diary-notion.")
 
 
-def _install_slash_command(path):
-    """Create ~/.claude/commands/diary.md if missing.
+def _install_all_slash_commands(force=False):
+    """Install every slash command in SLASH_COMMANDS. Returns {filename: (path, status)}."""
+    results = {}
+    for filename, (content, marker) in SLASH_COMMANDS.items():
+        path = _get_slash_command_path(filename)
+        results[filename] = (path, _install_slash_command(path, content, marker, force))
+    return results
 
-    Returns 'installed', 'already exists', or 'failed: <reason>'.
+
+def _install_all_codex_skills(force=False):
+    """Install Codex skills in ~/.codex/skills. Returns {skill: (path, status)}."""
+    results = {}
+    for skill_name, (content, marker) in CODEX_SKILLS.items():
+        path = _get_codex_skill_path(skill_name)
+        results[skill_name] = (path, _install_slash_command(path, content, marker, force))
+    return results
+
+
+def _install_slash_command(path, content, marker=None, force=False):
+    """Create or refresh the slash command file.
+
+    Without `force`: skip if the file already exists (preserves user customizations).
+    With `force`: overwrite only if the existing file looks like ours (contains
+    `marker`); files modified by the user are still preserved.
+
+    Returns 'installed', 'overwritten', 'already exists', 'skipped (modified by user)',
+    or 'failed: <reason>'.
     """
-    if os.path.exists(path):
+    exists = os.path.exists(path)
+    if exists and not force:
         return "already exists"
+    if exists and force:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                existing = f.read()
+        except OSError as e:
+            return "failed: %s" % e
+        if marker and marker not in existing:
+            return "skipped (modified by user)"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
-            f.write(DIARY_SLASH_COMMAND)
-        return "installed"
+            f.write(content)
+        return "overwritten" if exists else "installed"
     except OSError as e:
         return "failed: %s" % e
 
 
-def _uninstall_slash_command(path):
-    """Remove ~/.claude/commands/diary.md if it matches our content."""
+def _uninstall_slash_command(path, marker):
+    """Remove the slash command file only if its content contains the marker."""
     if not os.path.exists(path):
         return "not present"
     try:
         with open(path, "r", encoding="utf-8") as f:
             existing = f.read()
-        if "claude-diary write" not in existing:
+        if marker not in existing:
             return "skipped (modified by user)"
         os.remove(path)
         return "removed"
@@ -134,13 +517,42 @@ def _uninstall_slash_command(path):
         return "failed: %s" % e
 
 
+def _uninstall_all_slash_commands():
+    """Uninstall every slash command in SLASH_COMMANDS. Returns {filename: (path, status)}."""
+    results = {}
+    for filename, (_content, marker) in SLASH_COMMANDS.items():
+        path = _get_slash_command_path(filename)
+        results[filename] = (path, _uninstall_slash_command(path, marker))
+    return results
+
+
+def _uninstall_all_codex_skills():
+    """Uninstall Codex skills that still contain our marker."""
+    results = {}
+    for skill_name, (_content, marker) in CODEX_SKILLS.items():
+        path = _get_codex_skill_path(skill_name)
+        results[skill_name] = (path, _uninstall_slash_command(path, marker))
+    return results
+
+
 def cmd_uninstall(args):
-    """Remove claude-diary Stop hook from ~/.claude/settings.json."""
+    """Remove claude-diary Stop hook + slash commands."""
+    uninstall_codex = getattr(args, "codex", False) is True
     settings_path = _get_claude_settings_path()
     settings = _load_claude_settings(settings_path)
 
     if not _find_existing_hook(settings):
         print("claude-diary hook is not installed.")
+        # Still clean up slash commands if any are present
+        slash_statuses = _uninstall_all_slash_commands()
+        for filename, (path, status) in slash_statuses.items():
+            if status != "not present":
+                print("  Slash command %s: %s (%s)" % (filename, path, status))
+        if uninstall_codex:
+            codex_statuses = _uninstall_all_codex_skills()
+            for skill_name, (path, status) in codex_statuses.items():
+                if status != "not present":
+                    print("  Codex skill $%s: %s (%s)" % (skill_name, path, status))
         return
 
     # Remove diary hooks
@@ -161,9 +573,12 @@ def cmd_uninstall(args):
 
     _save_claude_settings(settings_path, settings)
 
-    slash_path = _get_slash_command_path()
-    slash_status = _uninstall_slash_command(slash_path)
+    slash_statuses = _uninstall_all_slash_commands()
+    codex_statuses = _uninstall_all_codex_skills() if uninstall_codex else {}
 
     print("claude-diary hook uninstalled.")
     print("  Settings: %s" % settings_path)
-    print("  Slash command: %s (%s)" % (slash_path, slash_status))
+    for filename, (path, status) in slash_statuses.items():
+        print("  Slash command %s: %s (%s)" % (filename, path, status))
+    for skill_name, (path, status) in codex_statuses.items():
+        print("  Codex skill $%s: %s (%s)" % (skill_name, path, status))
