@@ -35,6 +35,18 @@ RICH_TEXT_LIMIT = 2000
 SCHEMA_VERSION = "v7"
 DATABASE_TITLE = "Entries"
 
+# Relation property names this tool creates itself. Notion's *native* sub-item
+# relation (which alone drives the expand/collapse nesting in the UI) can only
+# be created via the Notion UI, and it is named with locale defaults
+# (e.g. "Parent item"/"Sub-item", "상위 항목"/"하위 항목"). We detect it as the
+# self-referential dual_property pair that is NOT one of these reserved names.
+RESERVED_RELATION_NAMES = frozenset({"Parent Task", "Sub-items", "Depends On"})
+
+# Tokens used only to orient which half of the native pair is the child
+# ("sub-item") side vs the parent side, across Notion's UI languages.
+_SUBITEM_CHILD_TOKENS = ("하위", "sub-item", "subitem", "sub item", "subelement", "sub-element")
+_SUBITEM_PARENT_TOKENS = ("상위", "parent")
+
 
 class NotionAuthError(Exception):
     """401/403 — token invalid or page not shared with integration."""
@@ -418,6 +430,39 @@ class NotionHierarchicalExporter:
             }
         })
 
+    def get_database_property_map(self, db_id):
+        """Return {name: {id, type, relation}} for the database's properties.
+
+        Uses the 2022-06-28 database endpoint, which keys properties by name.
+        Used to detect the native sub-item relation (see detect_subitem_relation).
+        """
+        data = self._request("GET", "/databases/%s" % db_id)
+        prop_map = {}
+        for name, prop in (data.get("properties") or {}).items():
+            prop_map[name] = {
+                "id": prop.get("id"),
+                "type": prop.get("type"),
+                "relation": prop.get("relation"),
+            }
+        return prop_map
+
+    def update_row_native_parent(self, row_id, parent_row_id, parent_property_name):
+        """PATCH a child row's native sub-item parent relation to `parent_row_id`.
+
+        `parent_property_name` is the parent side of Notion's native sub-item
+        relation (locale-named, e.g. "상위 항목"/"Parent item"). Writing the
+        single parent link lets Notion sync the child-listing side, which drives
+        the native nesting toggle — unlike the legacy `Parent Task` relation,
+        which Notion never treats as native sub-items.
+        """
+        self._request("PATCH", "/pages/%s" % row_id, {
+            "properties": {
+                parent_property_name: {
+                    "relation": [{"id": parent_row_id}]
+                }
+            }
+        })
+
     def update_row_subitems(self, row_id, child_row_ids):
         """PATCH a parent row to include native Notion `Sub-items` relations."""
         merged_ids = _unique_ids(
@@ -503,3 +548,62 @@ def _unique_ids(values):
         seen.add(value)
         result.append(value)
     return result
+
+
+def _orient_subitem_pair(name_a, prop_a, name_b, prop_b):
+    """Decide which of a native sub-item pair is the child side vs parent side.
+
+    Notion does not expose this structurally (both halves are symmetric
+    dual_property relations), so we disambiguate by localized name tokens.
+    Returns (child_name, child_prop, parent_name, parent_prop). Defaults to
+    treating name_a as the child side when no token matches.
+    """
+    def is_child(name):
+        low = (name or "").lower()
+        return any(tok in name or tok in low for tok in _SUBITEM_CHILD_TOKENS)
+
+    def is_parent(name):
+        low = (name or "").lower()
+        return any(tok in name or tok in low for tok in _SUBITEM_PARENT_TOKENS)
+
+    if is_child(name_a) or is_parent(name_b):
+        return name_a, prop_a, name_b, prop_b
+    if is_child(name_b) or is_parent(name_a):
+        return name_b, prop_b, name_a, prop_a
+    return name_a, prop_a, name_b, prop_b
+
+
+def detect_subitem_relation(properties):
+    """Locate Notion's native sub-item relation in a property map.
+
+    `properties` maps property name -> {"id": str, "type": str,
+    "relation": {...}} — the normalized shape both API clients can produce.
+
+    The native relation is the self-referential dual_property pair whose names
+    are NOT reserved (see RESERVED_RELATION_NAMES). Returns a dict with
+    parent_name/parent_id/child_name/child_id, or None when the database has no
+    native sub-item relation (i.e. the user has not enabled Sub-items in the UI).
+    """
+    candidates = {}
+    for name, prop in (properties or {}).items():
+        if name in RESERVED_RELATION_NAMES:
+            continue
+        rel = (prop or {}).get("relation") or {}
+        if rel.get("type") != "dual_property":
+            continue
+        candidates[name] = prop
+
+    for name, prop in candidates.items():
+        rel = prop.get("relation") or {}
+        synced = (rel.get("dual_property") or {}).get("synced_property_name")
+        if synced in candidates:
+            child_name, child_prop, parent_name, parent_prop = _orient_subitem_pair(
+                name, prop, synced, candidates[synced]
+            )
+            return {
+                "parent_name": parent_name,
+                "parent_id": (parent_prop or {}).get("id"),
+                "child_name": child_name,
+                "child_id": (child_prop or {}).get("id"),
+            }
+    return None
