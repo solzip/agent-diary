@@ -9,11 +9,11 @@ Thank you for your interest in contributing to claude-diary!
 ### How to Contribute
 
 #### Reporting Bugs
-- Use the [Bug Report](https://github.com/solzip/claude-code-hooks-diary/issues/new?template=bug_report.md) template
+- Use the [Bug Report](https://github.com/solzip/working-diary/issues/new?template=bug_report.md) template
 - Include: OS, Python version, steps to reproduce
 
 #### Feature Requests
-- Use the [Feature Request](https://github.com/solzip/claude-code-hooks-diary/issues/new?template=feature_request.md) template
+- Use the [Feature Request](https://github.com/solzip/working-diary/issues/new?template=feature_request.md) template
 
 #### Contributing an Exporter
 1. Inherit from `exporters/base.py` → `BaseExporter`
@@ -32,8 +32,8 @@ Thank you for your interest in contributing to claude-diary!
 ### Development Setup
 
 ```bash
-git clone https://github.com/solzip/claude-code-hooks-diary.git
-cd claude-code-hooks-diary
+git clone https://github.com/solzip/working-diary.git
+cd working-diary
 pip install pytest
 PYTHONPATH=src pytest tests/ -v
 ```
@@ -55,11 +55,11 @@ claude-diary에 기여해 주셔서 감사합니다!
 ### 기여 방법
 
 #### 버그 리포트
-- [Bug Report](https://github.com/solzip/claude-code-hooks-diary/issues/new?template=bug_report.md) 템플릿 사용
+- [Bug Report](https://github.com/solzip/working-diary/issues/new?template=bug_report.md) 템플릿 사용
 - OS, Python 버전, 재현 단계 포함
 
 #### 기능 요청
-- [Feature Request](https://github.com/solzip/claude-code-hooks-diary/issues/new?template=feature_request.md) 템플릿 사용
+- [Feature Request](https://github.com/solzip/working-diary/issues/new?template=feature_request.md) 템플릿 사용
 
 #### Exporter 기여
 1. `exporters/base.py`의 `BaseExporter` 상속

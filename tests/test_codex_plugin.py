@@ -12,6 +12,8 @@ def test_codex_plugin_manifest_points_to_skills():
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     assert data["name"] == "working-diary"
+    assert data["homepage"] == "https://github.com/solzip/working-diary"
+    assert data["repository"] == "https://github.com/solzip/working-diary"
     assert data["skills"] == "./skills/"
     assert data["interface"]["displayName"] == "Working Diary"
     assert "hooks" not in data
