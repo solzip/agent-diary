@@ -258,6 +258,25 @@ class TestBuildNotionBlocks:
         assert "Artifacts: stdout: .codefleet/runs/20260605-001/stdout.log - test output (sha256: abcdef123456)" in texts
         assert "Work Highlights: Short report body" in texts
 
+    def test_noop_followups_are_not_rendered_as_next_action_todos(self):
+        blocks = build_notion_blocks({
+            "summary": {
+                "intro": "Done.",
+                "outcomes": ["Completed"],
+                "remaining": ["None"],
+            },
+            "work": {"state": "Reviewed"},
+            "next_action": "No follow-up needed.",
+            "next_actions": ["없음"],
+            "support_needed": ["해당 없음"],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+        todos = [_block_text(b) for b in _flatten_blocks(blocks) if b["type"] == "to_do"]
+
+        assert "Next Actions / Support" not in texts
+        assert "No follow-up needed." not in todos
+        assert "None" not in todos
+
     def test_testing_tasks_move_full_verification_results_to_prompt_output_toggle(self):
         blocks = build_notion_blocks({
             "status": "Testing",

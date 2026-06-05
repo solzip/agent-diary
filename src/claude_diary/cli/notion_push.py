@@ -88,14 +88,13 @@ def cmd_notion_push(args):
             input_path, data, tasks, session_id, date_str, cwd, artifact_dir
         )
         if run_artifacts:
-            _attach_run_artifacts(tasks, run_artifacts)
+            _complete_run_artifacts_before_render(
+                run_artifacts, tasks, session_id, date_str, cwd, lang
+            )
         preview = _build_dry_run_preview(tasks, session_id, date_str, cwd, lang)
         if preview_file:
             _write_text_file(preview_file, preview)
             print("[claude-diary diary-notion push --dry-run] Preview file: %s" % preview_file)
-        if run_artifacts:
-            _write_artifact_preview(run_artifacts, preview)
-            _finalize_artifact_manifest(run_artifacts, tasks)
         print(preview)
         return
 
@@ -108,7 +107,9 @@ def cmd_notion_push(args):
         input_path, data, tasks, session_id, date_str, cwd, artifact_dir
     )
     if run_artifacts:
-        _attach_run_artifacts(tasks, run_artifacts)
+        _complete_run_artifacts_before_render(
+            run_artifacts, tasks, session_id, date_str, cwd, lang
+        )
 
     exporter = NotionHierarchicalExporter({
         "api_token": token,
@@ -164,8 +165,6 @@ def cmd_notion_push(args):
 
     _print_report(results, input_path)
     if run_artifacts:
-        preview = _build_dry_run_preview(tasks, session_id, date_str, cwd, lang)
-        _write_artifact_preview(run_artifacts, preview)
         _finalize_artifact_manifest(run_artifacts, tasks, results)
         print("[claude-diary diary-notion push] Artifacts: %s" % run_artifacts["run_dir"])
 
@@ -773,7 +772,7 @@ def _blocks_to_preview_lines(blocks, max_lines=80):
             lines.append("- %s" % _block_text(block, "bulleted_list_item"))
         elif block_type == "toggle":
             lines.append("> %s" % _block_text(block, "toggle"))
-            for child in block.get("toggle", {}).get("children", [])[:3]:
+            for child in block.get("toggle", {}).get("children", [])[:8]:
                 child_type = child.get("type")
                 if child_type:
                     lines.append("  - %s" % _block_text(child, child_type))
@@ -851,6 +850,15 @@ def _write_artifact_preview(run_artifacts, preview):
     ))
 
 
+def _complete_run_artifacts_before_render(run_artifacts, tasks, session_id, date_str, cwd, lang):
+    preview_tasks = deepcopy(tasks)
+    _set_run_artifacts(preview_tasks, run_artifacts)
+    preview = _build_dry_run_preview(preview_tasks, session_id, date_str, cwd, lang)
+    _write_artifact_preview(run_artifacts, preview)
+    _finalize_artifact_manifest(run_artifacts, tasks)
+    _set_run_artifacts(tasks, run_artifacts)
+
+
 def _finalize_artifact_manifest(run_artifacts, tasks, results=None):
     manifest_path = os.path.join(run_artifacts["run_dir"], "manifest.json")
     manifest = {
@@ -883,6 +891,24 @@ def _attach_run_artifacts(tasks, run_artifacts):
         elif not isinstance(existing, list):
             existing = []
         appendix["artifacts"] = existing + refs
+
+
+def _set_run_artifacts(tasks, run_artifacts):
+    refs = run_artifacts.get("refs") or []
+    ref_keys = {(ref.get("kind"), ref.get("path")) for ref in refs}
+    for task in tasks:
+        appendix = task.setdefault("appendix", {})
+        existing = appendix.get("artifacts") or []
+        if isinstance(existing, dict):
+            existing = [existing]
+        elif not isinstance(existing, list):
+            existing = []
+        cleaned = []
+        for item in existing:
+            if isinstance(item, dict) and (item.get("kind"), item.get("path")) in ref_keys:
+                continue
+            cleaned.append(item)
+        appendix["artifacts"] = cleaned + refs
 
 
 def _artifact_ref(cwd, path, kind, summary):
