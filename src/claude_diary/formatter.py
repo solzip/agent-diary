@@ -173,11 +173,11 @@ def normalize_notion_task(task):
         task.get("summary_hints"),
         task.get("outcome"),
     )
-    next_actions = _merge_texts(
+    next_actions = _filter_noop_texts(_merge_texts(
         task.get("next_actions"),
         task.get("next_steps"),
         task.get("next_action"),
-    )
+    ))
     risks = _merge_texts(
         task.get("risks"),
         task.get("cautions"),
@@ -208,7 +208,7 @@ def normalize_notion_task(task):
             "intro": _first_text(summary.get("intro"), task.get("body_intro")),
             "outcomes": outcomes,
             "verification": verification,
-            "remaining": _merge_texts(summary.get("remaining"), task.get("remaining_work")),
+            "remaining": _filter_noop_texts(_merge_texts(summary.get("remaining"), task.get("remaining_work"))),
         },
         "work": {
             "context": _first_text(work.get("context"), task.get("work_context"), task.get("context")),
@@ -220,7 +220,7 @@ def normalize_notion_task(task):
         "decisions": _merge_texts(task.get("decisions")),
         "risks": risks,
         "next_actions": next_actions,
-        "support_needed": _merge_texts(task.get("support_needed")),
+        "support_needed": _filter_noop_texts(_merge_texts(task.get("support_needed"))),
         "appendix": {
             "key_changes": _merge_texts(
                 appendix.get("key_changes"),
@@ -369,7 +369,7 @@ def _build_command_file_commit_items(task, git_info, L):
     for e in errors[:2]:
         evidence.append("%s: %s" % (L("issues"), _truncate(e, 500)))
 
-    for a in _format_artifacts(appendix.get("artifacts"))[:3]:
+    for a in _format_artifacts(appendix.get("artifacts"))[:5]:
         evidence.append("%s: %s" % (L("artifacts"), a))
 
     return evidence
@@ -486,6 +486,39 @@ def _dedupe_texts(items):
         seen.add(item)
         result.append(item)
     return result
+
+
+def _filter_noop_texts(items):
+    return [item for item in _as_text_list(items) if not _is_noop_text(item)]
+
+
+def _is_noop_text(value):
+    text = str(value or "").strip().lower().strip(".")
+    normalized = " ".join(text.split())
+    noop_prefixes = (
+        "no follow-up needed",
+        "no follow up needed",
+        "no further action",
+        "no action needed",
+        "not needed",
+    )
+    if any(normalized.startswith(prefix) for prefix in noop_prefixes):
+        return True
+    return normalized in {
+        "",
+        "none",
+        "n/a",
+        "na",
+        "no follow-up needed",
+        "no follow up needed",
+        "no further action",
+        "no action needed",
+        "not needed",
+        "없음",
+        "해당 없음",
+        "후속 조치 없음",
+        "추가 조치 없음",
+    }
 
 
 def _labeled_texts(label, items, max_items, limit=500):

@@ -744,6 +744,8 @@ class TestCmdNotionPush:
 
         out = capsys.readouterr().out
         assert "Preview file:" in out
+        assert "preview.md" in out
+        assert "manifest.json" in out
         assert preview_path.exists()
         assert "Schema Version: v2" in preview_path.read_text(encoding="utf-8")
         run_dirs = list(artifact_root.iterdir())
@@ -753,6 +755,7 @@ class TestCmdNotionPush:
         manifest = json.loads((run_dirs[0] / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["run_id"]
         assert any(a["kind"] == "preview" for a in manifest["artifacts"])
+        assert any(a["kind"] == "manifest" for a in manifest["artifacts"]) is False
 
     def test_missing_project_uses_command_cwd(self, tmp_path, monkeypatch):
         input_path = tmp_path / "in.json"
