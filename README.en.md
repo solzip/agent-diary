@@ -1,363 +1,454 @@
-# 📓 Working Diary
+# Working Diary
 
-**Record Claude Code and Codex work sessions in one diary.**
+Working Diary records Claude Code and Codex work sessions as Markdown diaries or task-based Notion work logs.
 
 [![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/working-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/solzip/working-diary)
+[![Core Dependencies: 0](https://img.shields.io/badge/core%20dependencies-0-brightgreen)](https://github.com/solzip/working-diary)
 
-> [한국어](README.md) | **English**
+> English | [한국어](README.md)
+>
+> This is a community project. It is not an official Anthropic or OpenAI project.
 
-> ⚠️ This is a community project, not officially affiliated with Anthropic or OpenAI.
+## 1. Overview
 
-Every AI development session is full of valuable work: tasks completed, files changed, bugs fixed, decisions made. But when the session ends, that context disappears. **Working Diary** records Claude Code and Codex work as structured Markdown diaries or Notion work logs.
+Working Diary preserves the context that usually disappears when an AI coding session ends.
 
-The package name and legacy CLI `claude-diary` remain for compatibility. New docs prefer the neutral `working-diary` alias.
+- User requests
+- Created and modified files
+- Important commands
+- Git branch, commit, and diff statistics
+- Work summaries and errors
+- Task rows for a Notion work database
+
+The package name remains `claude-diary` for compatibility. User-facing docs prefer the neutral `working-diary` CLI alias.
 
 ```bash
 pip install claude-diary
 working-diary init
 ```
 
-<p align="center">
-  <img src="docs/demo.svg" alt="claude-diary demo" width="680">
-</p>
+### Supported Agents
 
-## Common Core Summary
-
-Working Diary keeps each agent's input flow separate, then sends the actual write operation through the same core CLI. Markdown diary writing, Notion task-row push, Git enrichment, secret scanning, and formatting are handled by the common core.
-
-```
-Claude Code session ends
-        │
-        ├─ Stop Hook fires automatically
-        │
-        ▼
-  Parses transcript → extracts tasks, files, commands, git info
-        │
-        └─ ~/working-diary/2026-03-24.md
-
-Claude Code / Codex session in progress
-        │
-        ├─ /diary or $diary
-        │     └─ project-organized Markdown diary
-        │
-        └─ /diary-notion or $diary-notion
-              └─ task rows in a Notion work database
-```
-
-Claude Code automatic diaries are created when sessions end. Codex records only when you invoke `$diary` or `$diary-notion`.
-
-## Supported Agents
-
-| Agent | Auto Diary | Manual Diary | Notion Work Diary | Install/Refresh |
-|-------|------------|--------------|-------------------|-----------------|
+| Agent | Auto diary | Manual Markdown | Notion work log | Apply/refresh |
+|-------|------------|-----------------|-----------------|---------------|
 | Claude Code | Stop Hook | `/diary` | `/diary-notion` | `working-diary install --force` |
-| Codex | - | `$diary` | `$diary-notion` | `working-diary install --force --codex` |
+| Codex | None | `$diary` | `$diary-notion` | `working-diary install --force --codex-only` |
 
-## Claude Code vs Codex Flow
+Package installation is shared, but agent setup is different. Use `--codex-only` for Codex-only setup without modifying Claude Code settings. `--codex` remains as a compatibility option that also refreshes the Claude Code hook and slash commands.
 
-### Claude Code
+### Storage Paths
 
-Claude Code supports both **automatic diaries and manual diaries**.
-
-```text
-Claude Code session ends
-  -> Stop Hook runs automatically
-  -> transcript is parsed
-  -> tasks, files, commands, and Git info are extracted
-  -> ~/working-diary/2026-03-24.md
-
-Inside a Claude Code session
-  -> /diary        : project-organized Markdown manual diary
-  -> /diary-notion : task rows in the Notion work database
-```
-
-Install or refresh it with `working-diary install --force`. This registers the Claude Code Stop Hook and installs or updates the `/diary` and `/diary-notion` slash commands.
-
-### Codex
-
-Codex currently has **no automatic hook**. It records work only when you invoke a skill.
+Automatic diaries are appended to daily files.
 
 ```text
-Inside a Codex session
-  -> $diary        : write the current conversation/tool activity to a Markdown manual diary
-  -> $diary-notion : split the current session into task rows and push them to Notion
+~/working-diary/
+  2026-03-15.md
+  2026-03-16.md
+  .session_counts.json
+  weekly/
+    W11_2026-03-09.md
 ```
 
-Install or refresh it with `working-diary install --force --codex`. This keeps the Claude Code setup and also installs or updates the Codex `$diary` and `$diary-notion` skills. Already-running Codex sessions keep the skills they loaded at startup, so open a new Codex session after refreshing.
+Manual diaries are stored separately by date and project.
 
-## Supported Platforms
+```text
+~/working-diary/manual/
+  2026-04-29/
+    my-project/
+      2026-04-29.md
+```
 
-| Platform | Python | Auto Diary | Weekly Summary | Cron |
-|----------|--------|------------|----------------|------|
-| macOS | python3 | ✅ | ✅ | ✅ |
-| Linux | python3 | ✅ | ✅ | ✅ |
-| Windows (Git Bash) | python | ✅ | ✅ | ❌ (Use Task Scheduler) |
+## 2. Usage
 
-## What Gets Logged
+Follow the sequence for the target workflow.
 
-| Item | Description |
-|------|-------------|
-| 📋 Task Requests | What the user asked the AI agent to do |
-| 📄 Files Created | List of newly created files |
-| ✏️ Files Modified | List of edited files |
-| ⚡ Key Commands | Important shell commands executed |
-| 📝 Work Summary | Summary of AI-performed tasks |
-| ⚠️ Issues | Errors or problems encountered |
+| Goal | Command sequence |
+|------|------------------|
+| Claude Code Markdown auto/manual diary | `pip install claude-diary` -> `working-diary init` -> `working-diary install --force` |
+| Claude Code with Notion work log | `pip install "claude-diary[notion]"` -> `working-diary init` -> `working-diary install --force` -> `working-diary diary-notion init` -> `working-diary diary-notion ensure` |
+| Codex Markdown manual diary | `pip install claude-diary` -> `working-diary init --codex-only` -> `working-diary install --force --codex-only` -> open a new Codex session |
+| Codex with Notion work log | `pip install "claude-diary[notion]"` -> `working-diary init --codex-only` -> `working-diary install --force --codex-only` -> `working-diary diary-notion init` -> `working-diary diary-notion ensure` -> open a new Codex session |
 
-## Installation
+### 2-1. Package Install And Basic Setup
 
-### Option 1: pip (Recommended)
+pip install:
 
 ```bash
 pip install claude-diary
 working-diary init
 ```
 
-### Option 2: Claude Code Plugin
+With Notion support:
 
 ```bash
-# Inside Claude Code
+pip install "claude-diary[notion]"
+working-diary init
+```
+
+Claude Code plugin installation is a separate distribution path for Claude Code plugin marketplace users.
+
+```bash
+# Run inside Claude Code
 /plugin marketplace add https://github.com/solzip/working-diary
 /plugin install working-diary
 ```
 
-### Option 3: Manual Install
+The plugin distributes Claude Code hook settings. The `working-diary` CLI comes from the Python package, so Python package installation and `working-diary init` are still required.
+
+Install from source:
 
 ```bash
 git clone https://github.com/solzip/working-diary.git
-cd working-diary/working-diary-system
-./install.sh
+cd working-diary
+pip install -e .
+working-diary init
 ```
 
-After installation:
-- Stop Hook registered (auto-runs on session end)
-- `~/working-diary/` directory created
-- Config file generated
-
-To also use Codex skills:
+Install from source with Notion support:
 
 ```bash
-working-diary install --force --codex
+pip install -e ".[notion]"
 ```
 
-## Directory Structure
+`working-diary init` creates the config file and diary directory, and it also registers the Claude Code Stop Hook. If you only use Codex, run `working-diary init --codex-only` to avoid modifying Claude Code settings.
 
-```
-~/working-diary/
-├── 2026-03-15.md          ← Daily diary
-├── 2026-03-16.md
-├── 2026-03-17.md
-├── .session_counts.json    ← Internal counter (auto)
-├── .gitignore
-└── weekly/
-    ├── W11_2026-03-09.md   ← Weekly summary report
-    └── W12_2026-03-16.md
-```
+Run the agent-specific apply command below to refresh Claude Code slash commands or Codex skills.
 
-## Manual Diary — `/diary` / `$diary`
+### 2-2. Claude Code Usage
 
-For when you want to record an entry mid-session without waiting for the Stop Hook. **Coexists** with the auto diary and lives at a separate, project-organized path.
+Claude Code supports automatic diaries when sessions end and manual diaries during a session.
 
-```
-~/working-diary/manual/
-└── 2026-04-29/
-    └── my-project/
-        └── 2026-04-29.md      ← appended on subsequent calls within the same day/project
+Apply or refresh Claude Code setup:
+
+```bash
+working-diary install --force
 ```
 
-**Usage:**
-- Inside a Claude Code session: type `/diary` — reads the current cwd's transcript and writes the entry
-- Inside a Codex session: type `$diary` — writes the current conversation/tool context through the same manual diary path
-- Or from the terminal: `working-diary write`
+Automatic diary flow:
 
-`working-diary install` installs `~/.claude/commands/diary.md` so `/diary` works in every project. Re-run it when you need to refresh slash commands. `working-diary uninstall` removes it (preserves user-modified files).
-Codex skills can be installed from the Codex plugin in this repo or with `working-diary install --codex`.
-
-## Notion Work Diary — `/diary-notion` / `$diary-notion`
-
-Push the current session to a hierarchical Notion database as task-sized rows. Use `/diary-notion` in Claude Code and `$diary-notion` in Codex.
-
-```
-[Notion root page: "Working Diary"]
- └── 2026 (auto-created)
-     └── Entries (inline DB, auto-created)
-         ├── "Decide Notion DB schema" | Project: working-diary | Purpose: Planning
-         ├── "Refactor git_info.py"    | Project: working-diary | Purpose: Refactor
-         └── ...
+```text
+Claude Code session ends
+  -> Stop Hook runs
+  -> transcript is parsed
+  -> ~/working-diary/YYYY-MM-DD.md
 ```
 
-Rows include filterable/groupable/relational/operating columns for `Project`, `Purpose`, `Task Group`, `Parent Task`, `Sub-items`, `Depends On`, `Branch`, `Status`, `Work Period`, `Priority`, `Blocked`, `Next Action`, `Review Status`, and `Categories`. `Project` is the command cwd folder name; if a task JSON omits it or writes `unknown`, the CLI falls back to the cwd folder. Run `working-diary diary-notion ensure` to create or verify schema v7, native sub-items, 5 core views, and 5 operating views.
-Hierarchy nests through Notion's **native sub-item relation**, which can only be enabled in the Notion UI (locale-named, e.g. `Parent item`/`Sub-item` or `상위 항목`/`하위 항목`): open the year's `Entries` DB → ⋯ menu → Sub-items, once. push then writes each child's parent link into that native relation (auto-detected without hardcoded names), `ensure` points the 작업 계층 view at it and migrates legacy `Parent Task` links over. Until it is enabled, rows are still recorded and push prints a hint; the legacy `Parent Task`/`Sub-items` relation never drove native nesting and is kept hidden. `Depends On` is limited to prerequisite links between large top-level tasks. Do not connect subtasks with dependency relations. `working-diary diary-notion ensure` repairs required core/operating view settings, while `--dry-run` reports update plans without writing. Operating views cover today priority, previous unfinished work, blocked work, review-needed work, and task groups. Each Notion page body stays compact with one top summary callout, checked result items, a work-at-a-glance table, impact bullets, checked verification items, risks/next actions, and appendix toggles. Developer evidence such as code changes, files, commands, Git, and original prompts is hidden in the appendix. Code changes are high-signal summaries, not full diffs; include only behavior, schema, CLI, user workflow, or verification-scope changes.
-Titles and narrative body content are written in Korean. File paths, commands, branches, commit hashes, code identifiers, and `Purpose`/`Status` enum values remain literal or English.
+Manual Markdown diary:
+
+```text
+/diary
+```
+
+Notion work log:
+
+```text
+/diary-notion
+```
+
+`/diary` finds the Claude Code transcript for the current project and records it through the `working-diary write` core. `/diary-notion` creates task-row JSON from the session and passes it to `working-diary diary-notion push`.
+
+### 2-3. Codex Usage
+
+Codex does not use an automatic hook. It records only when the user invokes a skill.
+
+Apply or refresh Codex setup:
+
+```bash
+working-diary install --force --codex-only
+```
+
+`--codex-only` installs only the Codex skills under `~/.codex/skills` and does not modify Claude Code hooks or slash commands. `--codex` remains as a compatibility option that also refreshes the Claude Code setup.
+
+Manual Markdown diary:
+
+```text
+$diary
+```
+
+Notion work log:
+
+```text
+$diary-notion
+```
+
+`$diary` and `$diary-notion` create JSON from the current Codex conversation and tool activity, then call the same core CLI. Already-running Codex sessions keep the skills loaded at startup. Refreshed skills are applied in a new Codex session.
+
+### 2-4. First Notion Setup
+
+Notion work logs require the optional `requests` dependency.
+
+```bash
+pip install "claude-diary[notion]"
+```
+
+For source installs:
+
+```bash
+pip install -e ".[notion]"
+```
+
+Setup steps:
+
+1. Create a Notion integration at https://www.notion.so/my-integrations and copy the token.
+2. Create a Notion root page, for example `Working Diary`.
+3. Share the root page with the integration.
+4. Save the configuration.
 
 ```bash
 working-diary diary-notion init
-working-diary diary-notion ensure
-/diary-notion       # Claude Code
-$diary-notion       # Codex
 ```
 
-When `working-diary diary-notion push --input ...` records any failed task, it exits with code `1` and preserves the input JSON for retry. Fully successful or already-skipped pushes exit with code `0`.
+`diary-notion init` stores the Notion token and root page ID you enter in local config. If you later set `CLAUDE_DIARY_NOTION_TOKEN` or `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID`, those environment variables override the saved config values.
 
-Purpose values use stable English labels: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, `General`.
-
-## Diary Example
-
-```markdown
-# 📓 Work Diary — 2026-03-17 (Tue)
-
-> This file is auto-generated by Claude Code Stop Hook.
-> Work content is automatically recorded at the end of each session.
-
----
-
-### ⏰ 09:32:15 | 📁 `ai-chatbot`
-
-**📋 Task Requests:**
-  1. Implement circuit breaker pattern in WebSocket handler
-  2. Update error code definitions
-
-**📄 Files Created:**
-  - `.../handler/CircuitBreakerHandler.java`
-
-**✏️ Files Modified:**
-  - `.../config/WebSocketConfig.java`
-  - `.../constant/ErrorCode.java`
-
-**⚡ Key Commands:**
-  - `./gradlew test`
-  - `./gradlew bootRun`
-
-**📝 Work Summary:**
-  - Circuit breaker pattern implemented in WebSocket handler
-  - Added 3-state transition logic (CLOSED→OPEN→HALF_OPEN)
-```
-
-## Configuration
-
-| Environment Variable | Description | Default |
-|---------------------|-------------|---------|
-| `CLAUDE_DIARY_LANG` | Diary language (`ko` or `en`) | `ko` |
-| `CLAUDE_DIARY_DIR` | Auto diary storage path | `~/working-diary` |
-| `CLAUDE_DIARY_MANUAL_DIR` | Manual diary (`/diary`) storage path | `~/working-diary/manual` |
-| `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` (KST) |
-| `CLAUDE_DIARY_NOTION_TOKEN` | Notion integration token, prioritized over config for `diary-notion push` | - |
-| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID, prioritized over config for `diary-notion push` | - |
+5. Ensure the yearly `Entries` database, schema, and views.
 
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
-export CLAUDE_DIARY_LANG="en"
-export CLAUDE_DIARY_DIR="$HOME/working-diary"
-export CLAUDE_DIARY_TZ_OFFSET="-5"  # EST (UTC-5)
+working-diary diary-notion ensure
 ```
 
-**Windows environment variables:**
-```powershell
-# PowerShell (persistent)
-[Environment]::SetEnvironmentVariable("CLAUDE_DIARY_LANG", "en", "User")
-[Environment]::SetEnvironmentVariable("CLAUDE_DIARY_DIR", "$env:USERPROFILE\working-diary", "User")
+6. Run `/diary-notion` or `$diary-notion` from an agent session.
+
+### 2-5. Notion Push Behavior
+
+```bash
+working-diary diary-notion push --input .diary-notion-<id>.json
+working-diary diary-notion push --input .diary-notion-<id>.json --force
 ```
 
-**Windows UTF-8 output:**
-If Korean text or emoji looks garbled in PowerShell, switch the session output to UTF-8 before reading docs or running commands that print diary text:
+- Default push skips rows already recorded with the same `Session ID + Task Index`.
+- `--force` archives prior rows for the session and pushes again.
+- If any task fails, the command exits with code `1` and preserves the input JSON.
+- Fully successful pushes and already-skipped pushes exit with code `0`.
+
+### 2-6. Notion Sub-Items
+
+Expandable task hierarchy uses Notion native Sub-items. Enable it once in the Notion UI.
+
+1. Open the yearly `Entries` database.
+2. Open the top-right `...` menu and enable `Sub-items`.
+3. Run `working-diary diary-notion ensure` again.
+
+Rows are still recorded if Sub-items are not enabled. Only visual nesting is missing, and push prints a hint.
+
+## 3. Logic
+
+### 3-1. Core Logic
+
+The core handles actual recording independently of the agent.
+
+```text
+input
+  -> transcript or agent-authored JSON
+  -> cwd, session_id, task metadata
+
+core processing
+  -> parser
+  -> Git enrichment
+  -> category inference
+  -> secret scan
+  -> formatter
+  -> writer or Notion exporter
+  -> audit/index/export retry
+```
+
+Key modules:
+
+| Area | File | Role |
+|------|------|------|
+| CLI entry | `src/claude_diary/cli/__init__.py` | Routes `working-diary` and `claude-diary` commands |
+| Automatic diary core | `src/claude_diary/core.py` | Claude Code Stop Hook diary pipeline |
+| Manual diary core | `src/claude_diary/cli/write.py` | Handles `/diary`, `$diary`, and `working-diary write` |
+| Notion push | `src/claude_diary/cli/notion_push.py` | Pushes task JSON as Notion rows |
+| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | Ensures schema v7 and core/operating views |
+| Formatter | `src/claude_diary/formatter.py` | Creates Markdown entries and Notion page bodies |
+
+### 3-2. Claude Code Logic
+
+Automatic diary:
+
+```text
+Claude Code Stop Hook
+  -> src/claude_diary/hook.py
+  -> core.process_session(session_id, transcript_path, cwd)
+  -> ~/working-diary/YYYY-MM-DD.md
+```
+
+Manual diary:
+
+```text
+/diary
+  -> claude-diary write
+  -> find Claude transcript for the current cwd
+  -> append to manual diary path
+
+/diary-notion
+  -> agent creates task JSON
+  -> claude-diary diary-notion push --input <json>
+  -> push rows to Notion Entries DB
+```
+
+`working-diary install --force` refreshes:
+
+- `~/.claude/settings.json` Stop Hook
+- `~/.claude/commands/diary.md`
+- `~/.claude/commands/diary-notion.md`
+
+### 3-3. Codex Logic
+
+Codex has no Stop Hook. Global skills call the core CLI.
+
+```text
+$diary
+  -> Codex writes current session content to .diary-<id>.json
+  -> working-diary write --input .diary-<id>.json
+  -> append to manual diary path
+
+$diary-notion
+  -> Codex splits the session into tasks
+  -> writes .diary-notion-<id>.json
+  -> working-diary diary-notion push --input .diary-notion-<id>.json
+  -> push rows to Notion Entries DB
+```
+
+`working-diary install --force --codex-only` refreshes:
+
+- `~/.codex/skills/diary/SKILL.md`
+- `~/.codex/skills/diary-notion/SKILL.md`
+
+## 4. CLI
+
+Core commands:
+
+```bash
+working-diary init
+working-diary init --codex-only
+working-diary install --force
+working-diary install --force --codex
+working-diary install --force --codex-only
+working-diary uninstall
+working-diary uninstall --codex
+working-diary uninstall --codex-only
+
+working-diary write
+working-diary diary-notion init
+working-diary diary-notion ensure
+working-diary diary-notion ensure --dry-run
+working-diary diary-notion push --input .diary-notion-<id>.json
+working-diary notion push --input .diary-notion-<id>.json
+```
+
+Search and maintenance commands:
+
+```bash
+working-diary search "keyword"
+working-diary filter --project my-app
+working-diary trace src/main.py
+working-diary stats
+working-diary weekly
+working-diary audit
+working-diary audit --verify
+working-diary config
+working-diary config --set lang=en
+working-diary migrate
+working-diary reindex
+working-diary delete --last
+```
+
+Extension commands:
+
+```bash
+working-diary config --add-exporter slack
+working-diary config --add-exporter discord
+working-diary config --add-exporter obsidian
+working-diary config --add-exporter github
+working-diary dashboard
+working-diary dashboard --serve --port 8787
+working-diary team stats
+working-diary team weekly
+working-diary team monthly --month 2026-06
+working-diary team init --repo <url> --name <name>
+working-diary team add-member --name <name> --role member
+```
+
+The legacy CLI remains supported.
+
+```bash
+claude-diary write
+claude-diary diary-notion ensure
+```
+
+## 5. Configuration
+
+The config file is stored at the OS-specific user config path under `claude-diary/config.json`. If you configure exporters such as Notion, Slack, or Discord, API tokens, webhook URLs, and root page IDs are stored in this local config. CLI output masks long token and webhook values.
+
+| Environment variable | Description | Default |
+|----------------------|-------------|---------|
+| `CLAUDE_DIARY_LANG` | Diary language, `ko` or `en` | `ko` |
+| `CLAUDE_DIARY_DIR` | Automatic diary path | `~/working-diary` |
+| `CLAUDE_DIARY_MANUAL_DIR` | Manual diary path | `~/working-diary/manual` |
+| `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` |
+| `CLAUDE_DIARY_NOTION_TOKEN` | Notion token, overrides config | - |
+| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID, overrides config | - |
+| `CLAUDE_DIARY_SKIP` | `1`, `true`, or `yes` skips Claude Code Stop Hook auto diary | - |
+
+If PowerShell output shows broken Korean or emoji characters, switch the current session output encoding to UTF-8.
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 ```
 
-## CLI Commands
+## 6. Features
+
+- Automatic category inference
+- Git branch, commit, and diff stat recording
+- Secret scanning and masking
+- Search index
+- Notion work log: `working-diary diary-notion init` -> `working-diary diary-notion ensure`
+- Slack, Discord, Obsidian, GitHub exporters: `working-diary config --add-exporter <name>`
+- HTML dashboard: `working-diary dashboard` or `working-diary dashboard --serve --port 8787`
+- Audit log and source checksum verification
+- Team mode: `working-diary team init --repo <url> --name <name>`
+
+## 7. Troubleshooting
+
+| Symptom | Check |
+|---------|-------|
+| `/diary` or `/diary-notion` does not use the latest instructions | Run `working-diary install --force` to refresh the hook and slash commands |
+| `$diary` or `$diary-notion` does not use the latest instructions | Run `working-diary install --force --codex-only`, then open a new Codex session |
+| Notion push reports an auth error | Check the integration token, root page ID, and page sharing |
+| Notion task hierarchy is not nested | Enable Sub-items once in the Notion `Entries` database UI |
+| Re-push might duplicate rows | Default push skips the same `Session ID + Task Index`; use `--force` to rewrite |
+| PowerShell text is garbled | Apply the UTF-8 output setting above |
+
+## 8. Development
 
 ```bash
-working-diary init                        # Initialize config
-working-diary install --force             # Install/refresh Claude Code hook + slash commands
-working-diary install --force --codex     # Install/refresh Claude Code + Codex skills
-working-diary uninstall                   # Remove Claude Code hook/slash commands
-working-diary uninstall --codex           # Also remove Codex skills
-claude-diary write                        # Write current session diary on demand (also via `/diary` slash command)
-working-diary write                       # Neutral alias for the same CLI
-working-diary diary-notion init           # Configure Notion token/root page
-working-diary diary-notion ensure         # Ensure Notion schema/views
-working-diary diary-notion push --input .diary-notion-<id>.json
-working-diary notion push --input .diary-notion-<id>.json   # diary-notion alias
-claude-diary search "keyword"             # Keyword search
-claude-diary filter --project my-app      # Filter by project
-claude-diary trace src/main.py            # File change history
-claude-diary stats                        # Terminal dashboard
-claude-diary weekly                       # Weekly summary
-claude-diary dashboard                    # HTML dashboard
-claude-diary dashboard --serve --port 8787
-claude-diary audit                        # Security audit log
-claude-diary audit --verify               # Source code integrity check
-claude-diary config                       # View settings
-claude-diary config --set lang=en         # Update settings
-claude-diary reindex                      # Rebuild search index
-claude-diary delete --last                # Delete the last session entry
-claude-diary team stats                   # Team statistics
-claude-diary team weekly                  # Team weekly report
-claude-diary team monthly --month 2026-06
-claude-diary team init --repo <url> --name <name>
+pip install -e ".[dev,notion]"
+python -m pytest -q
+python -m ruff check .
 ```
 
-## Features
+## 9. Roadmap
 
-| Feature | Description |
-|---------|-------------|
-| Auto Categories | feature/bugfix/refactor/docs/test/config/style auto-tagging |
-| Git Integration | Branch, commits, diff stats (+/- lines) auto-recorded |
-| Secret Scanning | Passwords, API keys, tokens auto-masked (11+ patterns) |
-| Search Index | Fast search across months of diary files |
-| 5 Exporters | Notion, Slack, Discord, Obsidian, GitHub plugins |
-| HTML Dashboard | GitHub-style heatmap, offline charts (zero CDN) |
-| Security Audit | Audit log, SHA-256 checksum tamper detection |
-| Team Mode | Access control, central Git repo, team reports |
+This README focuses on currently usable functionality. Detailed design and planning artifacts live under `docs/`.
 
-## Requirements
+| Area | Status |
+|------|--------|
+| Stable now | Claude Code Stop Hook, Codex skills, Markdown diaries, Notion task row push, schema/view ensure |
+| Next | Windows install/output experience, Notion sub-item guidance, incremental CI/lint expansion |
+| Under review | SQLite search index, Cursor/Windsurf/VS Code integration |
 
-- Python 3.8+ (`python3` or `python`)
-- Claude Code (with hooks support)
-- Zero external dependencies (core), no API tokens required
+## 10. Documentation
 
-## Tips
+- [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
+- [Notion views design](docs/02-design/features/diary-notion-views.design.md)
+- [Distribution plan](docs/plans/phase-d-distribution.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
 
-**Add to your CLAUDE.md for better diary entries:**
+## 11. License
 
-```markdown
-## Work Diary
-- Work content is automatically recorded when the session ends
-- Please output clear summaries when completing/implementing/fixing tasks
-```
-
-## FAQ
-
-**"Isn't `git log` enough?"**
-
-git log records *what you committed*. claude-diary records *what you tried, asked for, and debugged* — including sessions where you didn't commit anything. It captures the original prompts ("implement JWT auth"), commands run, errors encountered, and time spent. Think of it as the gap between your commit history and your actual workday.
-
-**"Does it work with Cursor / Windsurf / Copilot?"**
-
-Not yet — currently Claude Code only (via Stop Hook). But the core pipeline just needs `session_id + transcript + cwd`, so adding other AI IDEs is architecturally straightforward. See roadmap below.
-
-**"Why JSON index instead of SQLite?"**
-
-The current JSON index is simple and has zero dependencies. SQLite (which is in Python's stdlib) is planned for v5.0 to enable full-text search and faster queries across months of data.
-
-## Roadmap
-
-| Phase | Goal | Version | Status |
-|-------|------|---------|--------|
-| **A** | Personal productivity (categories, Git, CLI, plugins, dashboard) | v2.0.0 | ✅ Done |
-| **B** | Open source community (security, 420+ tests, CI/CD) | v3.0.0 | ✅ Done |
-| **C** | Team/company tool (access control, central repo, team reports) | v4.0.0 | ✅ Done |
-| **D** | Distribution (plugin, PyPI, marketplace) | v4.1.0 | ✅ Done |
-| **E** | Multi-IDE support (Cursor, Windsurf, VS Code extension) | v5.0.0 | 📋 Planned |
-| **F** | SQLite index + full-text search + analytics API | v5.1.0 | 📋 Planned |
-
-See [`docs/plans/`](docs/plans/) for detailed roadmaps.
-
-## License
-
-MIT License — [LICENSE](LICENSE)
+MIT
