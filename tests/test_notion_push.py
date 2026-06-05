@@ -139,6 +139,27 @@ class TestBuildProperties:
         assert props["Commits"]["number"] == 0
         assert props["Lines"]["number"] == 0
 
+    def test_v2_appendix_files_counted(self):
+        task = {
+            "title": "v2 task",
+            "project": "diary",
+            "appendix": {
+                "files_modified": ["src/a.py", "src/b.py"],
+                "files_created": ["tests/test_a.py"],
+            },
+        }
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert props["Files"]["number"] == 3
+
+    def test_v2_next_actions_feed_next_action_property(self):
+        task = {
+            "title": "v2 task",
+            "project": "diary",
+            "next_actions": ["Run dry-run preview", "Push to Notion"],
+        }
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert props["Next Action"]["rich_text"][0]["text"]["content"] == "Run dry-run preview"
+
     def test_missing_purpose_defaults_to_general(self):
         task = self._base_task()
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
@@ -482,6 +503,7 @@ def _make_args(input_path, force=False):
     args = MagicMock()
     args.input = input_path
     args.force = force
+    args.dry_run = False
     return args
 
 
@@ -556,6 +578,98 @@ class TestCmdNotionPush:
         assert exc.value.code == 0
         mock_exp.create_row.assert_called_once()
         assert not input_path.exists()
+
+    def test_v2_appendix_commit_hashes_drive_git_info_and_properties(self, tmp_path):
+        input_path = tmp_path / "in.json"
+        _write_json(str(input_path), {
+            "session_id": "s1",
+            "tasks": [{
+                "title": "v2 task",
+                "project": "diary",
+                "appendix": {
+                    "files_modified": ["src/a.py"],
+                    "files_created": ["tests/test_a.py"],
+                    "commit_hashes": ["abc1234"],
+                },
+            }],
+        })
+        config = {
+            "exporters": {
+                "notion_hierarchical": {"api_token": "t", "root_page_id": "p"}
+            }
+        }
+
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db_xyz"
+        mock_exp.find_existing_row.return_value = None
+        mock_exp.create_row.return_value = "row_abc"
+        mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter",
+                   return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.get_branch_for_commit",
+                   return_value="feat/v2") as mock_branch, \
+             patch("claude_diary.cli.notion_push.get_commit_info",
+                   return_value={"hash": "abc1234", "short_hash": "abc1234", "message": "v2"}), \
+             patch("claude_diary.cli.notion_push.get_diff_stat_for_commits",
+                   return_value={"added": 10, "deleted": 2, "files": 2}), \
+             pytest.raises(SystemExit) as exc:
+            cmd_notion_push(_make_args(str(input_path)))
+
+        assert exc.value.code == 0
+        mock_branch.assert_called_once_with(os.getcwd(), "abc1234")
+        props = mock_exp.create_row.call_args.args[1]
+        assert props["Branch"]["select"]["name"] == "feat/v2"
+        assert props["Files"]["number"] == 2
+        assert props["Commits"]["number"] == 1
+        assert props["Lines"]["number"] == 12
+        assert not input_path.exists()
+
+    def test_push_dry_run_renders_preview_without_credentials_or_cleanup(self, tmp_path, capsys):
+        input_path = tmp_path / "in.json"
+        _write_json(str(input_path), {
+            "session_id": "s1",
+            "tasks": [{
+                "title": "dry run v2",
+                "project": "diary",
+                "purpose": "Test",
+                "summary": {
+                    "intro": "Compact report preview",
+                    "outcomes": ["Core renderer ready"],
+                    "verification": ["Tests passed"],
+                    "remaining": ["Install skill"],
+                },
+                "work": {
+                    "context": "v2 rollout",
+                    "scope": "push preview",
+                    "approach": "render blocks locally",
+                    "state": "Testing",
+                },
+                "appendix": {
+                    "files_modified": ["src/claude_diary/cli/notion_push.py"],
+                    "commands_run": ["python -m pytest -q"],
+                },
+            }],
+        })
+        args = _make_args(str(input_path))
+        args.dry_run = True
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value={}), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter") as mock_exporter, \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="feat/v2"):
+            cmd_notion_push(args)
+
+        out = capsys.readouterr().out
+        assert "[claude-diary diary-notion push --dry-run]" in out
+        assert "dry run v2" in out
+        assert "[Callout] Compact report preview" in out
+        assert "## 결과" in out
+        assert "> 명령 / 파일 / 커밋 근거" in out
+        mock_exporter.assert_not_called()
+        assert input_path.exists()
 
     def test_missing_project_uses_command_cwd(self, tmp_path, monkeypatch):
         input_path = tmp_path / "in.json"

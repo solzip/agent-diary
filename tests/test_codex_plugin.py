@@ -111,14 +111,17 @@ def test_codex_skills_exist_and_cover_diary_workflows():
     assert "working-diary write --input" in diary_text
     assert "claude-diary write --input" in diary_text
     assert "working-diary diary-notion push" in notion_text
+    assert '"schema_version": 2' in notion_text
     assert '"purpose": "Feature"' in notion_text
-    assert '"summary_hints": ["..."]' in notion_text
+    assert '"summary": {' in notion_text
+    assert '"outcomes": ["..."]' in notion_text
+    assert '"work": {' in notion_text
+    assert '"context": "..."' in notion_text
+    assert '"appendix": {' in notion_text
     assert '"key_changes": ["..."]' in notion_text
-    assert '"work_context": ["..."]' in notion_text
-    assert '"impact": ["..."]' in notion_text
-    assert '"code_change_highlights": ["..."]' in notion_text
     assert '"implementation_notes": ["..."]' in notion_text
     assert '"verification": ["..."]' in notion_text
+    assert '"artifacts": [' in notion_text
     assert '"risks": ["..."]' in notion_text
     assert '"support_needed": ["..."]' in notion_text
     assert '"work_period": "2026-06-02"' in notion_text
