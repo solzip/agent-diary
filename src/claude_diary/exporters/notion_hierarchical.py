@@ -396,6 +396,24 @@ class NotionHierarchicalExporter:
         notion_cache.invalidate_rows_for_session(self._cache, session_id)
         return archived
 
+    def query_database_rows(self, db_id, page_size=100):
+        """Return all rows in an Entries database without mutating Notion."""
+        rows = []
+        body = {
+            "page_size": page_size,
+        }
+        cursor = None
+        while True:
+            if cursor:
+                body["start_cursor"] = cursor
+            elif "start_cursor" in body:
+                del body["start_cursor"]
+            resp = self._request("POST", "/databases/%s/query" % db_id, dict(body))
+            rows.extend(resp.get("results", []))
+            if not resp.get("has_more"):
+                return rows
+            cursor = resp.get("next_cursor")
+
     def create_row(self, db_id, properties, body_blocks):
         """Create a new row (page) in the database with properties + body blocks."""
         body = {

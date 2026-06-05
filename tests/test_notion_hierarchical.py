@@ -576,6 +576,37 @@ class TestArchiveRowsForSession:
             assert c.kwargs["json"] == {"archived": True}
 
 
+class TestQueryDatabaseRows:
+    def test_paginates_all_rows(self):
+        exp = _make_exporter()
+        mock_req = MagicMock()
+        mock_req.request.side_effect = [
+            _make_response(200, {
+                "results": [{"id": "row_a"}],
+                "has_more": True,
+                "next_cursor": "cursor-1",
+            }),
+            _make_response(200, {
+                "results": [{"id": "row_b"}],
+                "has_more": False,
+            }),
+        ]
+
+        with _patch_requests(mock_req):
+            rows = exp.query_database_rows("db_xyz")
+
+        assert rows == [{"id": "row_a"}, {"id": "row_b"}]
+        first = mock_req.request.call_args_list[0]
+        second = mock_req.request.call_args_list[1]
+        assert first.args[0] == "POST"
+        assert first.args[1].endswith("/databases/db_xyz/query")
+        assert first.kwargs["json"] == {"page_size": 100}
+        assert second.kwargs["json"] == {
+            "page_size": 100,
+            "start_cursor": "cursor-1",
+        }
+
+
 class TestCreateRow:
     def test_posts_to_pages_endpoint(self, tmp_path):
         exp = _make_exporter()
