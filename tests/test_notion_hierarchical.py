@@ -104,6 +104,7 @@ CURRENT_EXTENSION_COLUMNS = [
     "Carryover",
     "Review Status",
     "Last Reviewed",
+    "Schema Version",
 ]
 
 
@@ -128,6 +129,7 @@ def _assert_current_extension_schema(patch_body, db_id):
     assert props["Carryover"] == {"checkbox": {}}
     assert props["Review Status"] == {"select": {}}
     assert props["Last Reviewed"] == {"date": {}}
+    assert props["Schema Version"] == {"select": {}}
 
 
 class TestValidateConfig:
@@ -445,7 +447,7 @@ class TestEnsureDatabase:
         _assert_current_extension_schema(patch_body, "db_known")
 
     def test_v3_database_gets_current_schema_upgrade(self, tmp_path):
-        """A DB already marked v3 still gets the current v7 schema patch."""
+        """A DB already marked v3 still gets the current schema patch."""
         exp = _make_exporter()
         with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
             exp.load_cache()
@@ -466,7 +468,7 @@ class TestEnsureDatabase:
         assert exp._cache["schema_v"]["db_v3"] == SCHEMA_VERSION
 
     def test_v2_database_gets_current_schema_upgrade(self, tmp_path):
-        """A DB already marked v2 still gets the current v7 schema patch."""
+        """A DB already marked v2 still gets the current schema patch."""
         exp = _make_exporter()
         with patch("claude_diary.lib.notion_cache.get_config_dir", return_value=str(tmp_path)):
             exp.load_cache()
