@@ -53,12 +53,17 @@ allowed-tools:
 ## 현재 구현 계약
 
 - `/diary-notion`은 작업 row push 전용. 사용자가 명시적으로 요청하지 않는 한 schema/view ensure를 실행하지 말 것
-- `working-diary diary-notion ensure`는 schema v7, native 하위항목, core view 5개, operating view 5개를 보장하는 별도 정비 명령
+- `working-diary diary-notion ensure`는 schema v8, native 하위항목, core view 5개, operating view 5개를 보장하는 별도 정비 명령
 - 포함 관계는 `parent_index`로 Notion native 하위항목에 기록. native 관계가 아직 활성화돼 있지 않으면 row는 그대로 push하고 하위항목 활성화가 필요함을 보고할 것
 - legacy `Parent Task` / `Sub-items`는 호환용 데이터로만 취급하고 JSON에서 직접 지정하지 말 것
 - `Depends On`은 큰 최상위 메인 작업끼리의 선행 연결에만 사용하고, 하위 작업에는 절대 종속성을 쓰지 말 것
 - `project`에 `"unknown"`을 쓰지 말 것 — 비우거나 생략하면 CLI가 명령 실행 cwd 폴더명으로 보정
 - 페이지 본문은 compact executive body로 렌더링됨: 상단 요약, 결과 체크리스트, 작업 한눈에 표, 영향, 검증, 리스크/다음 액션, 부록
+
+## Local Artifact Store
+
+- `diary-notion push` stores local run artifacts under `.codefleet/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`.
+- Use `--preview-file` for an extra Markdown preview path or `--no-artifacts` to disable local artifact writes.
 
 ## 단계
 
@@ -260,13 +265,14 @@ Split the current Codex session into task-sized entries and push them to Notion.
 ## Current Implementation Contract
 
 - `$diary-notion` is a row push workflow only. Do not run schema/view ensure unless the user explicitly asks for it.
-- `working-diary diary-notion ensure` is the separate maintenance command that guarantees schema v7, native sub-items, 5 core views, and 5 operating views.
+- `working-diary diary-notion ensure` is the separate maintenance command that guarantees schema v8, native sub-items, 5 core views, and 5 operating views.
 - Use Notion native sub-items for containment by setting `parent_index`. If the native relation is not enabled in Notion, still push the rows and report that sub-item activation is needed.
 - Treat legacy `Parent Task` / `Sub-items` as compatibility data only. Do not target them directly in JSON.
 - Use `Depends On` only for prerequisite links between large top-level main tasks. Never use dependencies for child tasks.
 - Never write `"unknown"` as `project`; omit it or leave it blank so the CLI falls back to the command cwd folder name.
 - Page bodies render as compact work reports: summary, results, work table, decisions, issues/risks, next actions/support, and appendix toggles.
 - Notion is the report surface; raw logs, long diffs, and bulky evidence belong in local artifact files and should be referenced by path/hash instead of pasted.
+- `diary-notion push` writes local run artifacts under `.codefleet/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`. Use `--preview-file` for an extra Markdown preview path or `--no-artifacts` to disable local artifact writes.
 - For testing, QA, review, validation, or verification sessions, create a row even without code changes; keep `verification` short and place the meaningful prompt-result document in `prompt_outputs` or `verification_artifacts` so it renders inside a toggle.
 
 ## Workflow
@@ -403,7 +409,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
 }
 ```
 
-5. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json --dry-run` to preview the compact report body and appendix toggles without writing to Notion.
+5. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json --dry-run` to validate v2 input, write local artifacts, and preview the compact report body and appendix toggles without writing to Notion.
 6. If the preview is structurally wrong, fix the JSON before pushing.
 7. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
 8. If `working-diary` is not available, run `claude-diary diary-notion push --input .diary-notion-<8-random>.json`.

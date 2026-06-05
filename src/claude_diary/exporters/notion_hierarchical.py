@@ -32,7 +32,7 @@ NOTION_API_VERSION = "2022-06-28"
 NOTION_API_BASE = "https://api.notion.com/v1"
 MAX_RETRIES = 3
 RICH_TEXT_LIMIT = 2000
-SCHEMA_VERSION = "v7"
+SCHEMA_VERSION = "v8"
 DATABASE_TITLE = "Entries"
 
 # Relation property names this tool creates itself. Notion's *native* sub-item
@@ -554,6 +554,7 @@ def _current_schema_extensions(db_id):
         "Carryover": {"checkbox": {}},
         "Review Status": {"select": {}},
         "Last Reviewed": {"date": {}},
+        "Schema Version": {"select": {}},
     }
 
 

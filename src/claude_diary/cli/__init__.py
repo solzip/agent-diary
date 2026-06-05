@@ -47,6 +47,12 @@ def _add_diary_notion_parser(sub, name):
     p_notion.add_argument("--year", type=int, help="Target year (ensure/ops only)")
     p_notion.add_argument("--dry-run", action="store_true",
                           help="Preview push body without writing, or print ensure plan")
+    p_notion.add_argument("--preview-file",
+                          help="Write push dry-run/preview Markdown to this file")
+    p_notion.add_argument("--artifact-dir", default=".codefleet/runs",
+                          help="Directory for local run artifacts (push only)")
+    p_notion.add_argument("--no-artifacts", action="store_true",
+                          help="Do not write local run artifacts (push only)")
     p_notion.add_argument("--stale-days", type=int, default=7,
                           help="Mark active rows stale after N days (ops only)")
     p_notion.add_argument("--json", dest="json_output", action="store_true",

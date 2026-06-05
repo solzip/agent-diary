@@ -13,7 +13,11 @@ then re-pushes everything.
 
 import json
 import os
+import hashlib
+import shutil
+import subprocess
 import sys
+from copy import deepcopy
 from datetime import datetime, timezone, timedelta
 
 from claude_diary.config import load_config
@@ -50,11 +54,18 @@ def cmd_notion_push(args):
 
     session_id = data.get("session_id") or _fallback_session_id()
     tasks = data.get("tasks") or []
+    validation_errors = _validate_push_data(data)
+    if validation_errors:
+        _print_validation_errors(validation_errors, input_path)
+        sys.exit(1)
     if not tasks:
         print("[claude-diary diary-notion push] No tasks to push.")
         if not dry_run:
             _cleanup(input_path)
         return
+    tasks = deepcopy(tasks)
+    report_schema_version = _report_schema_version(data, tasks)
+    _stamp_report_schema_version(tasks, report_schema_version)
 
     cwd = os.getcwd()
     # Hierarchical Notion diary pages are developer work records for this
@@ -68,14 +79,36 @@ def cmd_notion_push(args):
     year = today.year
     date_str = today.strftime("%Y-%m-%d")
 
+    artifact_dir = _arg_str(args, "artifact_dir")
+    if getattr(args, "no_artifacts", False) is True:
+        artifact_dir = ""
+    preview_file = _arg_str(args, "preview_file")
     if dry_run:
-        _print_dry_run_preview(tasks, session_id, date_str, cwd, lang)
+        run_artifacts = _prepare_run_artifacts(
+            input_path, data, tasks, session_id, date_str, cwd, artifact_dir
+        )
+        if run_artifacts:
+            _attach_run_artifacts(tasks, run_artifacts)
+        preview = _build_dry_run_preview(tasks, session_id, date_str, cwd, lang)
+        if preview_file:
+            _write_text_file(preview_file, preview)
+            print("[claude-diary diary-notion push --dry-run] Preview file: %s" % preview_file)
+        if run_artifacts:
+            _write_artifact_preview(run_artifacts, preview)
+            _finalize_artifact_manifest(run_artifacts, tasks)
+        print(preview)
         return
 
     token, root_page_id = _resolve_credentials(config)
     if not token or not root_page_id:
         _print_setup_hint()
         sys.exit(1)
+
+    run_artifacts = _prepare_run_artifacts(
+        input_path, data, tasks, session_id, date_str, cwd, artifact_dir
+    )
+    if run_artifacts:
+        _attach_run_artifacts(tasks, run_artifacts)
 
     exporter = NotionHierarchicalExporter({
         "api_token": token,
@@ -130,6 +163,11 @@ def cmd_notion_push(args):
     exporter.save_cache()
 
     _print_report(results, input_path)
+    if run_artifacts:
+        preview = _build_dry_run_preview(tasks, session_id, date_str, cwd, lang)
+        _write_artifact_preview(run_artifacts, preview)
+        _finalize_artifact_manifest(run_artifacts, tasks, results)
+        print("[claude-diary diary-notion push] Artifacts: %s" % run_artifacts["run_dir"])
 
     if not results["failed"]:
         _cleanup(input_path)
@@ -400,6 +438,9 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index, 
         "Session ID": {"rich_text": [{"text": {"content": session_id[:2000]}}]},
         "Task Index": {"number": task_index},
     }
+    report_schema = _clean_schema_version(task.get("_report_schema_version"))
+    if report_schema:
+        props["Schema Version"] = {"select": {"name": report_schema}}
     if branch:
         props["Branch"] = {"select": {"name": _safe_select(branch)}}
 
@@ -542,6 +583,99 @@ def _clean_rich_text(value):
     return raw[:2000] if raw else ""
 
 
+def _clean_schema_version(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if raw.lower().startswith("v"):
+        return raw[:100]
+    return ("v%s" % raw)[:100]
+
+
+def _report_schema_version(data, tasks):
+    raw = data.get("schema_version")
+    if raw is not None:
+        return _clean_schema_version(raw)
+    for task in tasks:
+        if isinstance(task, dict) and (
+            isinstance(task.get("summary"), dict)
+            or isinstance(task.get("work"), dict)
+            or isinstance(task.get("appendix"), dict)
+        ):
+            return "v2"
+    return "legacy"
+
+
+def _stamp_report_schema_version(tasks, version):
+    for task in tasks:
+        if isinstance(task, dict):
+            task["_report_schema_version"] = version
+
+
+def _validate_push_data(data):
+    errors = []
+    if not isinstance(data, dict):
+        return ["input root must be a JSON object"]
+    tasks = data.get("tasks")
+    if tasks is None:
+        return ["tasks is required"]
+    if not isinstance(tasks, list):
+        return ["tasks must be an array"]
+
+    schema_version = data.get("schema_version")
+    if schema_version is not None and _clean_schema_version(schema_version) != "v2":
+        errors.append("schema_version must be 2 for normalized report input")
+
+    strict_v2 = _clean_schema_version(schema_version) == "v2"
+    for idx, task in enumerate(tasks):
+        prefix = "tasks[%d]" % idx
+        if not isinstance(task, dict):
+            errors.append("%s must be an object" % prefix)
+            continue
+        if not str(task.get("title") or "").strip():
+            errors.append("%s.title is required" % prefix)
+        if strict_v2:
+            for key in ("summary", "work", "appendix"):
+                if not isinstance(task.get(key), dict):
+                    errors.append("%s.%s must be an object for schema_version 2" % (prefix, key))
+        status = task.get("status")
+        if status and str(status).strip() not in VALID_STATUSES:
+            errors.append("%s.status must be one of: %s" % (prefix, ", ".join(sorted(VALID_STATUSES))))
+        priority = task.get("priority")
+        if priority and not _normalize_priority(priority):
+            errors.append("%s.priority must be one of: %s" % (prefix, ", ".join(sorted(VALID_PRIORITIES))))
+        review = task.get("review_status")
+        if review and not _normalize_review_status(review):
+            errors.append("%s.review_status must be one of: %s" % (prefix, ", ".join(sorted(VALID_REVIEW_STATUSES))))
+        parent_idx = _get_parent_index(task)
+        if parent_idx is not None and parent_idx >= len(tasks):
+            errors.append("%s.parent_index points outside tasks" % prefix)
+        deps = task.get("depends_on_indices") or []
+        if not isinstance(deps, list):
+            errors.append("%s.depends_on_indices must be an array" % prefix)
+        else:
+            for dep in deps:
+                if not isinstance(dep, int) or dep < 0 or dep >= len(tasks):
+                    errors.append("%s.depends_on_indices contains invalid index %r" % (prefix, dep))
+        appendix = task.get("appendix") if isinstance(task.get("appendix"), dict) else {}
+        artifacts = appendix.get("artifacts") or task.get("artifacts") or []
+        if isinstance(artifacts, dict):
+            artifacts = [artifacts]
+        if artifacts and not isinstance(artifacts, list):
+            errors.append("%s.appendix.artifacts must be an array" % prefix)
+        elif isinstance(artifacts, list):
+            for art_idx, artifact in enumerate(artifacts):
+                if isinstance(artifact, dict) and not str(artifact.get("path") or "").strip():
+                    errors.append("%s.appendix.artifacts[%d].path is required" % (prefix, art_idx))
+    return errors
+
+
+def _print_validation_errors(errors, input_path):
+    print("[claude-diary diary-notion push] Invalid input: %s" % input_path, file=sys.stderr)
+    for error in errors[:20]:
+        print("  - %s" % error, file=sys.stderr)
+
+
 def _task_appendix(task):
     value = task.get("appendix")
     return value if isinstance(value, dict) else {}
@@ -596,27 +730,32 @@ def _task_next_action(task):
     return actions[0] if actions else ""
 
 
-def _print_dry_run_preview(tasks, session_id, date_str, cwd, lang):
-    print("[claude-diary diary-notion push --dry-run]")
-    print("Session ID: %s" % session_id)
-    print("Tasks: %d" % len(tasks))
+def _build_dry_run_preview(tasks, session_id, date_str, cwd, lang):
+    lines = [
+        "[claude-diary diary-notion push --dry-run]",
+        "Session ID: %s" % session_id,
+        "Tasks: %d" % len(tasks),
+    ]
     for idx, task in enumerate(tasks):
         title = task.get("title") or "(untitled)"
         git_info = _gather_git_info(cwd, _task_commit_hashes(task))
         branch = git_info.get("branch") or ""
         props = _build_properties(task, date_str, branch, git_info, session_id, idx, cwd)
         blocks = build_notion_blocks(task, git_info, lang)
-        print("")
-        print("[%d] %s" % (idx, title))
-        print("  Project: %s" % props["Project"]["select"]["name"])
-        print("  Purpose: %s" % props["Purpose"]["select"]["name"])
-        print("  Files: %d" % props["Files"]["number"])
-        print("  Commits: %d" % props["Commits"]["number"])
-        print("  Lines: %d" % props["Lines"]["number"])
+        lines.append("")
+        lines.append("[%d] %s" % (idx, title))
+        lines.append("  Project: %s" % props["Project"]["select"]["name"])
+        lines.append("  Purpose: %s" % props["Purpose"]["select"]["name"])
+        if "Schema Version" in props:
+            lines.append("  Schema Version: %s" % props["Schema Version"]["select"]["name"])
+        lines.append("  Files: %d" % props["Files"]["number"])
+        lines.append("  Commits: %d" % props["Commits"]["number"])
+        lines.append("  Lines: %d" % props["Lines"]["number"])
         if branch:
-            print("  Branch: %s" % branch)
+            lines.append("  Branch: %s" % branch)
         for line in _blocks_to_preview_lines(blocks):
-            print("  %s" % line)
+            lines.append("  %s" % line)
+    return "\n".join(lines)
 
 
 def _blocks_to_preview_lines(blocks, max_lines=80):
@@ -669,6 +808,138 @@ def _rich_text_plain(rich_text):
         if text:
             parts.append(text)
     return "".join(parts)
+
+
+def _arg_str(args, name):
+    value = getattr(args, name, None)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return ""
+
+
+def _prepare_run_artifacts(input_path, data, tasks, session_id, date_str, cwd, artifact_dir):
+    if not artifact_dir:
+        return None
+    run_id = _run_id(session_id, date_str)
+    run_dir = os.path.abspath(os.path.join(cwd, artifact_dir, run_id))
+    os.makedirs(run_dir, exist_ok=True)
+    artifacts = {
+        "run_id": run_id,
+        "run_dir": run_dir,
+        "cwd": cwd,
+        "refs": [],
+    }
+    if input_path and os.path.exists(input_path):
+        input_copy = os.path.join(run_dir, "input.json")
+        shutil.copyfile(input_path, input_copy)
+        artifacts["refs"].append(_artifact_ref(cwd, input_copy, "input", "original diary-notion JSON input"))
+    diff_path = os.path.join(run_dir, "git-diff.patch")
+    diff_text = _git_diff(cwd)
+    _write_text_file(diff_path, diff_text)
+    artifacts["refs"].append(_artifact_ref(cwd, diff_path, "diff", "git diff at diary-notion push time"))
+    return artifacts
+
+
+def _write_artifact_preview(run_artifacts, preview):
+    path = os.path.join(run_artifacts["run_dir"], "preview.md")
+    _write_text_file(path, preview)
+    run_artifacts["refs"] = [
+        ref for ref in run_artifacts["refs"] if ref.get("kind") != "preview"
+    ]
+    run_artifacts["refs"].append(_artifact_ref(
+        run_artifacts["cwd"], path, "preview", "rendered Notion body preview"
+    ))
+
+
+def _finalize_artifact_manifest(run_artifacts, tasks, results=None):
+    manifest_path = os.path.join(run_artifacts["run_dir"], "manifest.json")
+    manifest = {
+        "run_id": run_artifacts["run_id"],
+        "tasks": [task.get("title") or "(untitled)" for task in tasks],
+        "artifacts": run_artifacts["refs"],
+    }
+    if results is not None:
+        manifest["results"] = {
+            "pushed": len(results.get("pushed") or []),
+            "skipped": len(results.get("skipped") or []),
+            "failed": len(results.get("failed") or []),
+        }
+    _write_text_file(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2))
+    run_artifacts["refs"] = [
+        ref for ref in run_artifacts["refs"] if ref.get("kind") != "manifest"
+    ]
+    run_artifacts["refs"].append(_artifact_ref(
+        run_artifacts["cwd"], manifest_path, "manifest", "local run artifact manifest"
+    ))
+
+
+def _attach_run_artifacts(tasks, run_artifacts):
+    refs = run_artifacts.get("refs") or []
+    for task in tasks:
+        appendix = task.setdefault("appendix", {})
+        existing = appendix.get("artifacts") or []
+        if isinstance(existing, dict):
+            existing = [existing]
+        elif not isinstance(existing, list):
+            existing = []
+        appendix["artifacts"] = existing + refs
+
+
+def _artifact_ref(cwd, path, kind, summary):
+    return {
+        "kind": kind,
+        "path": _relpath(cwd, path),
+        "summary": summary,
+        "sha256": _sha256_file(path),
+    }
+
+
+def _run_id(session_id, date_str):
+    stamp = datetime.now().strftime("%H%M%S")
+    safe_session = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in str(session_id or "run"))
+    return "%s-%s-%s" % (date_str.replace("-", ""), stamp, safe_session[:24])
+
+
+def _git_diff(cwd):
+    try:
+        result = subprocess.run(
+            ["git", "-c", "safe.directory=%s" % cwd.replace("\\", "/"), "diff", "--binary"],
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+        )
+    except Exception as e:
+        return "git diff unavailable: %s\n" % e
+    if result.returncode != 0:
+        return "git diff failed: %s\n" % (result.stderr or result.stdout)
+    return result.stdout or "No working tree diff at capture time.\n"
+
+
+def _write_text_file(path, text):
+    parent = os.path.dirname(os.path.abspath(path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def _sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _relpath(cwd, path):
+    try:
+        return os.path.relpath(path, cwd).replace("\\", "/")
+    except ValueError:
+        return path.replace("\\", "/")
 
 
 def _print_report(results, input_path):

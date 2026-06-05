@@ -137,7 +137,9 @@ def test_codex_skills_exist_and_cover_diary_workflows():
     assert "in Korean" in notion_text
     assert "Notion task database record" in notion_text
     assert "Current Implementation Contract" in notion_text
-    assert "schema v7" in notion_text
+    assert "schema v8" in notion_text
+    assert ".codefleet/runs" in notion_text
+    assert "--preview-file" in notion_text
     assert "native sub-items" in notion_text
     assert "Never write `\"unknown\"` as `project`" in notion_text
     assert "Use `Depends On` only for prerequisite links" in notion_text
