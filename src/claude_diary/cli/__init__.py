@@ -93,7 +93,10 @@ def main():
 
     # init
     p_init = sub.add_parser("init", help="Initialize claude-diary setup")
-    p_init.add_argument("--team", dest="team_repo", help="Team repo URL for team mode")
+    init_mode = p_init.add_mutually_exclusive_group()
+    init_mode.add_argument("--team", dest="team_repo", help="Team repo URL for team mode")
+    init_mode.add_argument("--codex-only", action="store_true",
+                           help="Initialize config/diary directories without registering Claude Code hooks")
 
     # migrate
     sub.add_parser("migrate", help="Migrate v1.0 env vars to config.json")
@@ -133,12 +136,19 @@ def main():
     # install / uninstall
     p_install = sub.add_parser("install", help="Register claude-diary hook in Claude Code")
     p_install.add_argument("--force", action="store_true",
-                           help="Overwrite slash command files (preserves user-modified ones)")
-    p_install.add_argument("--codex", action="store_true",
-                           help="Also install Codex skills under ~/.codex/skills")
+                           help=("Refresh hook command and overwrite managed slash command files "
+                                 "(preserves user-modified ones)"))
+    install_agent = p_install.add_mutually_exclusive_group()
+    install_agent.add_argument("--codex", action="store_true",
+                               help="Also install Codex skills under ~/.codex/skills")
+    install_agent.add_argument("--codex-only", action="store_true",
+                               help="Install only Codex skills; do not modify Claude Code settings")
     p_uninstall = sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
-    p_uninstall.add_argument("--codex", action="store_true",
-                             help="Also remove Codex skills installed by claude-diary")
+    uninstall_agent = p_uninstall.add_mutually_exclusive_group()
+    uninstall_agent.add_argument("--codex", action="store_true",
+                                 help="Also remove Codex skills installed by claude-diary")
+    uninstall_agent.add_argument("--codex-only", action="store_true",
+                                 help="Remove only Codex skills; do not modify Claude Code settings")
 
     # write (manual diary — for /diary slash command)
     p_write = sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")

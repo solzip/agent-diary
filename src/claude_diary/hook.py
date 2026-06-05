@@ -7,9 +7,9 @@ This script is registered in ~/.claude/settings.json as:
 It reads session JSON from stdin and delegates to core.process_session().
 """
 
+import os
 import json
 import sys
-import os
 
 # Ensure the package is importable when running as a standalone script
 _script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,10 +23,35 @@ from claude_diary.log import get_logger
 logger = get_logger("claude_diary.hook")
 
 
+def _configure_stdio():
+    """Use UTF-8 for hook output without shell-specific env assignment."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
+
+
+def _load_stdin_json():
+    stream = sys.stdin
+    buffer = getattr(stream, "buffer", None)
+    if buffer is not None:
+        raw = buffer.read()
+        text = raw.decode("utf-8-sig", errors="replace")
+    else:
+        text = stream.read()
+    return json.loads(text)
+
+
 def main():
+    _configure_stdio()
     try:
-        input_data = json.load(sys.stdin)
+        input_data = _load_stdin_json()
     except (json.JSONDecodeError, EOFError, ValueError):
+        sys.exit(0)
+    if not isinstance(input_data, dict):
         sys.exit(0)
 
     session_id = input_data.get("session_id", "unknown")

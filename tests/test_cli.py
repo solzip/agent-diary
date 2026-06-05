@@ -29,6 +29,7 @@ from claude_diary.cli import (
     _print_box_bottom,
     _get_terminal_width,
 )
+from claude_diary.cli.setup import HOOK_COMMAND
 
 
 # ── Helper fixtures ──
@@ -927,6 +928,28 @@ class TestCmdInit:
         assert "Done!" in captured.out
         mock_ensure.assert_called_once()
         mock_save.assert_called_once()
+        settings_file = tmp_path / ".claude" / "settings.json"
+        settings = json.loads(settings_file.read_text(encoding="utf-8"))
+        hook = settings["hooks"]["Stop"][0]["hooks"][0]
+        assert hook["command"] == HOOK_COMMAND
+
+    @patch("claude_diary.cli.get_config_path", return_value="/fake/config.json")
+    @patch("claude_diary.cli.save_config")
+    @patch("claude_diary.cli.ensure_diary_dir")
+    @patch("claude_diary.cli.load_config")
+    def test_init_codex_only_skips_claude_hook(self, mock_config, mock_ensure,
+                                               mock_save, mock_path,
+                                               base_config, tmp_path, capsys):
+        mock_config.return_value = base_config
+        with patch("os.path.expanduser", return_value=str(tmp_path)):
+            args = Namespace(team_repo=None, codex_only=True)
+            cmd_init(args)
+
+        captured = capsys.readouterr()
+        assert "Codex-only init" in captured.out
+        assert not (tmp_path / ".claude" / "settings.json").exists()
+        mock_ensure.assert_called_once()
+        mock_save.assert_called_once()
 
     @patch("claude_diary.cli.get_config_path", return_value="/fake/config.json")
     @patch("claude_diary.cli.save_config")
@@ -976,7 +999,7 @@ class TestCmdInit:
         mock_config.return_value = base_config
         settings_data = json.dumps({
             "hooks": {
-                "Stop": [{"hooks": [{"type": "command", "command": "python -m claude_diary.hook"}]}]
+                "Stop": [{"hooks": [{"type": "command", "command": HOOK_COMMAND}]}]
             }
         })
         m_open = mock_open(read_data=settings_data)

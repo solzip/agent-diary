@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 from claude_diary.cli.setup import (
     SLASH_COMMANDS,
     CODEX_SKILLS,
+    HOOK_COMMAND,
     DIARY_SLASH_COMMAND,
     DIARY_NOTION_SLASH_COMMAND,
     cmd_install,
@@ -280,6 +281,21 @@ class TestCmdInstall:
         assert (tmp_path / ".codex" / "skills" / "diary" / "SKILL.md").exists()
         assert (tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md").exists()
 
+    def test_install_codex_only_writes_skills_without_claude_files(self, tmp_path):
+        args = MagicMock()
+        args.force = False
+        args.codex = False
+        args.codex_only = True
+
+        with _patch_home(tmp_path):
+            cmd_install(args)
+
+        assert (tmp_path / ".codex" / "skills" / "diary" / "SKILL.md").exists()
+        assert (tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md").exists()
+        assert not (tmp_path / ".claude" / "settings.json").exists()
+        assert not (tmp_path / ".claude" / "commands" / "diary.md").exists()
+        assert not (tmp_path / ".claude" / "commands" / "diary-notion.md").exists()
+
     def test_idempotent_when_hook_already_present(self, tmp_path):
         settings_path = tmp_path / ".claude" / "settings.json"
         settings_path.parent.mkdir(parents=True)
@@ -299,6 +315,29 @@ class TestCmdInstall:
             if "claude_diary.hook" in h["command"]
         ]
         assert len(diary_hooks) == 1
+
+    def test_force_updates_existing_legacy_hook_command(self, tmp_path):
+        settings_path = tmp_path / ".claude" / "settings.json"
+        settings_path.parent.mkdir(parents=True)
+        settings_path.write_text(json.dumps({
+            "hooks": {"Stop": [{"hooks": [{"type": "command",
+                                            "command": "PYTHONIOENCODING=utf-8 python -m claude_diary.hook"}]}]}
+        }), encoding="utf-8")
+        args = MagicMock()
+        args.force = True
+        args.codex = False
+
+        with _patch_home(tmp_path):
+            cmd_install(args)
+
+        after = json.loads(settings_path.read_text(encoding="utf-8"))
+        stop = after["hooks"]["Stop"]
+        diary_hooks = [
+            h for group in stop for h in group["hooks"]
+            if "claude_diary.hook" in h["command"]
+        ]
+        assert len(diary_hooks) == 1
+        assert diary_hooks[0]["command"] == HOOK_COMMAND
 
 
 class TestCmdUninstall:
@@ -337,3 +376,22 @@ class TestCmdUninstall:
 
         assert not (tmp_path / ".codex" / "skills" / "diary" / "SKILL.md").exists()
         assert not (tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md").exists()
+
+    def test_uninstall_codex_only_removes_skills_without_claude_files(self, tmp_path):
+        install_args = MagicMock()
+        install_args.force = False
+        install_args.codex = True
+        install_args.codex_only = False
+        uninstall_args = MagicMock()
+        uninstall_args.codex = False
+        uninstall_args.codex_only = True
+
+        with _patch_home(tmp_path):
+            cmd_install(install_args)
+            cmd_uninstall(uninstall_args)
+
+        assert not (tmp_path / ".codex" / "skills" / "diary" / "SKILL.md").exists()
+        assert not (tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md").exists()
+        assert (tmp_path / ".claude" / "settings.json").exists()
+        assert (tmp_path / ".claude" / "commands" / "diary.md").exists()
+        assert (tmp_path / ".claude" / "commands" / "diary-notion.md").exists()
