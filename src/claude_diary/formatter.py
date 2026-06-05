@@ -6,6 +6,10 @@ from datetime import datetime, timezone, timedelta
 from claude_diary.i18n import get_label
 
 
+DEFAULT_VERIFICATION_LIMIT = 3
+PROMPT_OUTPUT_LIMIT = 15
+
+
 def format_entry(entry_data, lang="ko"):
     """Format entry_data into a markdown diary entry."""
     L = lambda key: get_label(key, lang)
@@ -181,7 +185,7 @@ def _add_snapshot_section(blocks, task, L):
 
 def _add_verification_section(blocks, task, L):
     section_blocks = []
-    for v in _limited_texts(task.get("verification"), 3):
+    for v in _limited_texts(task.get("verification"), DEFAULT_VERIFICATION_LIMIT):
         section_blocks.append(_to_do(v, checked=True))
     if section_blocks:
         blocks.append(_heading(L("verification")))
@@ -204,9 +208,12 @@ def _add_risks_next_actions_section(blocks, task, L):
 
 def _build_appendix_blocks(task, git_info, L):
     blocks = []
+    prompt_outputs = _build_prompt_output_items(task)
     developer = _build_developer_evidence_items(task, git_info, L)
     raw = _build_raw_evidence_items(task, L)
 
+    if prompt_outputs:
+        blocks.append(_toggle(L("prompt_outputs"), [_bullet(item) for item in prompt_outputs]))
     if developer:
         blocks.append(_toggle(L("developer_evidence"), [_bullet(item) for item in developer]))
     if raw:
@@ -277,6 +284,55 @@ def _significant_commands(commands):
         if first and first not in trivial:
             sig.append(c)
     return sig
+
+
+def _build_prompt_output_items(task):
+    items = []
+    if _is_verification_session_task(task):
+        items.extend(_as_text_list(task.get("verification")))
+    for field in (
+        "prompt_outputs",
+        "verification_artifacts",
+        "test_results",
+        "validation_results",
+        "findings",
+    ):
+        items.extend(_as_text_list(task.get(field)))
+    return _dedupe_texts(_limited_texts(items, PROMPT_OUTPUT_LIMIT, limit=1000))
+
+
+def _is_verification_session_task(task):
+    tokens = [
+        task.get("status"),
+        task.get("purpose"),
+        task.get("task_group"),
+    ]
+    tokens.extend(_as_text_list(task.get("categories")))
+    haystack = " ".join(str(token or "").lower() for token in tokens)
+    keywords = (
+        "testing",
+        "test",
+        "qa",
+        "verify",
+        "verification",
+        "validation",
+        "review",
+        "검증",
+        "테스트",
+        "테스터",
+    )
+    return any(keyword in haystack for keyword in keywords)
+
+
+def _dedupe_texts(items):
+    seen = set()
+    result = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
 
 
 def _labeled_texts(label, items, max_items, limit=500):
