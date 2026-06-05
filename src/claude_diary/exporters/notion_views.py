@@ -265,7 +265,7 @@ class CoreViewsEnsurer:
             if dry_run:
                 result.updates_planned.append("작업 계층")
                 result.warnings.append(
-                    "schema v7 would convert Parent Task to a dual-property "
+                    "schema v8 would convert Parent Task to a dual-property "
                     "Sub-items relation"
                 )
                 return result

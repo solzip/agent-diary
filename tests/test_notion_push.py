@@ -160,6 +160,11 @@ class TestBuildProperties:
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
         assert props["Next Action"]["rich_text"][0]["text"]["content"] == "Run dry-run preview"
 
+    def test_report_schema_version_property_included_when_stamped(self):
+        task = dict(self._base_task(), _report_schema_version="v2")
+        props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
+        assert props["Schema Version"]["select"]["name"] == "v2"
+
     def test_missing_purpose_defaults_to_general(self):
         task = self._base_task()
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
@@ -261,6 +266,10 @@ class TestDependsOnWiring:
         args = MagicMock()
         args.input = input_path
         args.force = force
+        args.dry_run = False
+        args.preview_file = ""
+        args.artifact_dir = ""
+        args.no_artifacts = False
         return args
 
     def _write_json(self, path, data):
@@ -504,6 +513,9 @@ def _make_args(input_path, force=False):
     args.input = input_path
     args.force = force
     args.dry_run = False
+    args.preview_file = ""
+    args.artifact_dir = ""
+    args.no_artifacts = False
     return args
 
 
@@ -670,6 +682,77 @@ class TestCmdNotionPush:
         assert "> 명령 / 파일 / 커밋 근거" in out
         mock_exporter.assert_not_called()
         assert input_path.exists()
+
+    def test_v2_validation_rejects_missing_normalized_sections_before_auth(self, tmp_path, capsys):
+        input_path = tmp_path / "in.json"
+        _write_json(str(input_path), {
+            "session_id": "s1",
+            "schema_version": 2,
+            "tasks": [{"title": "bad v2"}],
+        })
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value={}), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter") as mock_exporter, \
+             pytest.raises(SystemExit) as exc:
+            cmd_notion_push(_make_args(str(input_path)))
+
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "Invalid input" in err
+        assert "tasks[0].summary must be an object" in err
+        mock_exporter.assert_not_called()
+        assert input_path.exists()
+
+    def test_dry_run_writes_preview_and_artifacts(self, tmp_path, capsys):
+        input_path = tmp_path / "in.json"
+        preview_path = tmp_path / "preview.md"
+        artifact_root = tmp_path / "runs"
+        _write_json(str(input_path), {
+            "session_id": "s1",
+            "schema_version": 2,
+            "tasks": [{
+                "title": "dry run artifacts",
+                "project": "diary",
+                "summary": {
+                    "intro": "Preview with artifacts",
+                    "outcomes": ["Rendered"],
+                    "verification": ["Checked"],
+                    "remaining": [],
+                },
+                "work": {
+                    "context": "Artifact validation",
+                    "scope": "Preview file and manifest",
+                    "approach": "Local render",
+                    "state": "Testing",
+                },
+                "appendix": {
+                    "files_modified": ["src/claude_diary/cli/notion_push.py"],
+                    "commands_run": ["python -m pytest -q"],
+                },
+            }],
+        })
+        args = _make_args(str(input_path))
+        args.dry_run = True
+        args.preview_file = str(preview_path)
+        args.artifact_dir = str(artifact_root)
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value={}), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="feat/v2"):
+            cmd_notion_push(args)
+
+        out = capsys.readouterr().out
+        assert "Preview file:" in out
+        assert preview_path.exists()
+        assert "Schema Version: v2" in preview_path.read_text(encoding="utf-8")
+        run_dirs = list(artifact_root.iterdir())
+        assert len(run_dirs) == 1
+        names = {p.name for p in run_dirs[0].iterdir()}
+        assert {"input.json", "git-diff.patch", "preview.md", "manifest.json"} <= names
+        manifest = json.loads((run_dirs[0] / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["run_id"]
+        assert any(a["kind"] == "preview" for a in manifest["artifacts"])
 
     def test_missing_project_uses_command_cwd(self, tmp_path, monkeypatch):
         input_path = tmp_path / "in.json"

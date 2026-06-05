@@ -28,3 +28,6 @@ claude-code-working-diary.tar.gz
 
 # /diary-notion 임시 JSON (Claude가 cwd에 작성 → CLI가 자동 삭제 / 부분 실패 시 보존)
 .diary-notion-*.json
+
+# Local v2 diary-notion run artifacts
+.codefleet/runs/
