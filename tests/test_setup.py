@@ -67,6 +67,8 @@ class TestDiaryNotionInstructions:
             "decisions",
             "implementation_notes",
             "verification",
+            "prompt_outputs",
+            "verification_artifacts",
             "risks",
             "next_steps",
             "support_needed",
@@ -96,11 +98,17 @@ class TestDiaryNotionInstructions:
         assert "schema v7" in codex_content
         assert "native sub-items" in codex_content
         assert "Never write `\"unknown\"` as `project`" in codex_content
+        assert "testing, QA, review, validation, or verification sessions" in codex_content
+        assert "verification-only work" in codex_content
+        assert "prompt-result document" in codex_content
+        assert "prompt_outputs" in codex_content
         # Claude /diary-notion slash command carries the implementation contract
         assert "현재 구현 계약" in DIARY_NOTION_SLASH_COMMAND
         assert "schema v7" in DIARY_NOTION_SLASH_COMMAND
         assert "native 하위항목" in DIARY_NOTION_SLASH_COMMAND
         assert "carryover=true" in DIARY_NOTION_SLASH_COMMAND
+        assert "Testing / Verification Sessions" in DIARY_NOTION_SLASH_COMMAND
+        assert "prompt-output artifact fields" in DIARY_NOTION_SLASH_COMMAND
 
 
 class TestInstallSlashCommandSingle:

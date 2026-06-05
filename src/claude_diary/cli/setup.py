@@ -33,6 +33,13 @@ allowed-tools:
 
 # /diary-notion
 
+## Testing / Verification Sessions
+
+- If the session work is testing, QA, review, validation, or verification, create a Notion row for the verification work even when there were no code changes.
+- Set `status` to `Testing` and `purpose` to `Test` for verification-only work unless a more specific enum is clearly better.
+- Keep `verification` short. Put the meaningful prompt-result document in `prompt_outputs` or `verification_artifacts` so it renders inside a Notion toggle.
+- Do not collapse important findings into a vague summary. Put distinct passed checks, failed checks, defects, regressions, blocked checks, skipped checks, and follow-up actions in the prompt-output artifact fields, or create a child task row with `parent_index` when the result needs its own status or owner.
+
 현재 세션의 transcript와 git 정보를 분석하여 Notion 업무일지 DB에 push.
 
 ## 현재 구현 계약
@@ -250,20 +257,23 @@ Split the current Codex session into task-sized entries and push them to Notion.
 - Use `Depends On` only for prerequisite links between large top-level main tasks. Never use dependencies for child tasks.
 - Never write `"unknown"` as `project`; omit it or leave it blank so the CLI falls back to the command cwd folder name.
 - Page bodies render as compact executive bodies: top summary, result checklist, work-at-a-glance table, impact, verification, risks/next action, and appendix.
+- For testing, QA, review, validation, or verification sessions, create a row even without code changes; keep `verification` short and place the meaningful prompt-result document in `prompt_outputs` or `verification_artifacts` so it renders inside a toggle.
 
 ## Workflow
 
 1. Review the current conversation, tool calls, git branch, and relevant git commits.
 2. Split work into task-sized database rows. Branch changes are hard task boundaries; within a branch, split by semantic work unit.
    - Create a row for work that has its own status, evidence, code/test output, or can block another task
+   - Create a row for verification-only work even when the session produced no file changes or commits
    - Keep tiny check items, raw notes, long SQL/JS snippets, and reference links inside the page body evidence instead of making them separate rows
    - Create a separate row only when the work has an independent status, verification/evidence, code change, commit, blocker, or follow-up owner
+   - For tester/verification sessions, summarize the final state in `verification` and put each meaningful pass, fail, blocker, skipped check, regression, defect, and follow-up in the prompt-output artifact fields
    - Use `parent_index` for containment hierarchy and Notion sub-items; do not model subtasks with dependencies
    - Use `depends_on_indices` only for prerequisite links between large top-level tasks
    - Mark continued work from an earlier day/session as a new row with the same `task_group` and `carryover=true` when it is still unfinished
 3. For each task, produce:
    - Language policy:
-     - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `risks`, `next_steps`, `support_needed`, `next_action`, and `block_reason` in Korean
+     - Write `title`, `body_intro`, `summary_hints`, `key_changes`, `work_context`, `work_scope`, `approach`, `outcome`, `impact`, `decisions`, `implementation_notes`, `verification`, `prompt_outputs`, `verification_artifacts`, `risks`, `next_steps`, `support_needed`, `next_action`, and `block_reason` in Korean
      - Keep `status` and `purpose` as the exact English enum values below
      - Preserve file paths, commands, branches, commit hashes, code identifiers, function names, and class names as written
      - Preserve `user_prompts` in the user's original wording as evidence
@@ -275,6 +285,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
      - Treat `summary_hints` as checked result items, not repeated callouts
      - Keep `work_context`, `work_scope`, `approach`, and `outcome` short because they render as a compact "work at a glance" table
      - Put final verification state in `verification`; move intermediate command history to appendix evidence
+     - For tester/verification sessions, keep `verification` to 1-3 summary items and put the full meaningful prompt-result document in `prompt_outputs` or `verification_artifacts`; summarize long raw logs instead of pasting them
      - Keep risks concise; multiple risks are combined into one warning callout
    - `summary_hints`: up to 3 outcome-focused result items that explain what changed and why it matters
    - `key_changes`: up to 3 major behavior/schema/workflow changes a developer can understand without opening the diff
@@ -289,12 +300,15 @@ Split the current Codex session into task-sized entries and push them to Notion.
      - Include changes to behavior, schema, CLI flow, user workflow, or verification scope
    - `decisions`: 0-3 decisions or tradeoffs made by the user or settled during implementation
    - `implementation_notes`: 0-4 constraints, compatibility notes, migrations, or details that do not fit code highlights
-   - `verification`: 0-3 tests/checks run, results, or explicit reasons checks were not run
+   - `verification`: 0-3 summary tests/checks run, final results, or explicit reasons checks were not run
+   - `prompt_outputs`: 0-15 meaningful prompt-result items for tester/verification sessions; include distinct pass/fail/blocker/skipped/regression/defect/follow-up results, not raw logs
+   - `verification_artifacts`: 0-15 structured verification artifact items when the prompt output is better grouped as a generated test report or review document
    - `risks`: 0-2 cautions, remaining risks, or usage/operation notes
    - `next_steps`: 0-2 remaining follow-ups
    - `support_needed`: 0-1 decisions or support needed from others
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
+     - Use `Test` for tester, QA, validation, and verification-only sessions unless another enum is clearly more accurate
    - `work_period`: actual work period; use today's `YYYY-MM-DD` by default, or `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for a range
    - `priority`: one of `P0`, `P1`, `P2`, `P3`; use `P0` for urgent/blocking work, `P1` for today's highest priority, `P2` for normal follow-up, and `P3` for low priority
    - `next_action`: 0-1 concrete Korean action that can be started next
@@ -330,6 +344,8 @@ Split the current Codex session into task-sized entries and push them to Notion.
       "decisions": ["..."],
       "implementation_notes": ["..."],
       "verification": ["..."],
+      "prompt_outputs": ["..."],
+      "verification_artifacts": ["..."],
       "risks": ["..."],
       "next_steps": ["..."],
       "support_needed": ["..."],

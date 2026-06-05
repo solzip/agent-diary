@@ -193,6 +193,46 @@ class TestBuildNotionBlocks:
         assert "summary-3" not in texts
         assert [b["type"] for b in blocks[:4]] == ["heading_2", "to_do", "to_do", "to_do"]
 
+    def test_testing_tasks_move_full_verification_results_to_prompt_output_toggle(self):
+        blocks = build_notion_blocks({
+            "status": "Testing",
+            "purpose": "Test",
+            "categories": ["qa"],
+            "verification": ["result-%d" % i for i in range(8)],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+        todos = [_block_text(b) for b in _flatten_blocks(blocks) if b["type"] == "to_do"]
+        bullets = [_block_text(b) for b in _flatten_blocks(blocks) if b["type"] == "bulleted_list_item"]
+
+        assert "Prompt Outputs / Verification Artifacts" in texts
+        assert "result-0" in texts
+        assert "result-2" in todos
+        assert "result-3" not in todos
+        assert "result-7" in bullets
+
+    def test_default_tasks_still_limit_verification_results(self):
+        blocks = build_notion_blocks({
+            "status": "Implementation",
+            "purpose": "Feature",
+            "verification": ["verify-%d" % i for i in range(8)],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+
+        assert "verify-2" in texts
+        assert "verify-3" not in texts
+
+    def test_verification_aliases_render_for_qa_tasks(self):
+        blocks = build_notion_blocks({
+            "categories": ["validation"],
+            "test_results": ["suite passed"],
+            "findings": ["missing error handling"],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+
+        assert "Prompt Outputs / Verification Artifacts" in texts
+        assert "suite passed" in texts
+        assert "missing error handling" in texts
+
     def test_work_snapshot_uses_table_not_callouts(self):
         blocks = build_notion_blocks({
             "work_context": "Started from UX feedback.",
