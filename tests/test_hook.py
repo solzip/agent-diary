@@ -2,12 +2,17 @@
 
 import json
 import sys
-from io import StringIO
+from io import BytesIO, StringIO
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from claude_diary.hook import main
+
+
+class BytesStdin:
+    def __init__(self, data):
+        self.buffer = BytesIO(data)
 
 
 class TestHookStdinParsing:
@@ -28,6 +33,27 @@ class TestHookStdinParsing:
             assert exc_info.value.code == 0
 
         mock_process.assert_called_once_with("sess-001", "/tmp/transcript.jsonl", "/home/user/project")
+
+    @patch("claude_diary.hook.process_session")
+    def test_utf8_bytes_stdin_parsed(self, mock_process):
+        mock_process.return_value = True
+        input_data = {
+            "session_id": "sess-한글",
+            "transcript_path": "C:/Users/유저/transcript.jsonl",
+            "cwd": "C:/Users/유저/프로젝트",
+        }
+        raw = json.dumps(input_data, ensure_ascii=False).encode("utf-8")
+
+        with patch("sys.stdin", BytesStdin(raw)):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 0
+
+        mock_process.assert_called_once_with(
+            "sess-한글",
+            "C:/Users/유저/transcript.jsonl",
+            "C:/Users/유저/프로젝트",
+        )
 
     def test_invalid_json_exits_gracefully(self):
         with patch("sys.stdin", StringIO("not valid json!!!")):
@@ -182,5 +208,6 @@ class TestHookErrorHandling:
     def test_json_array_input_exits_gracefully(self):
         """Even valid JSON that isn't a dict should be handled."""
         with patch("sys.stdin", StringIO(json.dumps([1, 2, 3]))):
-            with pytest.raises((SystemExit, AttributeError)):
+            with pytest.raises(SystemExit) as exc_info:
                 main()
+            assert exc_info.value.code == 0

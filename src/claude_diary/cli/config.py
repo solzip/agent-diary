@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import claude_diary.cli as _cli
+from claude_diary.cli.setup import HOOK_COMMAND
 
 
 def cmd_config(args):
@@ -121,6 +122,12 @@ def cmd_init(args):
     _cli.save_config(config)
     print("  [ok] Config: %s" % _cli.get_config_path())
 
+    if getattr(args, "codex_only", False) is True:
+        print("  [ok] Codex-only init: Claude Code Stop Hook not registered")
+        print()
+        print("Done! Run `working-diary install --force --codex-only` to install Codex skills.")
+        return
+
     # Register Stop Hook
     claude_settings = os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
     if os.path.exists(claude_settings):
@@ -144,7 +151,7 @@ def cmd_init(args):
                     break
 
         if not already:
-            hook_cmd = "python -m claude_diary.hook"
+            hook_cmd = HOOK_COMMAND
             settings["hooks"]["Stop"].append({
                 "hooks": [{"type": "command", "command": hook_cmd}]
             })
@@ -157,7 +164,7 @@ def cmd_init(args):
         # Create settings.json with hook registration
         claude_dir = os.path.join(os.path.expanduser("~"), ".claude")
         Path(claude_dir).mkdir(parents=True, exist_ok=True)
-        hook_cmd = "python -m claude_diary.hook"
+        hook_cmd = HOOK_COMMAND
         settings = {
             "hooks": {
                 "Stop": [{"hooks": [{"type": "command", "command": hook_cmd}]}]

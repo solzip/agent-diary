@@ -5,7 +5,7 @@ import os
 import sys
 
 
-HOOK_COMMAND = "PYTHONIOENCODING=utf-8 python -m claude_diary.hook"
+HOOK_COMMAND = "python -m claude_diary.hook"
 
 HOOK_ENTRY = {
     "type": "command",
@@ -424,29 +424,45 @@ def _is_diary_hook(hook):
 
 
 def _find_existing_hook(settings):
-    """Check if claude-diary hook is already registered.
-    Returns True if found.
-    """
+    """Return the first claude-diary hook entry if one is registered."""
     hooks = settings.get("hooks", {})
     stop_hooks = hooks.get("Stop", [])
     for group in stop_hooks:
         for hook in group.get("hooks", []):
             if _is_diary_hook(hook):
-                return True
-    return False
+                return hook
+    return None
 
 
 def cmd_install(args):
     """Register claude-diary Stop hook + all slash commands.
 
-    With --force, overwrite existing slash command files (useful after a
-    claude-diary upgrade that changed slash command instructions).
+    With --force, refresh the managed hook command and overwrite existing slash
+    command files (useful after a claude-diary upgrade).
     """
+    force = getattr(args, "force", False) is True
+    codex_only = getattr(args, "codex_only", False) is True
+    if codex_only:
+        codex_statuses = _install_all_codex_skills(force=force)
+        print("claude-diary install (codex-only):")
+        for skill_name, (path, status) in codex_statuses.items():
+            print("  Codex skill $%s: %s (%s)" % (skill_name, path, status))
+        print()
+        print("In Codex, use $diary or $diary-notion. Open a new Codex session after refresh.")
+        return
+
     settings_path = _get_claude_settings_path()
     settings = _load_claude_settings(settings_path)
 
-    if _find_existing_hook(settings):
-        hook_status = "already installed"
+    existing_hook = _find_existing_hook(settings)
+    if existing_hook:
+        if force and existing_hook.get("command") != HOOK_COMMAND:
+            existing_hook["type"] = "command"
+            existing_hook["command"] = HOOK_COMMAND
+            _save_claude_settings(settings_path, settings)
+            hook_status = "updated"
+        else:
+            hook_status = "already installed"
     else:
         if "hooks" not in settings:
             settings["hooks"] = {}
@@ -456,7 +472,6 @@ def cmd_install(args):
         _save_claude_settings(settings_path, settings)
         hook_status = "installed"
 
-    force = getattr(args, "force", False) is True
     install_codex = getattr(args, "codex", False) is True
     # Slash command install runs unconditionally — fixes upgrade path for
     # users who installed before a given slash command was a feature.
@@ -561,6 +576,14 @@ def _uninstall_all_codex_skills():
 def cmd_uninstall(args):
     """Remove claude-diary Stop hook + slash commands."""
     uninstall_codex = getattr(args, "codex", False) is True
+    codex_only = getattr(args, "codex_only", False) is True
+    if codex_only:
+        codex_statuses = _uninstall_all_codex_skills()
+        print("claude-diary uninstall (codex-only):")
+        for skill_name, (path, status) in codex_statuses.items():
+            print("  Codex skill $%s: %s (%s)" % (skill_name, path, status))
+        return
+
     settings_path = _get_claude_settings_path()
     settings = _load_claude_settings(settings_path)
 
