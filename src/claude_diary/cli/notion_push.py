@@ -41,11 +41,7 @@ def cmd_notion_push(args):
     """Read tasks JSON and push each task as a row to the Notion DB."""
     config = load_config()
     configure_from_config(config)
-
-    token, root_page_id = _resolve_credentials(config)
-    if not token or not root_page_id:
-        _print_setup_hint()
-        sys.exit(1)
+    dry_run = getattr(args, "dry_run", False) is True
 
     input_path = args.input
     data = _read_json(input_path)
@@ -56,7 +52,8 @@ def cmd_notion_push(args):
     tasks = data.get("tasks") or []
     if not tasks:
         print("[claude-diary diary-notion push] No tasks to push.")
-        _cleanup(input_path)
+        if not dry_run:
+            _cleanup(input_path)
         return
 
     cwd = os.getcwd()
@@ -70,6 +67,15 @@ def cmd_notion_push(args):
     today = datetime.now(local_tz)
     year = today.year
     date_str = today.strftime("%Y-%m-%d")
+
+    if dry_run:
+        _print_dry_run_preview(tasks, session_id, date_str, cwd, lang)
+        return
+
+    token, root_page_id = _resolve_credentials(config)
+    if not token or not root_page_id:
+        _print_setup_hint()
+        sys.exit(1)
 
     exporter = NotionHierarchicalExporter({
         "api_token": token,
@@ -296,7 +302,7 @@ def _push_task(exporter, year, date_str, session_id, task_index, task, cwd, lang
     if existing:
         return "skipped", existing
 
-    git_info = _gather_git_info(cwd, task.get("commit_hashes") or [])
+    git_info = _gather_git_info(cwd, _task_commit_hashes(task))
     branch = git_info.get("branch") or ""
 
     properties = _build_properties(
@@ -376,10 +382,7 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index, 
     categories = [c for c in (task.get("categories") or []) if c]
     stat = git_info.get("diff_stat") or {}
     commits = git_info.get("commits") or []
-    files_count = (
-        len(task.get("files_modified") or []) +
-        len(task.get("files_created") or [])
-    )
+    files_count = _task_files_count(task)
     lines = (stat.get("added", 0) or 0) + (stat.get("deleted", 0) or 0)
 
     props = {
@@ -412,7 +415,7 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index, 
     if priority:
         props["Priority"] = {"select": {"name": priority}}
 
-    next_action = _clean_rich_text(task.get("next_action"))
+    next_action = _clean_rich_text(_task_next_action(task))
     if next_action:
         props["Next Action"] = {"rich_text": [{"text": {"content": next_action}}]}
 
@@ -537,6 +540,135 @@ def _normalize_review_status(value):
 def _clean_rich_text(value):
     raw = str(value or "").strip()
     return raw[:2000] if raw else ""
+
+
+def _task_appendix(task):
+    value = task.get("appendix")
+    return value if isinstance(value, dict) else {}
+
+
+def _task_texts(*values):
+    items = []
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str):
+            candidates = [value]
+        elif isinstance(value, (list, tuple, set)):
+            candidates = value
+        else:
+            candidates = [value]
+        for item in candidates:
+            text = str(item or "").replace("\n", " ").strip()
+            if text:
+                items.append(text)
+    return _dedupe_texts(items)
+
+
+def _dedupe_texts(items):
+    seen = set()
+    result = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def _task_commit_hashes(task):
+    appendix = _task_appendix(task)
+    return _task_texts(appendix.get("commit_hashes"), task.get("commit_hashes"))
+
+
+def _task_files_count(task):
+    appendix = _task_appendix(task)
+    modified = _task_texts(appendix.get("files_modified"), task.get("files_modified"))
+    created = _task_texts(appendix.get("files_created"), task.get("files_created"))
+    return len(modified) + len(created)
+
+
+def _task_next_action(task):
+    flat = task.get("next_action")
+    if flat:
+        return flat
+    actions = _task_texts(task.get("next_actions"), task.get("next_steps"))
+    return actions[0] if actions else ""
+
+
+def _print_dry_run_preview(tasks, session_id, date_str, cwd, lang):
+    print("[claude-diary diary-notion push --dry-run]")
+    print("Session ID: %s" % session_id)
+    print("Tasks: %d" % len(tasks))
+    for idx, task in enumerate(tasks):
+        title = task.get("title") or "(untitled)"
+        git_info = _gather_git_info(cwd, _task_commit_hashes(task))
+        branch = git_info.get("branch") or ""
+        props = _build_properties(task, date_str, branch, git_info, session_id, idx, cwd)
+        blocks = build_notion_blocks(task, git_info, lang)
+        print("")
+        print("[%d] %s" % (idx, title))
+        print("  Project: %s" % props["Project"]["select"]["name"])
+        print("  Purpose: %s" % props["Purpose"]["select"]["name"])
+        print("  Files: %d" % props["Files"]["number"])
+        print("  Commits: %d" % props["Commits"]["number"])
+        print("  Lines: %d" % props["Lines"]["number"])
+        if branch:
+            print("  Branch: %s" % branch)
+        for line in _blocks_to_preview_lines(blocks):
+            print("  %s" % line)
+
+
+def _blocks_to_preview_lines(blocks, max_lines=80):
+    lines = []
+    for block in blocks:
+        block_type = block.get("type")
+        if block_type == "heading_2":
+            lines.append("## %s" % _block_text(block, "heading_2"))
+        elif block_type == "callout":
+            lines.append("[Callout] %s" % _block_text(block, "callout"))
+        elif block_type == "to_do":
+            checked = "x" if block.get("to_do", {}).get("checked") else " "
+            lines.append("- [%s] %s" % (checked, _block_text(block, "to_do")))
+        elif block_type == "bulleted_list_item":
+            lines.append("- %s" % _block_text(block, "bulleted_list_item"))
+        elif block_type == "toggle":
+            lines.append("> %s" % _block_text(block, "toggle"))
+            for child in block.get("toggle", {}).get("children", [])[:3]:
+                child_type = child.get("type")
+                if child_type:
+                    lines.append("  - %s" % _block_text(child, child_type))
+        elif block_type == "table":
+            lines.extend(_table_preview_lines(block))
+        if len(lines) >= max_lines:
+            lines.append("... (%d more block lines)" % (len(blocks) - max_lines))
+            break
+    return lines
+
+
+def _table_preview_lines(block):
+    rows = []
+    for child in block.get("table", {}).get("children", []):
+        cells = child.get("table_row", {}).get("cells", [])
+        row = " | ".join(_rich_text_plain(cell) for cell in cells)
+        if row.strip():
+            rows.append(row)
+    return rows
+
+
+def _block_text(block, block_type):
+    return _rich_text_plain(block.get(block_type, {}).get("rich_text", []))
+
+
+def _rich_text_plain(rich_text):
+    parts = []
+    for item in rich_text or []:
+        text = item.get("plain_text")
+        if text is None:
+            text = (item.get("text") or {}).get("content")
+        if text:
+            parts.append(text)
+    return "".join(parts)
 
 
 def _print_report(results, input_path):
