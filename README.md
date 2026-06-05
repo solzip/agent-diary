@@ -339,6 +339,7 @@ working-diary write
 working-diary diary-notion init
 working-diary diary-notion ensure
 working-diary diary-notion ensure --dry-run
+working-diary diary-notion ops
 working-diary diary-notion push --input .diary-notion-<id>.json
 working-diary notion push --input .diary-notion-<id>.json
 ```
@@ -411,6 +412,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 - secret scan과 masking
 - 검색 인덱스
 - Notion 업무일지: `working-diary diary-notion init` -> `working-diary diary-notion ensure`
+- Notion 운영 진단: `working-diary diary-notion ops`로 blocked/review/next action/stale/work days/today-plan 후보/부모 상태 제안 확인
 - Slack, Discord, Obsidian, GitHub exporter: `working-diary config --add-exporter <name>`
 - HTML dashboard: `working-diary dashboard` 또는 `working-diary dashboard --serve --port 8787`
 - audit log와 source checksum 검증
@@ -442,6 +444,7 @@ python -m ruff check .
 | 구분 | 내용 |
 |------|------|
 | 현재 안정화 | Claude Code Stop Hook, Codex skill, Markdown 일지, Notion task row push, schema/view ensure |
+| Phase 3 진입 | `working-diary diary-notion ops` 읽기 전용 운영 진단, parent/task group 진행률, ensure conflict 분류와 repair plan |
 | 다음 개선 | Windows 설치/출력 경험 정리, Notion sub-item 안내 개선, CI/lint 범위 점진 확대 |
 | 검토 중 | SQLite 기반 검색 인덱스, Cursor/Windsurf/VS Code 같은 다른 AI IDE 연동 |
 

@@ -23,6 +23,7 @@ from claude_diary.cli.write import cmd_write
 from claude_diary.cli.notion_push import cmd_notion_push
 from claude_diary.cli.notion_init import cmd_notion_init
 from claude_diary.cli.notion_ensure import cmd_notion_ensure
+from claude_diary.cli.notion_ops import cmd_notion_ops
 
 
 def cmd_notion(args):
@@ -33,17 +34,23 @@ def cmd_notion(args):
         cmd_notion_init(args)
     elif args.action == "ensure":
         cmd_notion_ensure(args)
+    elif args.action == "ops":
+        cmd_notion_ops(args)
 
 
 def _add_diary_notion_parser(sub, name):
     p_notion = sub.add_parser(name, help="Notion hierarchical work diary integration")
-    p_notion.add_argument("action", choices=["init", "push", "ensure"], help="Action to perform")
+    p_notion.add_argument("action", choices=["init", "push", "ensure", "ops"], help="Action to perform")
     p_notion.add_argument("--input", help="JSON input file (push only)")
     p_notion.add_argument("--force", action="store_true",
                           help="Archive prior rows for the session before pushing (push only)")
-    p_notion.add_argument("--year", type=int, help="Target year (ensure only)")
+    p_notion.add_argument("--year", type=int, help="Target year (ensure/ops only)")
     p_notion.add_argument("--dry-run", action="store_true",
                           help="Print the Notion schema/view plan without writing (ensure only)")
+    p_notion.add_argument("--stale-days", type=int, default=7,
+                          help="Mark active rows stale after N days (ops only)")
+    p_notion.add_argument("--json", dest="json_output", action="store_true",
+                          help="Output operations report as JSON (ops only)")
 
 
 def main():

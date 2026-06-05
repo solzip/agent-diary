@@ -114,10 +114,23 @@ def _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_r
     for name in result.verified:
         print("  = %s (verified)" % name)
     for conflict in result.conflicts:
-        print("  x %s -- conflict: %s" % (conflict.name, conflict.reason))
-        print("    action: check view permissions or fix the required setting, then rerun")
+        plan = build_conflict_plan(conflict.name, conflict.reason)
+        print("  x %s -- conflict[%s]: %s" % (
+            conflict.name,
+            plan["category"],
+            conflict.reason,
+        ))
+        print("    action: %s" % plan["action"])
+        print("    apply: %s" % ("yes" if plan["apply_supported"] else "manual"))
     for failure in result.failed:
-        print("  ! %s -- %s" % (failure.name, failure.reason))
+        plan = build_conflict_plan(failure.name, failure.reason)
+        print("  ! %s -- %s [%s]" % (
+            failure.name,
+            failure.reason,
+            plan["category"],
+        ))
+        print("    action: %s" % plan["action"])
+        print("    apply: %s" % ("yes" if plan["apply_supported"] else "manual"))
     if result.repaired:
         print("Sub-item sync:")
         for entry in result.repaired:
@@ -125,4 +138,49 @@ def _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_r
     if result.warnings:
         print("Warnings:")
         for warning in result.warnings:
-            print("  ! %s" % warning)
+            plan = build_conflict_plan("warning", warning)
+            print("  ! %s [%s]" % (warning, plan["category"]))
+            print("    action: %s" % plan["action"])
+            print("    apply: %s" % ("yes" if plan["apply_supported"] else "manual"))
+
+
+def build_conflict_plan(name, reason):
+    """Return a structured read-only repair plan for an ensure problem."""
+    category = classify_conflict_reason(reason)
+    if category == "missing_filter":
+        return _plan(name, reason, category, "rerun `working-diary diary-notion ensure` to repair the view filter", True)
+    if category == "missing_property":
+        return _plan(name, reason, category, "rerun `working-diary diary-notion ensure` to add the missing schema property", True)
+    if category == "subitem_missing":
+        return _plan(name, reason, category, "enable Notion Sub-items in the Entries DB UI, then rerun ensure", False)
+    if category == "permission_or_auth":
+        return _plan(name, reason, category, "share the root page/database with the integration or refresh the token", False)
+    if category == "api_failure":
+        return _plan(name, reason, category, "inspect the Notion API error, then rerun ensure after fixing the payload or permission issue", False)
+    return _plan(name, reason, category, "inspect the reported issue, then rerun ensure", False)
+
+
+def _plan(name, reason, category, action, apply_supported):
+    return {
+        "name": name,
+        "reason": reason,
+        "category": category,
+        "action": action,
+        "apply_supported": apply_supported,
+    }
+
+
+def classify_conflict_reason(reason):
+    """Return a stable Phase 3 conflict category for ensure diagnostics."""
+    text = (reason or "").lower()
+    if "native sub-items not enabled" in text or "sub-items" in text or "subitem" in text:
+        return "subitem_missing"
+    if "missing" in text and "filter" in text:
+        return "missing_filter"
+    if "missing" in text and ("property" in text or "column" in text):
+        return "missing_property"
+    if "permission" in text or "403" in text or "unauthorized" in text or "auth" in text:
+        return "permission_or_auth"
+    if "api" in text or "400" in text or "failed" in text:
+        return "api_failure"
+    return "unknown"
