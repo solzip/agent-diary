@@ -1,12 +1,12 @@
 {
   "name": "working-diary",
   "description": "Auto-generate work diaries from Claude Code sessions (KO/EN)",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "author": {
     "name": "solzip",
     "url": "https://github.com/solzip"
   },
-  "repository": "https://github.com/solzip/claude-code-hooks-diary",
+  "repository": "https://github.com/solzip/working-diary",
   "license": "MIT",
   "keywords": [
     "diary",

@@ -1,10 +1,21 @@
 """Tests for Codex plugin and skill packaging artifacts."""
 
 import json
+import re
 from pathlib import Path
+
+from claude_diary import __version__
+from claude_diary.cli.setup import HOOK_COMMAND
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _pyproject_version():
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    assert match is not None
+    return match.group(1)
 
 
 def test_codex_plugin_manifest_points_to_skills():
@@ -17,6 +28,77 @@ def test_codex_plugin_manifest_points_to_skills():
     assert data["skills"] == "./skills/"
     assert data["interface"]["displayName"] == "Working Diary"
     assert "hooks" not in data
+
+
+def test_claude_plugin_manifest_uses_current_repository():
+    manifest_path = ROOT / ".claude-plugin" / "plugin.json"
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert data["name"] == "working-diary"
+    assert data["repository"] == "https://github.com/solzip/working-diary"
+    assert data["hooks"] == "hooks.json"
+    assert "claude-code-hooks-diary" not in manifest_path.read_text(encoding="utf-8")
+
+
+def test_distribution_versions_match_package_version():
+    codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    claude = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+
+    assert _pyproject_version() == __version__
+    assert codex["version"] == __version__
+    assert claude["version"] == __version__
+
+
+def test_claude_plugin_hook_uses_installer_command():
+    hooks_path = ROOT / ".claude-plugin" / "hooks.json"
+    data = json.loads(hooks_path.read_text(encoding="utf-8"))
+    command = data["hooks"]["Stop"][0]["hooks"][0]["command"]
+
+    assert command == HOOK_COMMAND
+    assert "PYTHONIOENCODING=" not in command
+
+
+def test_english_readme_uses_current_install_flow():
+    text = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    assert "working-diary-system" not in text
+    assert "install.sh" not in text
+    assert "working-diary init --codex-only" in text
+    assert "working-diary install --force --codex-only" in text
+    assert "Apply or refresh Codex setup:\n\n```bash\nworking-diary install --force --codex-only" in text
+    assert 'pip install "claude-diary[notion]"' in text
+    assert "stores the Notion token and root page ID" in text
+    assert "API tokens, webhook URLs, and root page IDs are stored in this local config" in text
+
+
+def test_korean_readme_uses_codex_only_install_flow():
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "working-diary init --codex-only" in text
+    assert "working-diary install --force --codex-only" in text
+    assert "Codex 적용 또는 갱신:\n\n```bash\nworking-diary install --force --codex-only" in text
+    assert "현재 구현에는 Codex만 단독으로 적용하는 별도 명령이 없습니다" not in text
+
+
+def test_legacy_script_readme_points_to_current_install_flow():
+    text = (ROOT / "working-diary-system" / "README.md").read_text(encoding="utf-8")
+
+    assert "Deprecated v1 Scripts" in text
+    assert "pip install claude-diary" in text
+    assert "working-diary install --force" in text
+    assert "working-diary install --force --codex-only" in text
+
+
+def test_security_policy_matches_current_config_behavior():
+    text = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+
+    assert "Does NOT modify your source code or Claude Code configuration" not in text
+    assert "Registers or refreshes Claude Code hook/slash command settings" in text
+    assert "Codex-only setup does not modify Claude Code settings" in text
+    assert "unless you explicitly enable an exporter" in text
+    assert "Stores exporter credentials such as API tokens and webhook URLs in local config" in text
+    assert "Does NOT transmit stored exporter credentials except" in text
+    assert "Does NOT store or transmit API tokens" not in text
 
 
 def test_codex_skills_exist_and_cover_diary_workflows():
