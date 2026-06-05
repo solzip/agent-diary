@@ -772,7 +772,7 @@ def _blocks_to_preview_lines(blocks, max_lines=80):
             lines.append("- %s" % _block_text(block, "bulleted_list_item"))
         elif block_type == "toggle":
             lines.append("> %s" % _block_text(block, "toggle"))
-            for child in block.get("toggle", {}).get("children", [])[:8]:
+            for child in block.get("toggle", {}).get("children", [])[:20]:
                 child_type = child.get("type")
                 if child_type:
                     lines.append("  - %s" % _block_text(child, child_type))
