@@ -147,6 +147,9 @@ def build_conflict_plan(name, reason):
                      "rerun `working-diary diary-notion ensure` to add the missing schema property", True)
     if category == "subitem_missing":
         return _plan(name, reason, category, "enable Notion Sub-items in the Entries DB UI, then rerun ensure", False)
+    if category == "retired_view":
+        return _plan(name, reason, category,
+                     "delete the listed views in Notion if you no longer use them; rerun changes nothing", False)
     if category == "permission_or_auth":
         return _plan(name, reason, category,
                      "share the root page/database with the integration or refresh the token", False)
@@ -170,6 +173,10 @@ def _plan(name, reason, category, action, apply_supported):
 def classify_conflict_reason(reason):
     """Return a stable Phase 3 conflict category for ensure diagnostics."""
     text = (reason or "").lower()
+    # Checked before the sub-item rules: the retired list contains view names,
+    # not a schema problem, and one of them would otherwise match "sub-items".
+    if "no longer managed" in text:
+        return "retired_view"
     if "native sub-items not enabled" in text or "sub-items" in text or "subitem" in text:
         return "subitem_missing"
     if "missing" in text and "filter" in text:
