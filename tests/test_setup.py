@@ -78,8 +78,6 @@ class TestDiaryNotionInstructions:
             "blocked",
             "block_reason",
             "carryover",
-            "review_status",
-            "last_reviewed",
             "parent_index",
             "depends_on_indices",
         ]
@@ -88,6 +86,12 @@ class TestDiaryNotionInstructions:
         for field in fields:
             assert field in DIARY_NOTION_SLASH_COMMAND
             assert field in codex_content
+
+        # Review state is a human judgement made later, so the contract must
+        # not invite the agent to author it.
+        for field in ("review_status", "last_reviewed"):
+            assert field not in DIARY_NOTION_SLASH_COMMAND
+            assert field not in codex_content
         assert "full diff" in DIARY_NOTION_SLASH_COMMAND
         assert "formatting-only" in codex_content
         assert "반드시 한국어로 작성" in DIARY_NOTION_SLASH_COMMAND
