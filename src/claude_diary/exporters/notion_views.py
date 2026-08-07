@@ -509,7 +509,7 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             prop_map,
             visible=["Name", "Status", "Project", "Task Group", "Date"],
             hidden=hierarchy_hidden,
-            sorts=[_date_desc_sort()],
+            sorts=[_date_desc_sort(), _task_index_asc_sort()],
             subtasks=hierarchy_subtasks,
         ),
         _view_spec(
@@ -519,7 +519,7 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             prop_map,
             visible=["Name", "Status", "Priority", "Next Action", "Project"],
             filter_body=_relative_today_filter(),
-            sorts=[_priority_asc_sort(), _date_desc_sort()],
+            sorts=[_priority_asc_sort(), _date_desc_sort(), _task_index_asc_sort()],
             relative_today=True,
             today=today,
         ),
@@ -530,7 +530,7 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             prop_map,
             visible=["Name", "Priority", "Block Reason", "Next Action", "Project"],
             filter_body=_blocked_filter(),
-            sorts=[_priority_asc_sort(), _date_desc_sort()],
+            sorts=[_priority_asc_sort(), _date_desc_sort(), _task_index_asc_sort()],
         ),
         _view_spec(
             "전날 미완료",
@@ -539,7 +539,7 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             prop_map,
             visible=["Name", "Status", "Priority", "Next Action", "Date"],
             filter_body=_unfinished_before_today_filter(),
-            sorts=[_priority_asc_sort(), _date_desc_sort()],
+            sorts=[_priority_asc_sort(), _date_desc_sort(), _task_index_asc_sort()],
             relative_today=True,
             today=today,
         ),
@@ -550,7 +550,7 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             prop_map,
             visible=["Name", "Status", "Project", "Date"],
             group_by=_group_by(prop_map, "Task Group"),
-            sorts=[_date_desc_sort()],
+            sorts=[_date_desc_sort(), _task_index_asc_sort()],
         ),
     ]
 
@@ -705,6 +705,17 @@ def _priority_asc_sort():
     return {"property": "Priority", "direction": "ascending"}
 
 
+def _task_index_asc_sort():
+    """Tie-break within a day by the order the tasks were worked.
+
+    Every row a push creates carries the same `Date`, so `Date` alone leaves
+    them tied and Notion orders them arbitrarily. `Task Index` already records
+    the position of each task within its push, and a sort may reference a
+    hidden property — so the work order shows up without widening the table.
+    """
+    return {"property": "Task Index", "direction": "ascending"}
+
+
 def _verify_view(view, spec, prop_map, today):
     reasons = []
     if view.get("type") != "table":
@@ -738,6 +749,11 @@ def _verify_view(view, spec, prop_map, today):
     if spec["name"] == "Blocked":
         if not _has_checkbox_filter(view.get("filter"), "Blocked", True, prop_map):
             reasons.append("missing Blocked=true filter")
+
+    # Every managed view tie-breaks on work order, so an existing view that
+    # predates this sort gets repaired rather than left ordering arbitrarily.
+    if not _has_task_index_sort(view.get("sorts"), prop_map):
+        reasons.append("missing Task Index ascending tie-break sort")
 
     if spec["name"] == "전날 미완료":
         if not _has_date_before_today_filter(view.get("filter"), prop_map, today):
@@ -806,6 +822,15 @@ def _has_date_desc_sort(sorts, prop_map):
     for sort in sorts or []:
         prop = sort.get("property") or sort.get("property_id")
         if prop in date_keys and sort.get("direction") == "descending":
+            return True
+    return False
+
+
+def _has_task_index_sort(sorts, prop_map):
+    keys = {"Task Index", _prop_id(prop_map, "Task Index")}
+    for sort in sorts or []:
+        prop = sort.get("property") or sort.get("property_id")
+        if prop in keys and sort.get("direction") == "ascending":
             return True
     return False
 
