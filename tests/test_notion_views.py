@@ -217,40 +217,51 @@ class TestCoreViewsEnsurer:
         from claude_diary.exporters.notion_views import ENSURED_VIEW_NAMES
         assert result.created == list(ENSURED_VIEW_NAMES)
         assert result.ok()
-        assert len(client.created_payloads) == 10
+        assert len(client.created_payloads) == 5
 
         by_name = {payload["name"]: payload for payload in client.created_payloads}
         hierarchy = by_name["작업 계층"]
         hierarchy_config = hierarchy["configuration"]
         # subtasks must point at the NATIVE child relation, not the legacy one
         assert hierarchy_config["subtasks"]["property_id"] == "sub_item_id"
-        assert _visible(hierarchy, "parent_item_id") is True   # native parent shown
         assert _visible(hierarchy, "parent_id") is False       # legacy Parent Task hidden
         assert _visible(hierarchy, "subitems_id") is False     # legacy Sub-items hidden
         assert _visible(hierarchy, "depends_id") is False
-        assert _visible(hierarchy, "work_period_id") is True
         assert _visible(hierarchy, "session_id") is False
+        # Off-spec columns are hidden even though the spec never names them.
+        assert _visible(hierarchy, "work_period_id") is False
+        assert _visible(hierarchy, "review_status_id") is False
+        assert _visible(hierarchy, "carryover_id") is False
 
         today = by_name["오늘 작업"]
         assert today["filter"] == {"property": "Date", "date": {"equals": "today"}}
-        assert today["sorts"] == [{"property": "Date", "direction": "descending"}]
+        assert today["sorts"] == [
+            {"property": "Priority", "direction": "ascending"},
+            {"property": "Date", "direction": "descending"},
+        ]
 
-        assert by_name["상태별"]["configuration"]["group_by"]["property_id"] == "status_id"
-        assert by_name["목적별"]["configuration"]["group_by"]["property_id"] == "purpose_id"
-        assert by_name["프로젝트별"]["configuration"]["group_by"]["property_id"] == "project_id"
-        assert by_name["오늘 우선순위"]["filter"]["and"][0] == {
-            "property": "Date",
-            "date": {"equals": "today"},
-        }
-        assert by_name["오늘 우선순위"]["sorts"][0] == {
-            "property": "Priority",
-            "direction": "ascending",
-        }
         assert by_name["Blocked"]["filter"] == {
             "property": "Blocked",
             "checkbox": {"equals": True},
         }
         assert by_name["작업 그룹별"]["configuration"]["group_by"]["property_id"] == "task_group_id"
+        assert by_name["전날 미완료"]["filter"]["and"][0] == {
+            "property": "Date",
+            "date": {"before": "today"},
+        }
+
+    def test_every_view_is_capped_at_five_columns(self):
+        specs = _build_core_view_specs("db1", "ds1", _prop_map(), "2026-06-02")
+        for spec in specs:
+            assert len(spec["visible"]) <= 5, spec["name"]
+
+    def test_retired_views_are_reported_not_deleted(self):
+        stale = _matching_views() + [{"id": "old", "name": "리뷰 필요", "type": "table"}]
+        client = FakeViewsClient(views=stale)
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+
+        assert client.created_payloads == []
+        assert any("리뷰 필요" in w for w in result.warnings)
 
     def test_verifies_existing_matching_views(self):
         client = FakeViewsClient(views=_matching_views())
@@ -335,7 +346,10 @@ class TestCoreViewsEnsurer:
         view_id, payload = client.updated_payloads[0]
         assert view_id == "오늘 작업_id"
         assert payload["filter"] == {"property": "Date", "date": {"equals": "today"}}
-        assert payload["sorts"] == [{"property": "Date", "direction": "descending"}]
+        assert payload["sorts"] == [
+            {"property": "Priority", "direction": "ascending"},
+            {"property": "Date", "direction": "descending"},
+        ]
 
     def test_dry_run_plans_required_mismatch_update(self):
         views = _matching_views()
@@ -414,33 +428,34 @@ class TestCoreViewsEnsurer:
         }
         assert any("relative today filter failed" in w for w in result.warnings)
 
-    def test_today_priority_relative_filter_fallback_keeps_blocked_filter(self):
-        views = [v for v in _matching_views() if v["name"] != "오늘 우선순위"]
+    def test_carryover_relative_filter_fallback_keeps_status_filter(self):
+        views = [v for v in _matching_views() if v["name"] != "전날 미완료"]
         client = FailingCreateClient(
             views=views,
             fail_when=lambda payload: (
-                payload["name"] == "오늘 우선순위"
-                and payload.get("filter", {}).get("and", [{}])[0].get("date", {}).get("equals") == "today"
+                payload["name"] == "전날 미완료"
+                and payload.get("filter", {}).get("and", [{}])[0].get("date", {}).get("before") == "today"
             ),
         )
 
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
 
         assert result.ok()
-        assert result.created == ["오늘 우선순위"]
+        assert result.created == ["전날 미완료"]
         assert client.created_payloads[-1]["filter"] == {
             "and": [
-                {"property": "Date", "date": {"equals": "2026-06-02"}},
-                {"property": "Blocked", "checkbox": {"equals": False}},
+                {"property": "Date", "date": {"before": "2026-06-02"}},
+                {"property": "Status", "select": {"does_not_equal": "Deployed"}},
             ]
         }
         assert any("relative today filter failed" in w for w in result.warnings)
 
     def test_update_payload_omits_empty_filter_and_sorts(self):
-        spec = _build_core_view_specs("db1", "ds1", _prop_map(), "2026-06-02")[2]
+        from claude_diary.exporters.notion_views import _view_spec
+        spec = _view_spec("컬럼만", "db1", "ds1", _prop_map(), visible=["Name", "Status"])
         payload = _update_payload_for_spec(spec)
 
-        assert payload["name"] == "상태별"
+        assert payload["name"] == "컬럼만"
         assert "configuration" in payload
         assert "filter" not in payload
         assert "sorts" not in payload
