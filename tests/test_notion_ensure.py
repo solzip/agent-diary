@@ -100,8 +100,8 @@ class TestCmdNotionEnsure:
         ensurer_cls.assert_not_called()
         captured = capsys.readouterr()
         assert "Database: missing" in captured.out
-        assert "+ create 5 core views" in captured.out
-        assert "+ create 5 operating views" in captured.out
+        assert "+ create 3 core views" in captured.out
+        assert "+ create 2 operating views" in captured.out
 
     def test_conflict_exits_1(self, capsys):
         exporter = MagicMock()
