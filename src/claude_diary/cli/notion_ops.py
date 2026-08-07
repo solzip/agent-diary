@@ -2,10 +2,17 @@
 
 import json
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 from claude_diary.config import load_config
 from claude_diary.log import configure_from_config
+from claude_diary.cli.notion_common import (
+    date_start_value as _date_start,
+    plain_text as _plain_text,
+    resolve_year_and_today as _resolve_year_and_today,
+    select_value as _select,
+    title_value as _title,
+)
 from claude_diary.cli.notion_push import _resolve_credentials, _print_setup_hint
 from claude_diary.exporters.notion_hierarchical import (
     NotionHierarchicalExporter,
@@ -72,14 +79,6 @@ def cmd_notion_ops(args):
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
         _print_ops_report(year, db_id, report)
-
-
-def _resolve_year_and_today(config, explicit_year):
-    tz_offset = config.get("timezone_offset", 9)
-    local_tz = timezone(timedelta(hours=tz_offset))
-    now = datetime.now(local_tz)
-    year = explicit_year or now.year
-    return year, now.strftime("%Y-%m-%d")
 
 
 def build_ops_report(rows, today, stale_days=7, parent_property_name="Parent Task"):
@@ -378,31 +377,13 @@ def _days_since(date_str, today):
     return (end - start).days
 
 
-def _title(prop):
-    values = (prop or {}).get("title") or []
-    text = "".join(_plain_text(item) for item in values).strip()
-    return text or "(untitled)"
-
-
 def _rich_text(prop):
     values = (prop or {}).get("rich_text") or []
     return "".join(_plain_text(item) for item in values).strip()
 
 
-def _plain_text(item):
-    return item.get("plain_text") or ((item.get("text") or {}).get("content")) or ""
-
-
-def _select(prop):
-    return ((prop or {}).get("select") or {}).get("name") or ""
-
-
 def _checkbox(prop):
     return bool((prop or {}).get("checkbox"))
-
-
-def _date_start(prop):
-    return ((prop or {}).get("date") or {}).get("start") or ""
 
 
 def _relation_ids(prop):
