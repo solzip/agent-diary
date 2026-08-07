@@ -414,6 +414,36 @@ class NotionHierarchicalExporter:
                 return rows
             cursor = resp.get("next_cursor")
 
+    def get_task_group_session_ids(self, db_id, task_group):
+        """Return the distinct Session IDs already filed under a task group.
+
+        Continuation work is recorded as a new row sharing the previous row's
+        `Task Group` (never by widening the earlier row), so the number of
+        distinct sessions under that name is how far along the group is.
+        Archived rows are excluded by Notion's query, so `--force` re-pushes
+        do not inflate the count.
+        """
+        body = {
+            "filter": {"property": "Task Group", "select": {"equals": task_group}},
+            "page_size": 100,
+        }
+        session_ids = set()
+        cursor = None
+        while True:
+            if cursor:
+                body["start_cursor"] = cursor
+            resp = self._request("POST", "/databases/%s/query" % db_id, dict(body))
+            for row in resp.get("results", []):
+                prop = (row.get("properties") or {}).get("Session ID") or {}
+                text = "".join(
+                    part.get("plain_text", "") for part in prop.get("rich_text") or []
+                ).strip()
+                if text:
+                    session_ids.add(text)
+            if not resp.get("has_more"):
+                return session_ids
+            cursor = resp.get("next_cursor")
+
     def create_row(self, db_id, properties, body_blocks):
         """Create a new row (page) in the database with properties + body blocks."""
         body = {
@@ -445,6 +475,19 @@ class NotionHierarchicalExporter:
                 "Parent Task": {
                     "relation": [{"id": parent_row_id}]
                 }
+            }
+        })
+
+    def update_row_review(self, row_id, status, reviewed_date):
+        """PATCH a row's review state.
+
+        Only `diary-notion review --apply` calls this: review is a human
+        judgement, so no automatic path may set it.
+        """
+        self._request("PATCH", "/pages/%s" % row_id, {
+            "properties": {
+                "Review Status": {"select": {"name": status}},
+                "Last Reviewed": {"date": {"start": reviewed_date}},
             }
         })
 
