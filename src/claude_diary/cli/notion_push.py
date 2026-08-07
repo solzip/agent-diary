@@ -205,10 +205,16 @@ def _resolve_task_group_ordinals(exporter, year, tasks, session_id):
     for group in groups:
         try:
             prior = set(exporter.get_task_group_session_ids(db_id, group) or [])
-            prior.discard(session_id)
-            ordinals[group] = len(prior) + 1
+        except NotionBadRequest:
+            # Notion rejects a select filter naming an option that does not
+            # exist yet, which is exactly what a brand-new task group looks
+            # like. That is not an error: it means no prior session.
+            prior = set()
         except Exception as e:
             logger.warning("Task group ordinal lookup failed for %s: %s", group, e)
+            continue
+        prior.discard(session_id)
+        ordinals[group] = len(prior) + 1
     return ordinals
 
 

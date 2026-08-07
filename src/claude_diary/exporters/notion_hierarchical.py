@@ -549,12 +549,18 @@ class NotionHierarchicalExporter:
 
 
 def short_error(resp):
-    """Extract a one-line error description from a Notion error response."""
+    """Extract a one-line error description from a Notion error response.
+
+    Capped: Notion's select-option errors enumerate every existing option,
+    which runs to thousands of characters and buries the actual message.
+    """
     try:
         data = resp.json()
-        return data.get("message") or data.get("code") or resp.text[:200]
+        message = data.get("message") or data.get("code") or resp.text
     except Exception:
-        return resp.text[:200]
+        message = resp.text
+    message = (message or "")[:200]
+    return message
 
 
 def _self_relation(db_id):
