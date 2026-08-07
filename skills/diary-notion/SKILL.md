@@ -74,14 +74,14 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
      - Use `Test` for tester, QA, validation, and verification-only sessions unless another enum is clearly more accurate
-   - `work_period`: actual work period; use today's `YYYY-MM-DD` by default, or `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for a range
-   - `priority`: one of `P0`, `P1`, `P2`, `P3`; use `P0` for urgent/blocking work, `P1` for today's highest priority, `P2` for normal follow-up, and `P3` for low priority
+   - Omit any optional field you cannot ground in what actually happened this session. A guessed value is worse than a blank one: it reads as a real signal in Notion and in `working-diary diary-notion ops`
+   - `work_period`: only for work that genuinely spans several days, as `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}`. Omit it for single-day work — the CLI records the date the command ran
+   - `priority`: `P0`, `P1`, `P2`, or `P3`, only when the session gives a real reason to rank it — `P0` when it blocks other work, `P1` when the user asked for it next. Omit it rather than defaulting everything to `P2`
    - `next_action`: 0-1 concrete Korean action that can be started next
    - `blocked`: `true` only when the task cannot continue without external decision, permission, or information
    - `block_reason`: Korean reason when `blocked` is `true`
    - `carryover`: `true` when this row continues unfinished work from a previous day/session
-   - `review_status`: `Needs Review`, `Reviewed`, or `Deferred`
-   - `last_reviewed`: `YYYY-MM-DD` when this work was actually reviewed
+   - Do not author review state. Every row is filed as `Needs Review`; only a human running `working-diary diary-notion review --apply` moves it to `Reviewed`
    - `task_group`: stable kebab-case/snake-case group for multi-session work
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy and Notion sub-items
    - `depends_on_indices`: zero-based indices in this push, or `[]`
@@ -136,14 +136,11 @@ Split the current Codex session into task-sized entries and push them to Notion.
       },
       "status": "Implementation",
       "purpose": "Feature",
-      "work_period": "2026-06-02",
       "priority": "P1",
       "next_action": "...",
       "blocked": false,
       "block_reason": "",
       "carryover": false,
-      "review_status": "Needs Review",
-      "last_reviewed": "2026-06-02",
       "task_group": "working-diary-notion",
       "parent_index": null,
       "depends_on_indices": [],
