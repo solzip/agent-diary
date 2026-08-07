@@ -236,6 +236,7 @@ class TestCoreViewsEnsurer:
         assert today["sorts"] == [
             {"property": "Priority", "direction": "ascending"},
             {"property": "Date", "direction": "descending"},
+            {"property": "Task Index", "direction": "ascending"},
         ]
 
         assert by_name["Blocked"]["filter"] == {
@@ -252,6 +253,27 @@ class TestCoreViewsEnsurer:
         specs = _build_core_view_specs("db1", "ds1", _prop_map(), "2026-06-02")
         for spec in specs:
             assert len(spec["visible"]) <= 5, spec["name"]
+
+    def test_every_view_tie_breaks_on_work_order(self):
+        # All rows from one push share a Date, so without this the order within
+        # a day is arbitrary.
+        specs = _build_core_view_specs("db1", "ds1", _prop_map(), "2026-06-02")
+        for spec in specs:
+            assert spec["sorts"][-1] == {
+                "property": "Task Index", "direction": "ascending",
+            }, spec["name"]
+
+    def test_existing_view_without_the_tie_break_is_repaired(self):
+        views = _matching_views()
+        for view in views:
+            view["sorts"] = [s for s in view["sorts"] if s["property"] != "Task Index"]
+
+        from claude_diary.exporters.notion_views import ENSURED_VIEW_NAMES
+        client = FakeViewsClient(views=views)
+        result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
+
+        assert result.ok()
+        assert sorted(result.updated) == sorted(ENSURED_VIEW_NAMES)
 
     def test_retired_views_are_reported_not_deleted(self):
         stale = _matching_views() + [{"id": "old", "name": "리뷰 필요", "type": "table"}]
@@ -347,6 +369,7 @@ class TestCoreViewsEnsurer:
         assert payload["sorts"] == [
             {"property": "Priority", "direction": "ascending"},
             {"property": "Date", "direction": "descending"},
+            {"property": "Task Index", "direction": "ascending"},
         ]
 
     def test_dry_run_plans_required_mismatch_update(self):
