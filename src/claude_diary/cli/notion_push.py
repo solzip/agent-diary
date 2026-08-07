@@ -22,7 +22,7 @@ from datetime import datetime, timezone, timedelta
 
 from claude_diary.config import load_config
 from claude_diary.log import get_logger, configure_from_config
-from claude_diary.formatter import build_notion_blocks
+from claude_diary.formatter import build_notion_blocks, dedupe_texts
 from claude_diary.lib import notion_cache
 from claude_diary.lib.git_info import (
     get_branch_for_commit,
@@ -34,7 +34,6 @@ from claude_diary.exporters.notion_hierarchical import (
     NotionHierarchicalExporter,
     NotionAuthError,
     NotionBadRequest,
-    NotionNotFound,
     detect_subitem_relation,
 )
 
@@ -757,18 +756,7 @@ def _task_texts(*values):
             text = str(item or "").replace("\n", " ").strip()
             if text:
                 items.append(text)
-    return _dedupe_texts(items)
-
-
-def _dedupe_texts(items):
-    seen = set()
-    result = []
-    for item in items:
-        if item in seen:
-            continue
-        seen.add(item)
-        result.append(item)
-    return result
+    return dedupe_texts(items)
 
 
 def _task_commit_hashes(task):

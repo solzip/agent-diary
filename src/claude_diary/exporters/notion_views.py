@@ -11,6 +11,7 @@ from claude_diary.exporters.notion_hierarchical import (
     NotionBadRequest,
     NotionNotFound,
     detect_subitem_relation,
+    short_error,
 )
 
 
@@ -114,7 +115,7 @@ class NotionViewsClient:
         except ImportError:
             raise RuntimeError(
                 "Notion views client requires 'requests'. Install with: pip install requests"
-            )
+            ) from None
 
     def _headers(self):
         return {
@@ -142,7 +143,7 @@ class NotionViewsClient:
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(2 ** attempt)
                     continue
-                raise RuntimeError("Notion Views API network error: %s" % e)
+                raise RuntimeError("Notion Views API network error: %s" % e) from e
 
             status = resp.status_code
             if status in (200, 201):
@@ -150,15 +151,15 @@ class NotionViewsClient:
 
             if status == 401 or status == 403:
                 raise NotionAuthError(
-                    "Notion Views API %d: %s" % (status, _short_error(resp))
+                    "Notion Views API %d: %s" % (status, short_error(resp))
                 )
             if status == 404:
                 raise NotionNotFound(
-                    "Notion Views API 404: %s" % _short_error(resp)
+                    "Notion Views API 404: %s" % short_error(resp)
                 )
             if status == 400:
                 raise NotionBadRequest(
-                    "Notion Views API 400: %s" % _short_error(resp)
+                    "Notion Views API 400: %s" % short_error(resp)
                 )
             if status == 429:
                 retry_after = int(resp.headers.get("Retry-After", "1"))
@@ -172,12 +173,12 @@ class NotionViewsClient:
                     continue
                 raise RuntimeError(
                     "Notion Views API %d after %d retries: %s" %
-                    (status, MAX_RETRIES, _short_error(resp))
+                    (status, MAX_RETRIES, short_error(resp))
                 )
 
             raise RuntimeError(
                 "Notion Views API unexpected status %d: %s" %
-                (status, _short_error(resp))
+                (status, short_error(resp))
             )
 
         raise RuntimeError("Notion Views API failed after retries: %s" % last_error)
@@ -492,7 +493,6 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             "filter_scope": "parents_and_subitems",
             "toggle_column_id": _prop_id(prop_map, "Name"),
         }
-    native_parent = native["parent_name"] if native else "Parent Task"
     # Hide the legacy Parent Task column only once a native relation supersedes it.
     hierarchy_hidden = ["Depends On", "Sub-items"]
     if native:
@@ -969,9 +969,3 @@ def _infer_property_type(prop):
     return "unknown"
 
 
-def _short_error(resp):
-    try:
-        data = resp.json()
-        return data.get("message") or data.get("code") or resp.text[:200]
-    except Exception:
-        return resp.text[:200]

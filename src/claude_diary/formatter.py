@@ -1,7 +1,6 @@
 """Markdown formatter — converts entry_data to diary markdown."""
 
-import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 from claude_diary.i18n import get_label
 
@@ -13,7 +12,9 @@ APPENDIX_ITEM_LIMIT = 10
 
 def format_entry(entry_data, lang="ko"):
     """Format entry_data into a markdown diary entry."""
-    L = lambda key: get_label(key, lang)
+    def L(key):
+        return get_label(key, lang)
+
     time = entry_data.get("time", "")
     project = entry_data.get("project", "unknown")
 
@@ -138,7 +139,9 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
     Skipped sections render no heading (page doesn't get noisy with empty heads).
     Long strings are truncated to RICH_TEXT_LIMIT (Notion rich_text caps at 2000).
     """
-    L = lambda key: get_label(key, lang)
+    def L(key):
+        return get_label(key, lang)
+
     blocks = []
     normalized = normalize_notion_task(task)
 
@@ -417,7 +420,7 @@ def _merge_texts(*values):
     items = []
     for value in values:
         items.extend(_as_text_list(value))
-    return _dedupe_texts([item.replace("\n", " ").strip() for item in items if item and item.strip()])
+    return dedupe_texts([item.replace("\n", " ").strip() for item in items if item and item.strip()])
 
 
 def _format_artifacts(value):
@@ -468,7 +471,7 @@ def _build_prompt_output_items(task):
     items = []
     items.extend(_as_text_list(appendix.get("prompt_outputs")))
     items.extend(_as_text_list(appendix.get("verification_artifacts")))
-    return _dedupe_texts(_limited_texts(items, PROMPT_OUTPUT_LIMIT, limit=1000))
+    return dedupe_texts(_limited_texts(items, PROMPT_OUTPUT_LIMIT, limit=1000))
 
 
 def _is_verification_session_task(task):
@@ -494,7 +497,7 @@ def _is_verification_session_task(task):
     return any(keyword in haystack for keyword in keywords)
 
 
-def _dedupe_texts(items):
+def dedupe_texts(items):
     seen = set()
     result = []
     for item in items:
@@ -683,7 +686,9 @@ def _truncate(text, n):
 
 def format_daily_header(date_str, lang="ko"):
     """Create daily diary file header."""
-    L = lambda key: get_label(key, lang)
+    def L(key):
+        return get_label(key, lang)
+
 
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
