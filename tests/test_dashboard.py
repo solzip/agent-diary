@@ -1,9 +1,8 @@
 """Tests for dashboard.py — generate_dashboard HTML generation."""
 
-import json
 import os
 from collections import Counter
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from claude_diary.dashboard import generate_dashboard, _render_html
 
@@ -188,6 +187,7 @@ class TestGenerateDashboard:
         output_path = generate_dashboard(str(tmp_path), months=1)
         dashboard_dir = os.path.join(str(tmp_path), "dashboard")
         assert os.path.isdir(dashboard_dir)
+        assert os.path.isfile(output_path)
 
     @patch("claude_diary.dashboard.load_config")
     @patch("claude_diary.dashboard.parse_daily_file")

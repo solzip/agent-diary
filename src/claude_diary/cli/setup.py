@@ -2,7 +2,6 @@
 
 import json
 import os
-import sys
 
 
 HOOK_COMMAND = "python -m claude_diary.hook"

@@ -3,7 +3,6 @@
 import importlib
 import json
 import os
-import sys
 
 from claude_diary.log import get_logger
 

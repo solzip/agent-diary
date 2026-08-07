@@ -1,11 +1,8 @@
 """Tests for configuration management."""
 
 import json
-import os
-import tempfile
-import pytest
 
-from claude_diary.config import load_config, save_config, get_config_dir, DEFAULT_CONFIG
+from claude_diary.config import load_config, save_config
 
 
 class TestLoadConfig:

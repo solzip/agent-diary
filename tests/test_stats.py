@@ -1,6 +1,5 @@
 """Tests for statistics engine."""
 
-import os
 
 from claude_diary.lib.stats import parse_daily_file
 
@@ -25,7 +24,7 @@ class TestParseDailyFileBasic:
         f = tmp_path / "2026-03-17.md"
         f.write_bytes(b"\x80\x81\x82")
         # Force an error by making file unreadable via a mock
-        from unittest.mock import patch, mock_open
+        from unittest.mock import patch
         with patch("builtins.open", side_effect=PermissionError("no access")):
             result = parse_daily_file(str(f))
         assert result["sessions"] == 0

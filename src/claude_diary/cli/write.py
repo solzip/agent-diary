@@ -218,7 +218,8 @@ def _write_manual_entry(entry_data, manual_dir, lang):
         print("[claude-diary write] Failed to write diary file.", file=sys.stderr)
         print("  target: %s" % target, file=sys.stderr)
         print("  error: %s" % e, file=sys.stderr)
-        print("  hint: check CLAUDE_DIARY_MANUAL_DIR or `claude-diary config --set manual_diary_dir=<path>`", file=sys.stderr)
+        print("  hint: check CLAUDE_DIARY_MANUAL_DIR or"
+              " `claude-diary config --set manual_diary_dir=<path>`", file=sys.stderr)
         sys.exit(1)
 
     return "appended to" if existed else "created", target

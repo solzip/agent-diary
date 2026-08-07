@@ -1,6 +1,5 @@
 """Tests for `claude-diary diary-notion init` interactive setup."""
 
-import json
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -10,10 +9,6 @@ from claude_diary.cli.notion_init import (
     parse_page_id,
     _verify_access,
     _save_credentials,
-)
-from claude_diary.exporters.notion_hierarchical import (
-    NotionAuthError,
-    NotionNotFound,
 )
 
 

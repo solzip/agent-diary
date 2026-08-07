@@ -1,7 +1,5 @@
 """Tests for Notion ID cache."""
 
-import json
-import os
 from unittest.mock import patch
 
 from claude_diary.lib import notion_cache

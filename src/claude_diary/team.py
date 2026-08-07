@@ -4,7 +4,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -255,7 +254,6 @@ def team_weekly_report(team_repo_path, target_date=None, lang="ko"):
     local_tz = timezone(timedelta(hours=tz_offset))
 
     if target_date:
-        from datetime import date as date_cls
         target = datetime.strptime(target_date, "%Y-%m-%d").date()
     else:
         target = datetime.now(local_tz).date()

@@ -114,7 +114,7 @@ def _compute_source_checksum():
     # Hash all .py source files for comprehensive tamper detection
     src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    for root, dirs, files in os.walk(src_dir):
+    for root, _dirs, files in os.walk(src_dir):
         for fname in sorted(files):
             if fname.endswith(".py"):
                 full_path = os.path.join(root, fname)

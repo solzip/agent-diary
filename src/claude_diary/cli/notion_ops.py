@@ -291,7 +291,8 @@ def _suggest_parent_status(parent, children):
     if any(child["blocked"] for child in children):
         if parent["blocked"]:
             return None
-        return _parent_suggestion(parent, parent["status"] or "Implementation", "at least one child task is blocked", children)
+        return _parent_suggestion(parent, parent["status"] or "Implementation",
+                                  "at least one child task is blocked", children)
     if "Testing" in child_statuses and parent["status"] not in ("Testing", "Deployed"):
         return _parent_suggestion(parent, "Testing", "at least one child task is in Testing", children)
     if "Implementation" in child_statuses and parent["status"] in ("", "Discussion", "Design"):

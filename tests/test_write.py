@@ -85,7 +85,7 @@ class TestFindLatestTranscript:
         encoded = write_mod._encode_cwd(cwd)
         proj_dir = tmp_path / ".claude" / "projects" / encoded
 
-        old = self._make_jsonl(str(proj_dir), "old.jsonl", mtime=time.time() - 1000)
+        self._make_jsonl(str(proj_dir), "old.jsonl", mtime=time.time() - 1000)
         new = self._make_jsonl(str(proj_dir), "new.jsonl", mtime=time.time())
 
         result = write_mod._find_latest_transcript(cwd)
@@ -179,7 +179,7 @@ class TestCmdWriteIntegration:
         return cwd
 
     def test_creates_then_appends(self, tmp_path, monkeypatch, capsys):
-        cwd = self._setup_fake_session(tmp_path, monkeypatch)
+        self._setup_fake_session(tmp_path, monkeypatch)
         args = types.SimpleNamespace()
 
         write_mod.cmd_write(args)
