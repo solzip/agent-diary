@@ -301,6 +301,19 @@ class TestTaskGroupOrdinals:
 
         assert ordinals == {"auth-refactor": 2}
 
+    def test_unknown_select_option_means_first_session(self):
+        # Notion 400s on a select filter naming an option that does not exist
+        # yet — which is what every brand-new task group looks like.
+        from claude_diary.cli.notion_push import _resolve_task_group_ordinals
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db"
+        mock_exp.get_task_group_session_ids.side_effect = NotionBadRequest(
+            'select option "auth-refactor" not found for property "Task Group"'
+        )
+
+        tasks = [{"title": "A", "task_group": "auth-refactor"}]
+        assert _resolve_task_group_ordinals(mock_exp, 2026, tasks, "s1") == {"auth-refactor": 1}
+
     def test_lookup_failure_is_not_fatal(self):
         from claude_diary.cli.notion_push import _resolve_task_group_ordinals
         mock_exp = MagicMock()
