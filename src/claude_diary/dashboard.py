@@ -168,9 +168,11 @@ def _render_html(total_sessions, total_files_created, total_files_modified,
 <title>Claude Diary Dashboard</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       background: #0d1117; color: #c9d1d9; padding: 24px; }
 h1 { color: #58a6ff; margin-bottom: 24px; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              gap: 16px; margin-bottom: 32px; }
 .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; text-align: center; }
 .stat-card .value { font-size: 2em; font-weight: bold; color: #58a6ff; }
 .stat-card .label { font-size: 0.9em; color: #8b949e; margin-top: 4px; }
@@ -178,7 +180,8 @@ h1 { color: #58a6ff; margin-bottom: 24px; }
 .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
 .chart-card h3 { color: #c9d1d9; margin-bottom: 16px; }
 .bar-row { display: flex; align-items: center; margin-bottom: 10px; }
-.bar-label { min-width: 100px; max-width: 140px; font-size: 0.85em; color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+.bar-label { min-width: 100px; max-width: 140px; font-size: 0.85em; color: #c9d1d9;
+             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
 .bar-track { flex: 1; height: 18px; background: #21262d; border-radius: 4px; overflow: hidden; }
 .bar-fill { height: 100%%; border-radius: 4px; transition: width 0.3s; }
 .bar-value { min-width: 36px; text-align: right; font-size: 0.85em; color: #8b949e; margin-left: 10px; }

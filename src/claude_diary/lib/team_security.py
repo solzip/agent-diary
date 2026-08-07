@@ -3,7 +3,6 @@
 import fnmatch
 import os
 import re
-import sys
 
 
 # ── Path Masking ──
@@ -206,5 +205,6 @@ def apply_access_filter(entry_data, access_level):
         "project": entry_data.get("project", ""),
         "categories": entry_data.get("categories", []),
         "code_stats": entry_data.get("code_stats"),
-        "git_info": {"branch": entry_data.get("git_info", {}).get("branch", "")} if entry_data.get("git_info") else None,
+        "git_info": ({"branch": entry_data.get("git_info", {}).get("branch", "")}
+                     if entry_data.get("git_info") else None),
     }

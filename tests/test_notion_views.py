@@ -2,11 +2,9 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from claude_diary.exporters.notion_hierarchical import NotionBadRequest
 from claude_diary.exporters.notion_views import (
-    CORE_VIEW_NAMES,
     NOTION_VIEWS_API_VERSION,
     CoreViewsEnsurer,
     NotionViewsClient,

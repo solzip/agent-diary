@@ -140,15 +140,20 @@ def build_conflict_plan(name, reason):
     """Return a structured read-only repair plan for an ensure problem."""
     category = classify_conflict_reason(reason)
     if category == "missing_filter":
-        return _plan(name, reason, category, "rerun `working-diary diary-notion ensure` to repair the view filter", True)
+        return _plan(name, reason, category,
+                     "rerun `working-diary diary-notion ensure` to repair the view filter", True)
     if category == "missing_property":
-        return _plan(name, reason, category, "rerun `working-diary diary-notion ensure` to add the missing schema property", True)
+        return _plan(name, reason, category,
+                     "rerun `working-diary diary-notion ensure` to add the missing schema property", True)
     if category == "subitem_missing":
         return _plan(name, reason, category, "enable Notion Sub-items in the Entries DB UI, then rerun ensure", False)
     if category == "permission_or_auth":
-        return _plan(name, reason, category, "share the root page/database with the integration or refresh the token", False)
+        return _plan(name, reason, category,
+                     "share the root page/database with the integration or refresh the token", False)
     if category == "api_failure":
-        return _plan(name, reason, category, "inspect the Notion API error, then rerun ensure after fixing the payload or permission issue", False)
+        return _plan(name, reason, category,
+                     "inspect the Notion API error, then rerun ensure after fixing the payload"
+                     " or permission issue", False)
     return _plan(name, reason, category, "inspect the reported issue, then rerun ensure", False)
 
 

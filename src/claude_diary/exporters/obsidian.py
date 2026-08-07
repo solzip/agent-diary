@@ -1,7 +1,6 @@
 """Obsidian exporter — copies diary entries to an Obsidian vault."""
 
 import os
-import shutil
 
 from claude_diary.exporters.base import BaseExporter
 

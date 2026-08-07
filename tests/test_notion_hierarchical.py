@@ -1,6 +1,6 @@
 """Tests for NotionHierarchicalExporter — HTTP layer + page/DB/row CRUD."""
 
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 import pytest
 
