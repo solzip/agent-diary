@@ -1,5 +1,18 @@
 # Code Analysis Results
 
+> **SUPERSEDED — 이 문서는 2026-03-17 기준 v4.1.0 스냅샷입니다. 현재 코드 기준으로 읽지 마세요.**
+>
+> 아래 지적 대부분은 이미 해결됐습니다. 특히:
+>
+> - `pyproject.toml`의 build backend는 `setuptools.build_meta`로 정상 (C5)
+> - `cli.py` 823줄 단일 파일은 v4.2.0에서 `cli/` 서브패키지로 분리됨 (I5)
+> - `core.py`의 예외 묵살은 구조적 로깅으로 대체됨 (C4)
+> - 버전 문자열은 `__init__.py` 단일 출처로 통일되고 테스트가 강제함 (C1, W1)
+> - "커버리지 ~35%, core/formatter/cli 0%"는 더 이상 사실이 아님 (전체 88%)
+> - "Deployment: BLOCKED" 판정은 무효
+>
+> 새 분석이 필요하면 이 문서를 갱신하지 말고 새 파일로 작성하세요.
+
 ## Analysis Target
 - Path: `src/claude_diary/` (20 source files), `tests/` (5 test files), `working-diary-system/` (2 legacy scripts)
 - Supporting files: `pyproject.toml`, `README.md`, `README.en.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`
