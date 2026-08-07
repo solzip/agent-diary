@@ -125,12 +125,15 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
 
     Body layout:
       [body_intro callout]   - one top-level executive summary
-      ## 결과                 - up to 3 checked outcome items
-      ## 작업 한눈에          - context/scope/approach/outcome table
-      ## 영향                 - impact bullets
-      ## 검증                 - checked verification items
-      ## 리스크 / 다음 액션    - one risk callout + unchecked next-step/support items
-      ## 부록                 - collapsed developer/raw evidence toggles
+      ## 결과                 - outcomes, verification, then what is still open
+      ## 결정 / 트레이드오프   - decision bullets
+      ## 이슈 / 리스크        - risk bullets
+      ## 다음 액션 / 지원      - unchecked next-step/support items
+      ## 부록                 - collapsed work snapshot + developer/raw evidence
+
+    What the page opens on is what the session produced. The context / scope /
+    approach / state narrative says the same thing four more ways, so it is
+    folded into the appendix instead of sitting above the results.
 
     Skipped sections render no heading (page doesn't get noisy with empty heads).
     Long strings are truncated to RICH_TEXT_LIMIT (Notion rich_text caps at 2000).
@@ -144,9 +147,8 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
         blocks.append(_callout(intro, "📌"))
 
     _add_results_section(blocks, normalized, L)
-    _add_work_report_section(blocks, normalized, L)
-    _add_bullet_section(blocks, L("decisions"), normalized.get("decisions"), 3)
-    _add_bullet_section(blocks, L("issues_risks"), normalized.get("risks"), 3)
+    _add_bullet_section(blocks, L("decisions"), normalized.get("decisions"), 2)
+    _add_bullet_section(blocks, L("issues_risks"), normalized.get("risks"), 2)
     _add_next_actions_support_section(blocks, normalized, L)
 
     appendix = _build_appendix_blocks(normalized, git_info, L)
@@ -250,10 +252,16 @@ def normalize_notion_task(task):
 
 
 def _add_results_section(blocks, task, L):
+    """Render what the session produced — the reason the page exists.
+
+    Given more room than the narrative sections: outcomes and verification are
+    the concrete record, and `remaining` is the only unchecked item so an open
+    box always means work that is genuinely still open.
+    """
     summary = task.get("summary") or {}
-    outcome_items = _limited_texts(summary.get("outcomes"), 2)
-    verification_items = _limited_texts(summary.get("verification"), 1)
-    remaining_items = _limited_texts(summary.get("remaining"), 1)
+    outcome_items = _limited_texts(summary.get("outcomes"), 4)
+    verification_items = _limited_texts(summary.get("verification"), 3)
+    remaining_items = _limited_texts(summary.get("remaining"), 2)
     items = []
     items.extend((item, True) for item in outcome_items)
     items.extend((item, True) for item in verification_items)
@@ -261,11 +269,17 @@ def _add_results_section(blocks, task, L):
     if not items:
         return
     blocks.append(_heading(L("results")))
-    for item, checked in items[:4]:
+    for item, checked in items[:7]:
         blocks.append(_to_do(item, checked=checked))
 
 
-def _add_work_report_section(blocks, task, L):
+def _build_work_snapshot_toggle(task, L):
+    """Fold the context / scope / approach / state narrative into one toggle.
+
+    Four prose restatements of the same session used to sit between the intro
+    callout and the results. Kept for the record, collapsed so they no longer
+    bury what was actually produced.
+    """
     work = task.get("work") or {}
     pairs = [
         (L("context"), work.get("context")),
@@ -273,14 +287,14 @@ def _add_work_report_section(blocks, task, L):
         (L("approach"), work.get("approach")),
         (L("work_state"), work.get("state")),
     ]
-    rows = [[L("item"), L("content")]]
+    items = []
     for label, value in pairs:
         texts = _limited_texts(value, 1)
         if texts:
-            rows.append([label, texts[0]])
-    if len(rows) > 1:
-        blocks.append(_heading(L("work_report")))
-        blocks.append(_table(rows))
+            items.append("%s: %s" % (label, texts[0]))
+    if not items:
+        return None
+    return _toggle(L("work_snapshot"), [_bullet(item) for item in items])
 
 
 def _add_next_actions_support_section(blocks, task, L):
@@ -301,6 +315,9 @@ def _build_appendix_blocks(task, git_info, L):
     command_file_commit = _build_command_file_commit_items(task, git_info, L)
     raw = _build_raw_evidence_items(task, L)
 
+    snapshot = _build_work_snapshot_toggle(task, L)
+    if snapshot:
+        blocks.append(snapshot)
     if developer:
         blocks.append(_toggle(L("developer_evidence"), [_bullet(item) for item in developer]))
     if prompt_outputs:
