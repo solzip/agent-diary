@@ -1,10 +1,10 @@
 """`claude-diary diary-notion ensure` -- ensure Notion DB schema and core views."""
 
 import sys
-from datetime import datetime, timezone, timedelta
 
 from claude_diary.config import load_config
 from claude_diary.log import configure_from_config
+from claude_diary.cli.notion_common import resolve_year_and_today as _resolve_year_and_today
 from claude_diary.cli.notion_push import _resolve_credentials, _print_setup_hint
 from claude_diary.exporters.notion_hierarchical import (
     NotionHierarchicalExporter,
@@ -72,14 +72,6 @@ def cmd_notion_ensure(args):
     _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_run)
     if not result.ok():
         sys.exit(1)
-
-
-def _resolve_year_and_today(config, explicit_year):
-    tz_offset = config.get("timezone_offset", 9)
-    local_tz = timezone(timedelta(hours=tz_offset))
-    now = datetime.now(local_tz)
-    year = explicit_year or now.year
-    return year, now.strftime("%Y-%m-%d")
 
 
 def _print_missing_database_plan(root_page_id, year):
