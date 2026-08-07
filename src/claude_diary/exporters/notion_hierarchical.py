@@ -83,7 +83,7 @@ class NotionHierarchicalExporter:
         except ImportError:
             raise RuntimeError(
                 "Notion exporter requires 'requests'. Install with: pip install requests"
-            )
+            ) from None
 
     def _headers(self):
         return {
@@ -114,7 +114,7 @@ class NotionHierarchicalExporter:
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(2 ** attempt)
                     continue
-                raise RuntimeError("Notion API network error: %s" % e)
+                raise RuntimeError("Notion API network error: %s" % e) from e
 
             status = resp.status_code
             if status == 200:
@@ -122,17 +122,17 @@ class NotionHierarchicalExporter:
 
             if status == 401 or status == 403:
                 raise NotionAuthError(
-                    "Notion API %d: %s" % (status, _short_error(resp))
+                    "Notion API %d: %s" % (status, short_error(resp))
                 )
 
             if status == 404:
                 raise NotionNotFound(
-                    "Notion API 404: %s" % _short_error(resp)
+                    "Notion API 404: %s" % short_error(resp)
                 )
 
             if status == 400:
                 raise NotionBadRequest(
-                    "Notion API 400: %s" % _short_error(resp)
+                    "Notion API 400: %s" % short_error(resp)
                 )
 
             if status == 429:
@@ -148,12 +148,12 @@ class NotionHierarchicalExporter:
                     continue
                 raise RuntimeError(
                     "Notion API %d after %d retries: %s" %
-                    (status, MAX_RETRIES, _short_error(resp))
+                    (status, MAX_RETRIES, short_error(resp))
                 )
 
             raise RuntimeError(
                 "Notion API unexpected status %d: %s" %
-                (status, _short_error(resp))
+                (status, short_error(resp))
             )
 
         raise RuntimeError("Notion API failed after retries: %s" % last_error)
@@ -548,7 +548,7 @@ class NotionHierarchicalExporter:
         ]
 
 
-def _short_error(resp):
+def short_error(resp):
     """Extract a one-line error description from a Notion error response."""
     try:
         data = resp.json()
