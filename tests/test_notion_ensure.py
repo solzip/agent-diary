@@ -161,3 +161,15 @@ class TestBuildConflictPlan:
         assert plan["category"] == "permission_or_auth"
         assert plan["apply_supported"] is False
         assert "refresh the token" in plan["action"]
+
+
+class TestRetiredViewPlan:
+    def test_retired_view_warning_is_not_classified_as_unknown(self):
+        from claude_diary.cli.notion_ensure import build_conflict_plan
+        reason = "no longer managed — delete by hand in Notion if unused: 상태별, 리뷰 필요"
+        plan = build_conflict_plan("warning", reason)
+
+        assert plan["category"] == "retired_view"
+        assert plan["apply_supported"] is False
+        # Rerunning ensure does nothing for this one, so it must not say to.
+        assert "rerun changes nothing" in plan["action"]
