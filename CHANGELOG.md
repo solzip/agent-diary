@@ -31,10 +31,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`lib/git_info.py` 확장**: `get_branch_for_commit`, `get_head_branch`, `get_commit_info`, `get_diff_stat_for_commits`
 - **테스트 보강**: Notion Purpose, Codex plugin/skills, Codex JSON input 경로 검증 (전체 583 통과)
 
+- **`working-diary diary-notion review`**: 검토 대기 row를 읽기 전용으로 나열하고, `--apply`로 `Reviewed` + `Last Reviewed=오늘` 기록. 검토 상태를 사람 소유로 전환 — push는 항상 `Needs Review`로 기록하고 에이전트는 이 필드를 작성하지 않음
+- **작업 그룹 차수**: 같은 `Task Group`에 이미 기록된 세션 수를 세어 제목에 `(N차)` 부여 (컬럼 추가 없음). 세션 단위로 집계하고 자기 세션은 제외하므로 재push해도 밀리지 않음
+
 ### Changed
 - `cli/setup.py` 일반화: `SLASH_COMMANDS` dict로 다중 슬래시 커맨드 관리
+- **Notion 뷰 10개 → 5개**: `작업 계층` / `오늘 작업` / `Blocked` / `전날 미완료` / `작업 그룹별`. 각 뷰 컬럼은 최대 5개. `_property_config`가 property map 전체를 순회해 spec에 없는 컬럼을 전부 숨기므로, 스키마가 늘어도 테이블이 넓어지지 않음. 더 이상 관리하지 않는 뷰는 `ensure`가 목록으로 보고 (자동 삭제하지 않음)
+- **Notion 본문**: 배경/범위/접근/상태 서술 표를 부록 토글로 접고 결과·검증 섹션을 확대 (성과 2→4, 검증 1→3, 상한 4→7)
+- **`Work Period`를 명령 실행일에 고정**: 단일 날짜는 실행일로 수렴, 범위는 실행일을 넘지 못하게 clamp. 에이전트가 넣은 세션 날짜나 예시 날짜가 Notion에 들어가지 않음
+- **에이전트 계약**: 근거 없는 선택 필드는 생략하도록 변경 (`priority`, `work_period`). 예시 JSON의 하드코딩 날짜 제거
+- ruff 룰 확대: `E9,F63,F7,F82` → `E4,E7,E9,E501,F,B`
+- CI가 모든 브랜치에서 실행되고 `[notion]` extra까지 설치
+
+### Fixed
+- Notion native 하위항목이 비활성일 때 계층 연결을 조용히 건너뛰던 문제 — 실패로 집계하고 입력 JSON을 보존해 재실행 가능
 - `formatter.py`: Notion API blocks 빌더 (`build_notion_blocks`) 추가 및 compact executive body 렌더링 보강
 - 설계 문서: [`docs/02-design/features/diary-notion-hierarchical.design.md`](docs/02-design/features/diary-notion-hierarchical.design.md)
+
+## [4.2.0] - 2026-04-29
+
+### Added
+- **`/diary` 슬래시 커맨드**: 세션 중 수동으로 Markdown 작업일지 작성
+- **`claude-diary install` / `uninstall`**: pip 설치 후 Claude Code Stop Hook과 슬래시 커맨드를 등록/해제
+- 오프라인 HTML 대시보드 (외부 CDN 의존 제거)
+- 구조적 로깅 (`log.py`)
+- 크로스플랫폼 경로/인코딩 fallback
+
+### Changed
+- `cli.py` 단일 파일(823줄)을 `cli/` 서브패키지로 분리
+- README 리뉴얼 + 데모 SVG + FAQ
+
+### Fixed
+- `stats`의 프로젝트별 세션 카운트 오류와 막대 정렬
 
 ## [4.1.0] - 2026-03-17 (Phase D)
 
