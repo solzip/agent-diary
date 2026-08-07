@@ -127,6 +127,11 @@ def cmd_notion_push(args):
             print("  Check: claude-diary config or run `claude-diary diary-notion init`", file=sys.stderr)
             sys.exit(1)
 
+    # Resolve after --force archiving so re-pushed rows are not counted twice.
+    _stamp_task_group_ordinals(
+        tasks, _resolve_task_group_ordinals(exporter, year, tasks, session_id)
+    )
+
     results = {"pushed": [], "skipped": [], "failed": []}
     row_ids = {}  # task_index → Notion row_id (used by 2nd pass for relations)
     auth_failed = False
@@ -172,6 +177,58 @@ def cmd_notion_push(args):
         _cleanup(input_path)
 
     sys.exit(1 if results["failed"] else 0)
+
+
+def _resolve_task_group_ordinals(exporter, year, tasks, session_id):
+    """Return {task_group: ordinal} — which session of that group this push is.
+
+    A task group is the only thing tying several days of the same work
+    together, and a bare select tag gives no sense of progress. Counting the
+    distinct sessions already filed under the name turns it into a readable
+    sequence without adding a database column. Best-effort: a query failure
+    just means no ordinal, never a failed push.
+    """
+    groups = []
+    for task in tasks:
+        group = (task.get("task_group") or "").strip()
+        if group and group not in groups:
+            groups.append(group)
+    if not groups:
+        return {}
+
+    try:
+        db_id = exporter.ensure_database(year)
+    except Exception as e:
+        logger.warning("Task group ordinal lookup skipped: %s", e)
+        return {}
+
+    ordinals = {}
+    for group in groups:
+        try:
+            prior = set(exporter.get_task_group_session_ids(db_id, group) or [])
+            prior.discard(session_id)
+            ordinals[group] = len(prior) + 1
+        except Exception as e:
+            logger.warning("Task group ordinal lookup failed for %s: %s", group, e)
+    return ordinals
+
+
+def _stamp_task_group_ordinals(tasks, ordinals):
+    """Append `(N차)` to titles continuing an existing task group.
+
+    The first session of a group is left alone — `(1차)` on every one-off task
+    would be noise. Mutates `tasks` before pass 1 so the row title, the push
+    report, and the local run artifacts all agree.
+    """
+    for task in tasks:
+        group = (task.get("task_group") or "").strip()
+        ordinal = ordinals.get(group)
+        if not ordinal or ordinal < 2:
+            continue
+        title = (task.get("title") or "").strip()
+        suffix = " (%d차)" % ordinal
+        if title and not title.endswith(suffix):
+            task["title"] = title + suffix
 
 
 def _wire_depends_on(exporter, tasks, row_ids):
@@ -243,8 +300,18 @@ def _wire_parent_tasks(exporter, year, tasks, row_ids):
         ]
 
     if not native:
+        # Report as failures rather than skipping quietly: the rows were pushed
+        # but the requested hierarchy was not, and the preserved input JSON lets
+        # the user re-run push once Sub-items is enabled in the Notion UI.
         _print_enable_subitems_hint(len(pairs))
-        return []
+        return [
+            (
+                child_idx,
+                tasks[child_idx].get("title") or "(untitled)",
+                "sub-item: native Sub-items relation is not enabled in this database",
+            )
+            for child_idx, _ in pairs
+        ]
 
     parent_prop = native["parent_name"]
     failures = []
@@ -369,7 +436,9 @@ def _gather_git_info(cwd, commit_hashes):
 
 VALID_STATUSES = {"Discussion", "Design", "Implementation", "Testing", "Deployed"}
 VALID_PRIORITIES = {"P0", "P1", "P2", "P3"}
-VALID_REVIEW_STATUSES = {"Needs Review", "Reviewed", "Deferred"}
+# Every pushed row starts unreviewed; `diary-notion review --apply` is the only
+# thing that advances it.
+DEFAULT_REVIEW_STATUS = "Needs Review"
 
 VALID_PURPOSES = {
     "Feature",
@@ -469,13 +538,11 @@ def _build_properties(task, date_str, branch, git_info, session_id, task_index, 
     if isinstance(task.get("carryover"), bool):
         props["Carryover"] = {"checkbox": task.get("carryover")}
 
-    review_status = _normalize_review_status(task.get("review_status"))
-    if review_status:
-        props["Review Status"] = {"select": {"name": review_status}}
-
-    last_reviewed = _clean_date(task.get("last_reviewed"))
-    if last_reviewed:
-        props["Last Reviewed"] = {"date": {"start": last_reviewed}}
+    # Review state is owned by the human, not by the session that produced the
+    # work: every new row files as unreviewed and only
+    # `diary-notion review --apply` can advance it. `Last Reviewed` is left
+    # unset for the same reason — at push time nobody has reviewed anything.
+    props["Review Status"] = {"select": {"name": DEFAULT_REVIEW_STATUS}}
 
     return props
 
@@ -500,29 +567,38 @@ def _project_name_from_cwd(cwd):
 
 
 def _normalize_work_period(value, fallback_date):
-    """Return a Notion date object for the actual work period."""
+    """Return a Notion date object for the actual work period.
+
+    The row is recorded on the day `push` runs, so `fallback_date` (the
+    execution date) anchors the period: a single day always collapses to it and
+    a range never ends in the future. Agents author `work_period` from session
+    context, so without this anchor a stale session date — or the date copied
+    out of the contract's example JSON — lands in Notion and drifts away from
+    the `Date` column.
+    """
+    start = ""
+    end = ""
     if isinstance(value, dict):
         start = _clean_date(value.get("start") or value.get("date"))
         end = _clean_date(value.get("end"))
-        if start:
-            result = {"start": start}
-            if end and end != start:
-                result["end"] = end
-            return result
     elif isinstance(value, str):
         raw = value.strip()
-        if raw:
-            if ".." in raw:
-                start, end = raw.split("..", 1)
-                result = {"start": _clean_date(start) or fallback_date}
-                end = _clean_date(end)
-                if end and end != result["start"]:
-                    result["end"] = end
-                return result
-            clean = _clean_date(raw)
-            if clean:
-                return {"start": clean}
-    return {"start": fallback_date}
+        if ".." in raw:
+            head, tail = raw.split("..", 1)
+            start = _clean_date(head)
+            end = _clean_date(tail)
+        else:
+            start = _clean_date(raw)
+
+    # ISO dates compare correctly as strings; "" (invalid/absent) never wins.
+    if start > fallback_date:
+        start = ""
+    if end > fallback_date:
+        end = fallback_date
+
+    if not start or not end or end <= start:
+        return {"start": fallback_date}
+    return {"start": start, "end": end}
 
 
 def _clean_date(value):
@@ -564,17 +640,6 @@ def _normalize_priority(value):
     }
     raw = aliases.get(raw, raw)
     return raw if raw in VALID_PRIORITIES else ""
-
-
-def _normalize_review_status(value):
-    raw = str(value or "").strip()
-    normalized = {
-        "needs_review": "Needs Review",
-        "needs review": "Needs Review",
-        "reviewed": "Reviewed",
-        "deferred": "Deferred",
-    }.get(raw.lower(), raw)
-    return normalized if normalized in VALID_REVIEW_STATUSES else ""
 
 
 def _clean_rich_text(value):
@@ -643,9 +708,6 @@ def _validate_push_data(data):
         priority = task.get("priority")
         if priority and not _normalize_priority(priority):
             errors.append("%s.priority must be one of: %s" % (prefix, ", ".join(sorted(VALID_PRIORITIES))))
-        review = task.get("review_status")
-        if review and not _normalize_review_status(review):
-            errors.append("%s.review_status must be one of: %s" % (prefix, ", ".join(sorted(VALID_REVIEW_STATUSES))))
         parent_idx = _get_parent_index(task)
         if parent_idx is not None and parent_idx >= len(tasks):
             errors.append("%s.parent_index points outside tasks" % prefix)

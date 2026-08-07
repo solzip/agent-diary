@@ -230,8 +230,6 @@ class TestBuildProperties:
             blocked=True,
             block_reason="Notion API 응답 확인 필요",
             carryover=True,
-            review_status="needs_review",
-            last_reviewed="2026-06-02T09:00:00",
         )
         props = _build_properties(task, "2026-06-02", "main", {}, "sess1", 0)
 
@@ -240,16 +238,35 @@ class TestBuildProperties:
         assert props["Blocked"]["checkbox"] is True
         assert props["Block Reason"]["rich_text"][0]["text"]["content"] == "Notion API 응답 확인 필요"
         assert props["Carryover"]["checkbox"] is True
+
+    def test_review_state_is_system_owned(self):
+        # The session that produced the work never gets to call it reviewed.
+        task = dict(self._base_task(), review_status="Reviewed", last_reviewed="2026-06-02")
+        props = _build_properties(task, "2026-06-02", "main", {}, "sess1", 0)
+
         assert props["Review Status"]["select"]["name"] == "Needs Review"
-        assert props["Last Reviewed"]["date"]["start"] == "2026-06-02"
+        assert "Last Reviewed" not in props
 
 
 class TestNormalizeWorkPeriod:
     def test_missing_falls_back_to_date(self):
         assert _normalize_work_period(None, "2026-05-26") == {"start": "2026-05-26"}
 
-    def test_string_date(self):
-        assert _normalize_work_period("2026-05-25", "2026-05-26") == {"start": "2026-05-25"}
+    def test_single_date_collapses_to_execution_date(self):
+        # A lone agent-supplied day is not trusted over the day push actually ran.
+        assert _normalize_work_period("2026-05-25", "2026-05-26") == {"start": "2026-05-26"}
+
+    def test_execution_date_is_kept(self):
+        assert _normalize_work_period("2026-05-26", "2026-05-26") == {"start": "2026-05-26"}
+
+    def test_future_range_end_is_clamped(self):
+        assert _normalize_work_period("2026-05-24..2026-09-01", "2026-05-26") == {
+            "start": "2026-05-24",
+            "end": "2026-05-26",
+        }
+
+    def test_future_start_falls_back(self):
+        assert _normalize_work_period("2026-09-01", "2026-05-26") == {"start": "2026-05-26"}
 
     def test_string_range(self):
         assert _normalize_work_period("2026-05-25..2026-05-26", "2026-05-26") == {
@@ -259,6 +276,102 @@ class TestNormalizeWorkPeriod:
 
     def test_invalid_falls_back(self):
         assert _normalize_work_period("not-a-date", "2026-05-26") == {"start": "2026-05-26"}
+
+
+class TestTaskGroupOrdinals:
+    def test_ordinal_counts_distinct_prior_sessions(self):
+        from claude_diary.cli.notion_push import _resolve_task_group_ordinals
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db"
+        mock_exp.get_task_group_session_ids.return_value = {"s1", "s2", "s3"}
+
+        tasks = [{"title": "A", "task_group": "auth-refactor"}]
+        ordinals = _resolve_task_group_ordinals(mock_exp, 2026, tasks, "s4")
+
+        assert ordinals == {"auth-refactor": 4}
+
+    def test_repush_of_same_session_does_not_advance_ordinal(self):
+        from claude_diary.cli.notion_push import _resolve_task_group_ordinals
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db"
+        mock_exp.get_task_group_session_ids.return_value = {"s1", "s2"}
+
+        tasks = [{"title": "A", "task_group": "auth-refactor"}]
+        ordinals = _resolve_task_group_ordinals(mock_exp, 2026, tasks, "s2")
+
+        assert ordinals == {"auth-refactor": 2}
+
+    def test_lookup_failure_is_not_fatal(self):
+        from claude_diary.cli.notion_push import _resolve_task_group_ordinals
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db"
+        mock_exp.get_task_group_session_ids.side_effect = RuntimeError("boom")
+
+        tasks = [{"title": "A", "task_group": "auth-refactor"}]
+        assert _resolve_task_group_ordinals(mock_exp, 2026, tasks, "s1") == {}
+
+    def test_tasks_without_group_are_skipped(self):
+        from claude_diary.cli.notion_push import _resolve_task_group_ordinals
+        mock_exp = MagicMock()
+        assert _resolve_task_group_ordinals(mock_exp, 2026, [{"title": "A"}], "s1") == {}
+        mock_exp.ensure_database.assert_not_called()
+
+    def test_first_session_title_is_left_alone(self):
+        from claude_diary.cli.notion_push import _stamp_task_group_ordinals
+        tasks = [{"title": "인증 미들웨어", "task_group": "auth-refactor"}]
+        _stamp_task_group_ordinals(tasks, {"auth-refactor": 1})
+        assert tasks[0]["title"] == "인증 미들웨어"
+
+    def test_continuation_title_gets_ordinal_suffix(self):
+        from claude_diary.cli.notion_push import _stamp_task_group_ordinals
+        tasks = [
+            {"title": "인증 미들웨어", "task_group": "auth-refactor"},
+            {"title": "무관한 작업"},
+        ]
+        _stamp_task_group_ordinals(tasks, {"auth-refactor": 3})
+        assert tasks[0]["title"] == "인증 미들웨어 (3차)"
+        assert tasks[1]["title"] == "무관한 작업"
+
+    def test_stamping_is_idempotent(self):
+        from claude_diary.cli.notion_push import _stamp_task_group_ordinals
+        tasks = [{"title": "인증 미들웨어", "task_group": "auth-refactor"}]
+        _stamp_task_group_ordinals(tasks, {"auth-refactor": 2})
+        _stamp_task_group_ordinals(tasks, {"auth-refactor": 2})
+        assert tasks[0]["title"] == "인증 미들웨어 (2차)"
+
+    def test_push_writes_the_ordinal_into_the_row_title(self, tmp_path):
+        input_path = tmp_path / "in.json"
+        with open(str(input_path), "w", encoding="utf-8") as f:
+            json.dump({
+                "session_id": "s3",
+                "tasks": [{"title": "인증 미들웨어", "task_group": "auth-refactor"}],
+            }, f)
+
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db_xyz"
+        mock_exp.find_existing_row.return_value = None
+        mock_exp.create_row.return_value = "row_a"
+        mock_exp.get_task_group_session_ids.return_value = {"s1", "s2"}
+        mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
+
+        args = MagicMock()
+        args.input = str(input_path)
+        args.force = False
+        args.dry_run = False
+        args.preview_file = ""
+        args.artifact_dir = ""
+        args.no_artifacts = False
+
+        config = {"exporters": {"notion_hierarchical": {"api_token": "t", "root_page_id": "p"}}}
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter", return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"), \
+             pytest.raises(SystemExit):
+            cmd_notion_push(args)
+
+        props = mock_exp.create_row.call_args.args[1]
+        assert props["Name"]["title"][0]["text"]["content"] == "인증 미들웨어 (3차)"
 
 
 class TestDependsOnWiring:
@@ -422,7 +535,7 @@ class TestDependsOnWiring:
         )
         assert failures == []
 
-    def test_wire_parent_tasks_hint_when_no_native(self, capsys):
+    def test_wire_parent_tasks_reports_failure_when_no_native(self, capsys):
         from claude_diary.cli.notion_push import _wire_parent_tasks
         mock_exp = MagicMock()
         mock_exp.ensure_database.return_value = "db"
@@ -439,7 +552,9 @@ class TestDependsOnWiring:
         row_ids = {0: "row_a", 1: "row_b"}
         failures = _wire_parent_tasks(mock_exp, 2026, tasks, row_ids)
         mock_exp.update_row_native_parent.assert_not_called()
-        assert failures == []
+        # The child row could not be nested — surfaced instead of silently dropped.
+        assert [f[0] for f in failures] == [1]
+        assert "sub-item" in failures[0][2]
         assert "Sub-items" in capsys.readouterr().out
 
     def test_wire_parent_tasks_skips_missing_parent(self):
