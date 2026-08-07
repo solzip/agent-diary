@@ -320,6 +320,7 @@ class TestEnsureDatabase:
             _make_response(200, {"id": "year_page"}),
             _make_response(200, {"results": [], "has_more": False}),
             _make_response(200, {"id": "db_xyz"}),
+            _make_response(200, {"properties": {}}),  # GET property map
             _make_response(200, {"id": "db_xyz"}),
         ]
         with _patch_requests(mock_req):
@@ -345,7 +346,7 @@ class TestEnsureDatabase:
         assert "Parent Task" not in props
 
         # Fourth call: PATCH to add the full current extension schema
-        patch_call = mock_req.request.call_args_list[3]
+        patch_call = mock_req.request.call_args_list[4]
         assert patch_call.args[0] == "PATCH"
         assert patch_call.args[1].endswith("/databases/db_xyz")
         patch_body = patch_call.kwargs["json"]
@@ -364,6 +365,7 @@ class TestEnsureDatabase:
         mock_req = MagicMock()
         mock_req.request.side_effect = [
             _make_response(200, {"id": "old_db"}),   # GET /databases/old_db (exists)
+            _make_response(200, {"properties": {}}),  # GET property map
             _make_response(200, {"id": "old_db"}),   # PATCH schema extension
         ]
         with _patch_requests(mock_req):
@@ -371,7 +373,7 @@ class TestEnsureDatabase:
 
         assert db_id == "old_db"
         # Second call: PATCH for schema extension on the existing DB
-        patch_call = mock_req.request.call_args_list[1]
+        patch_call = mock_req.request.call_args_list[2]
         assert patch_call.args[0] == "PATCH"
         _assert_current_extension_schema(patch_call.kwargs["json"], "old_db")
         assert exp._cache["schema_v"]["old_db"] == SCHEMA_VERSION
@@ -396,6 +398,7 @@ class TestEnsureDatabase:
                 ],
                 "has_more": False,
             }),
+            _make_response(200, {"properties": {}}),  # GET property map
             _make_response(200, {"id": "existing_db"}),
         ]
         with _patch_requests(mock_req):
@@ -436,14 +439,15 @@ class TestEnsureDatabase:
         mock_req = MagicMock()
         mock_req.request.side_effect = [
             _make_response(200, {"id": "db_known"}),
+            _make_response(200, {"properties": {}}),  # GET property map
             _make_response(200, {"id": "db_known"}),
         ]
         with _patch_requests(mock_req):
             db_id = exp.ensure_database(2026, force_schema=True)
 
         assert db_id == "db_known"
-        assert mock_req.request.call_args_list[1].args[0] == "PATCH"
-        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        assert mock_req.request.call_args_list[2].args[0] == "PATCH"
+        patch_body = mock_req.request.call_args_list[2].kwargs["json"]
         _assert_current_extension_schema(patch_body, "db_known")
 
     def test_v3_database_gets_current_schema_upgrade(self, tmp_path):
@@ -457,13 +461,14 @@ class TestEnsureDatabase:
         mock_req = MagicMock()
         mock_req.request.side_effect = [
             _make_response(200, {"id": "db_v3"}),
+            _make_response(200, {"properties": {}}),  # GET property map
             _make_response(200, {"id": "db_v3"}),
         ]
         with _patch_requests(mock_req):
             db_id = exp.ensure_database(2026)
 
         assert db_id == "db_v3"
-        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        patch_body = mock_req.request.call_args_list[2].kwargs["json"]
         _assert_current_extension_schema(patch_body, "db_v3")
         assert exp._cache["schema_v"]["db_v3"] == SCHEMA_VERSION
 
@@ -478,13 +483,14 @@ class TestEnsureDatabase:
         mock_req = MagicMock()
         mock_req.request.side_effect = [
             _make_response(200, {"id": "db_v2"}),
+            _make_response(200, {"properties": {}}),  # GET property map
             _make_response(200, {"id": "db_v2"}),
         ]
         with _patch_requests(mock_req):
             db_id = exp.ensure_database(2026)
 
         assert db_id == "db_v2"
-        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        patch_body = mock_req.request.call_args_list[2].kwargs["json"]
         _assert_current_extension_schema(patch_body, "db_v2")
         assert exp._cache["schema_v"]["db_v2"] == SCHEMA_VERSION
 
@@ -499,13 +505,14 @@ class TestEnsureDatabase:
         mock_req = MagicMock()
         mock_req.request.side_effect = [
             _make_response(200, {"id": "db_v4"}),
+            _make_response(200, {"properties": {}}),  # GET property map
             _make_response(200, {"id": "db_v4"}),
         ]
         with _patch_requests(mock_req):
             db_id = exp.ensure_database(2026)
 
         assert db_id == "db_v4"
-        patch_body = mock_req.request.call_args_list[1].kwargs["json"]
+        patch_body = mock_req.request.call_args_list[2].kwargs["json"]
         _assert_current_extension_schema(patch_body, "db_v4")
         assert exp._cache["schema_v"]["db_v4"] == SCHEMA_VERSION
 
@@ -718,3 +725,45 @@ class TestRequestsMissing:
         with patch("builtins.__import__", side_effect=fake_import):
             with pytest.raises(RuntimeError, match="requests"):
                 exp._request("GET", "/anything")
+
+
+class TestSchemaExtensionsNeverClobber:
+    """Regression: patching an existing select property wipes its options.
+
+    Notion replaces the option list when a select property is patched with an
+    empty body, and then clears that property on every row that referenced a
+    removed option. `ensure` did this on every run.
+    """
+
+    def _exporter(self, existing_names):
+        from unittest.mock import MagicMock
+        from claude_diary.exporters.notion_hierarchical import NotionHierarchicalExporter
+        exp = NotionHierarchicalExporter({"api_token": "t", "root_page_id": "p"})
+        exp._cache = {"schema_v": {}}
+        exp._request = MagicMock(return_value={})
+        exp.get_database_property_map = MagicMock(
+            return_value={name: {"id": name, "type": "select", "relation": None}
+                          for name in existing_names}
+        )
+        return exp
+
+    def test_existing_select_properties_are_never_patched(self):
+        from claude_diary.exporters.notion_hierarchical import _current_schema_extensions
+        all_names = list(_current_schema_extensions("db1"))
+        exp = self._exporter(all_names)
+
+        exp._ensure_db_schema_extensions("db1", force=True)
+
+        # Everything already exists, so there is nothing to send at all.
+        exp._request.assert_not_called()
+
+    def test_only_the_missing_property_is_sent(self):
+        from claude_diary.exporters.notion_hierarchical import _current_schema_extensions
+        all_names = list(_current_schema_extensions("db1"))
+        exp = self._exporter([n for n in all_names if n != "Priority"])
+
+        exp._ensure_db_schema_extensions("db1", force=True)
+
+        exp._request.assert_called_once()
+        payload = exp._request.call_args.args[2]
+        assert list(payload["properties"]) == ["Priority"]

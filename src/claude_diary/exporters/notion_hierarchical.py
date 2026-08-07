@@ -290,25 +290,28 @@ class NotionHierarchicalExporter:
             cursor = data.get("next_cursor")
 
     def _ensure_db_schema_extensions(self, db_id, force=False):
-        """Add current schema extensions if not yet recorded in cache.
+        """Add any schema extension property the database is missing.
 
-        Patching the same property twice is harmless (Notion treats existing
-        properties as no-ops), but we still gate by a cache flag to skip the
-        API call on the happy path.
+        Only missing properties are sent. Re-patching one that already exists
+        is NOT a no-op: `{"select": {}}` replaces its option list with an empty
+        one, and Notion then clears that property on every row referencing the
+        removed options. Patching the full extension set on each run therefore
+        wiped Status/Purpose/Task Group/Priority/Review Status/Schema Version
+        across the whole database.
         """
         schema_v = self._cache.setdefault("schema_v", {})
         current = schema_v.get(db_id)
         if current == SCHEMA_VERSION and not force:
             return
-        if current == SCHEMA_VERSION and force:
-            self._request("PATCH", "/databases/%s" % db_id, {
-                "properties": _current_schema_extensions(db_id)
-            })
-            schema_v[db_id] = SCHEMA_VERSION
-            return
-        self._request("PATCH", "/databases/%s" % db_id, {
-            "properties": _current_schema_extensions(db_id)
-        })
+
+        existing = set(self.get_database_property_map(db_id))
+        missing = {
+            name: spec
+            for name, spec in _current_schema_extensions(db_id).items()
+            if name not in existing
+        }
+        if missing:
+            self._request("PATCH", "/databases/%s" % db_id, {"properties": missing})
         schema_v[db_id] = SCHEMA_VERSION
 
     def _create_database(self, parent_page_id):
