@@ -97,6 +97,44 @@ class TestShouldSkipSession:
         assert should_skip_session("/home/sol/personal-notes", config) is True
         assert should_skip_session("/home/sol/work-project", config) is False
 
+    def test_a_path_rule_distinguishes_same_named_projects(self):
+        """A bare name cannot tell ~/work/acme from ~/personal/acme."""
+        config = {"skip_projects": ["/home/u/clients/acme"]}
+        assert should_skip_session("/home/u/clients/acme", config) is True
+        assert should_skip_session("/home/u/personal/acme", config) is False
+
+    def test_a_path_rule_covers_everything_beneath_it(self):
+        config = {"skip_projects": ["/home/u/clients"]}
+        assert should_skip_session("/home/u/clients/acme", config) is True
+        assert should_skip_session("/home/u/clients/acme/api", config) is True
+        assert should_skip_session("/home/u/clientsX", config) is False
+
+    def test_a_trailing_glob_means_the_same_thing(self):
+        config = {"skip_projects": ["/home/u/clients/**"]}
+        assert should_skip_session("/home/u/clients/acme", config) is True
+
+    def test_tilde_is_expanded_on_both_sides(self):
+        import os
+        home = os.path.expanduser("~").replace("\\", "/")
+        config = {"skip_projects": ["~/clients"]}
+        assert should_skip_session("%s/clients/acme" % home, config) is True
+        assert should_skip_session("%s/other/acme" % home, config) is False
+
+    def test_backslash_rules_work_on_windows_paths(self):
+        config = {"skip_projects": ["C:\\work\\clients"]}
+        assert should_skip_session("C:\\work\\clients\\acme", config) is True
+        assert should_skip_session("C:\\work\\public\\acme", config) is False
+
+    def test_name_and_path_rules_coexist(self):
+        config = {"skip_projects": ["scratch", "/home/u/clients"]}
+        assert should_skip_session("/anywhere/scratch", config) is True
+        assert should_skip_session("/home/u/clients/acme", config) is True
+        assert should_skip_session("/home/u/open-source/thing", config) is False
+
+    def test_blank_entries_are_ignored_rather_than_matching_everything(self):
+        config = {"skip_projects": ["", "   ", None]}
+        assert should_skip_session("/home/u/anything", config) is False
+
     def test_no_skip_default(self, monkeypatch):
         monkeypatch.delenv("CLAUDE_DIARY_SKIP", raising=False)
         assert should_skip_session("/dir", {}) is False

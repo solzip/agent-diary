@@ -60,6 +60,7 @@ def cmd_doctor(args) -> None:
     checks.append(_check_hook_registered())
     checks.append(_check_diary_dir(config))
     checks.append(_check_recent_activity(config))
+    checks.append(_check_privacy(config))
     checks.extend(_check_notion(config, verbose=getattr(args, "notion", False)))
 
     print("[agent-diary doctor]")
@@ -184,6 +185,28 @@ def _latest_entry_date(diary_dir: str):
         if newest is None or parsed > newest:
             newest = parsed
     return newest
+
+
+def _check_privacy(config) -> Check:
+    """Report what is excluded, because the default is to record everything.
+
+    Prompts are stored as written, so at work they carry client names and
+    internal detail. Both controls that limit that are opt-in, which means
+    the answer to "what is this recording" is easy to be wrong about.
+    """
+    skips = [s for s in (config.get("skip_projects") or []) if str(s or "").strip()]
+    extra = [p for p in ((config.get("security") or {}).get(
+        "additional_secret_patterns") or []) if str(p or "").strip()]
+
+    parts = []
+    parts.append("%d skipped project rule(s)" % len(skips))
+    parts.append("%d extra redaction pattern(s)" % len(extra))
+    detail = ", ".join(parts)
+
+    if not skips and not extra:
+        return Check(OK, "privacy", detail + " — recording everything",
+                     "see README section 5 if any project should be excluded")
+    return Check(OK, "privacy", detail)
 
 
 def _check_notion(config, verbose: bool = False) -> List[Check]:
