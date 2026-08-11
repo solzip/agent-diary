@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-08-11
+
 ### Added
 
 - **`agent-diary doctor`**: 이 도구가 아직 기록하고 있는지 점검한다. postmortem이 지목한 실패 유형 — *일지가 안 쌓이는 것은 조용한 하루와 구별되지 않는다* — 에 대한 탐지 수단이 그동안 없었다. 같은 유형을 오늘 한 번 더 만들 뻔했다(import 패키지를 바꿨다면 사용자 `settings.json`의 hook이 에러 없이 죽었을 것)
