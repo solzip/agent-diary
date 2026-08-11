@@ -98,6 +98,26 @@ def reindex_all(diary_dir):
                     if len(w) > 2:
                         keywords.add(w)
 
+            # These four used to be written as empty, which meant a rebuild
+            # silently produced a thinner index than the incremental path:
+            # session ids gone, commits gone, line counts zeroed. Anything
+            # reading them got plausible-looking nothing. They are all in the
+            # entry text, so a rebuild now recovers them.
+            sid_match = re.search(
+                r'^<code>([0-9A-Za-z][0-9A-Za-z._-]{7,})</code>\s*$', session, re.M
+            )
+            session_id = sid_match.group(1) if sid_match else ""
+
+            stat_match = re.search(
+                r'(?:변경 통계|Code Stats).*?\+(\d+)\s*/\s*-(\d+)', session
+            )
+            lines_added = int(stat_match.group(1)) if stat_match else 0
+            lines_deleted = int(stat_match.group(2)) if stat_match else 0
+
+            git_commits = re.findall(
+                r'(?:커밋|Commit):\s*`([^`]+)`', session
+            )
+
             index["entries"].append({
                 "date": date_str,
                 "time": time_str,
@@ -105,10 +125,10 @@ def reindex_all(diary_dir):
                 "categories": cats,
                 "files": files[:20],
                 "keywords": sorted(keywords)[:30],
-                "git_commits": [],
-                "lines_added": 0,
-                "lines_deleted": 0,
-                "session_id": "",
+                "git_commits": git_commits,
+                "lines_added": lines_added,
+                "lines_deleted": lines_deleted,
+                "session_id": session_id,
             })
             count += 1
 

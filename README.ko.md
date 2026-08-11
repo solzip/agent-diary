@@ -442,6 +442,14 @@ agent-diary backfill --transcripts /path/to/projects
 agent-diary doctor
 agent-diary doctor --notion
 
+agent-diary report
+agent-diary report --days 14
+agent-diary report --month 2026-07
+agent-diary report --from 2026-07-01 --to 2026-07-15
+agent-diary report --project my-app --output july.md
+agent-diary report --month 2026-07 --detail
+agent-diary report --month 2026-07 --json
+
 agent-diary diary-notion init
 agent-diary diary-notion ensure
 agent-diary diary-notion ensure --dry-run
@@ -521,6 +529,34 @@ agent-diary diary-notion ensure
 | `CLAUDE_DIARY_SKIP` | `1`, `true`, `yes`이면 Claude Code Stop Hook 자동 기록 skip | - | 환경변수 전용 |
 
 앞의 네 개는 `config.json > 환경변수 > 기본값` 순서로 병합됩니다. 즉 `init`을 한 번이라도 실행했다면 해당 키가 config에 기록돼 있어서 **환경변수를 지정해도 무시됩니다.** 저장 경로를 임시로 바꾸려면 환경변수가 아니라 `config.json`을 고쳐야 합니다.
+
+### 기간 단위 보고서
+
+`search`는 항목을 찾고 `stats`는 개수를 셉니다. `report`는 **한 덩어리의 작업을 문서 하나로** 만듭니다 — 스탠드업, 월간 보고, 청구 근거, 또는 그 기간에 무엇을 했는지에 대한 증빙용으로요.
+
+```bash
+agent-diary report                                  # 최근 7일
+agent-diary report --month 2026-07 --project my-app
+agent-diary report --from 2026-07-01 --to 2026-07-15 --output july.md
+```
+
+```markdown
+# 작업 보고 — 2026-07-01 ~ 2026-07-31
+
+640 session(s) · 16 day(s) · 1 project(s) · +21871 / -11431 lines · 11272 file(s) · 2305 commit(s)
+
+`docs` 197 · `bugfix` 177 · `test` 169 · `feature` 88
+
+## my-app — 640 session(s)
+
+### 2026-07-01
+- JWT 검증 미들웨어를 추가하고 로그인 실패 경로를 테스트로 덮음
+- …
+```
+
+세션 목록은 검색 인덱스에서, 서술은 일지에서 가져와 **session id로 조인**합니다. 그래서 한 프로젝트로 필터링하면 같은 날 다른 프로젝트의 문장이 섞이지 않습니다.
+
+작업 요약을 우선하고 입력한 요청은 뒤로 뺍니다 — 요약은 정리된 기록이고 요청은 날것이니까요. `--detail`을 주면 둘 다 넣습니다. 요약이 없는 날은 요청을 쓰고, 그 사실을 문서에 밝힙니다.
 
 ### 무엇이 기록되고, 어떻게 제한하는가
 

@@ -25,6 +25,7 @@ from claude_diary.cli.setup import cmd_install, cmd_uninstall
 from claude_diary.cli.write import cmd_write
 from claude_diary.cli.backfill import cmd_backfill
 from claude_diary.cli.doctor import cmd_doctor
+from claude_diary.cli.report import cmd_report
 from claude_diary.cli.notion_push import cmd_notion_push
 from claude_diary.cli.notion_init import cmd_notion_init
 from claude_diary.cli.notion_ensure import cmd_notion_ensure
@@ -202,6 +203,21 @@ def main():
     p_doctor.add_argument("--notion", action="store_true",
                           help="Also make a read-only request to Notion")
 
+    # report (one document for a period, for someone else to read)
+    p_report = sub.add_parser(
+        "report",
+        help="Write one document covering a period and project",
+    )
+    p_report.add_argument("--from", dest="date_from", help="Start date (YYYY-MM-DD)")
+    p_report.add_argument("--to", dest="date_to", help="End date (YYYY-MM-DD)")
+    p_report.add_argument("--month", "-m", help="Whole calendar month (YYYY-MM)")
+    p_report.add_argument("--days", type=int, help="The last N days, including today")
+    p_report.add_argument("--project", "-p", help="Limit to one project")
+    p_report.add_argument("--output", "-o", help="Write to this file instead of stdout")
+    p_report.add_argument("--detail", action="store_true",
+                          help="Include the requests as typed alongside the summaries")
+    p_report.add_argument("--json", action="store_true", help="Output as JSON")
+
     # notion (hierarchical Notion DB integration — for /diary-notion slash command)
     _add_diary_notion_parser(sub, "diary-notion")
     _add_diary_notion_parser(sub, "notion")
@@ -231,6 +247,7 @@ def main():
         "write": cmd_write,
         "backfill": cmd_backfill,
         "doctor": cmd_doctor,
+        "report": cmd_report,
         "diary-notion": cmd_notion,
         "notion": cmd_notion,
     }
