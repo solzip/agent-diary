@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-08-11
+
 ### Added
 - **`/diary-notion` 슬래시 커맨드**: 현재 세션을 작업 단위로 분리해 Notion 업무일지 DB에 push
   - 계층 구조: 루트 페이지 → 연도 페이지 → 단일 Entries DB (자동 생성)

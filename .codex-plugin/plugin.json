@@ -1,6 +1,6 @@
 {
   "name": "working-diary",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "Record AI coding sessions as Markdown diaries or task-based Notion entries.",
   "author": {
     "name": "solzip",
