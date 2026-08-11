@@ -205,8 +205,8 @@ def _enrich_entry_data(entry_data, config, enrichment, session_start=None):
         logger.warning("Secret scan failed: %s", e)
 
 
-def _write_manual_entry(entry_data, manual_dir, lang):
-    entry_text = format_entry(entry_data, lang)
+def _write_manual_entry(entry_data, manual_dir, lang, gitmoji=False):
+    entry_text = format_entry(entry_data, lang, gitmoji=gitmoji)
     date_str = entry_data["date"]
     project = _safe_project_name(entry_data.get("project") or "unknown")
     target = Path(manual_dir) / date_str / project / ("%s.md" % date_str)
@@ -264,7 +264,10 @@ def cmd_write(args):
             print("[agent-diary write] Input has no diary-worthy content.", file=sys.stderr)
             sys.exit(1)
         _enrich_entry_data(entry_data, config, enrichment, data.get("session_start"))
-        action, target = _write_manual_entry(entry_data, manual_dir, lang)
+        action, target = _write_manual_entry(
+        entry_data, manual_dir, lang,
+        gitmoji=bool((config.get("formatting") or {}).get("gitmoji", False)),
+    )
         _cleanup(input_path)
         print("[agent-diary write] %s %s" % (action, target))
         return
@@ -305,5 +308,8 @@ def cmd_write(args):
         sys.exit(1)
 
     _enrich_entry_data(entry_data, config, enrichment, parsed.get("session_start"))
-    action, target = _write_manual_entry(entry_data, manual_dir, lang)
+    action, target = _write_manual_entry(
+        entry_data, manual_dir, lang,
+        gitmoji=bool((config.get("formatting") or {}).get("gitmoji", False)),
+    )
     print("[agent-diary write] %s %s" % (action, target))

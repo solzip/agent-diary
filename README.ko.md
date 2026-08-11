@@ -519,6 +519,23 @@ agent-diary diary-notion ensure
 
 앞의 네 개는 `config.json > 환경변수 > 기본값` 순서로 병합됩니다. 즉 `init`을 한 번이라도 실행했다면 해당 키가 config에 기록돼 있어서 **환경변수를 지정해도 무시됩니다.** 저장 경로를 임시로 바꾸려면 환경변수가 아니라 `config.json`을 고쳐야 합니다.
 
+### 커밋 줄의 Gitmoji
+
+기본은 꺼짐입니다. `config.json`에서 켜면 커밋 줄에 Conventional Commit 타입에 해당하는 [gitmoji](https://gitmoji.dev)가 붙습니다.
+
+```json
+{ "formatting": { "gitmoji": true } }
+```
+
+```diff
+-  - 커밋: `a1b2c3d` feat: verify tokens and cover login
++  - 커밋: `a1b2c3d` ✨ feat: verify tokens and cover login
+```
+
+타입을 알아볼 수 없는 커밋은 그대로 두고, 이미 이모지로 시작하는 메시지에는 덧붙이지 않습니다.
+
+**커밋 줄에만** 적용되고 카테고리 태그에는 붙이지 않습니다. 📝·⚡·🔒 세 개가 일지에서 이미 작업 요약·주요 명령어·시크릿 마스킹을 뜻해서, 카테고리까지 장식하면 한 화면에서 같은 글자가 두 가지 의미를 갖게 됩니다.
+
 Notion 자격증명 두 개만 반대로, 환경변수가 config를 덮어씁니다. CI나 여러 워크스페이스를 오갈 때 토큰을 파일에 남기지 않기 위한 예외입니다.
 
 PowerShell에서 한글이나 이모지가 깨져 보이면 현재 세션 출력 인코딩을 UTF-8로 바꿉니다.

@@ -515,6 +515,23 @@ These variables fall into **two groups whose precedence runs in opposite directi
 
 The first four merge as `config.json > environment > defaults`. So if you have ever run `init`, the key is already written to the config and **setting the environment variable has no effect.** To move the diary path, edit `config.json` rather than exporting a variable.
 
+### Gitmoji on commit lines
+
+Off by default. Turn it on in `config.json` and each commit line gains the [gitmoji](https://gitmoji.dev) for its Conventional Commit type:
+
+```json
+{ "formatting": { "gitmoji": true } }
+```
+
+```diff
+-  - Commit: `a1b2c3d` feat: verify tokens and cover login
++  - Commit: `a1b2c3d` ✨ feat: verify tokens and cover login
+```
+
+A commit with no recognised type is left as it is, and one that already starts with an emoji is not given a second.
+
+It applies to commit lines only, not to the category tags. Three gitmoji — 📝, ⚡ and 🔒 — already mean Work Summary, Key Commands and secrets-masked in an entry, and decorating categories would give the same glyph two meanings on one screen.
+
 The two Notion credentials are the exception and override the config, so a token need not be written to a file in CI or when moving between workspaces.
 
 If PowerShell output shows broken Korean or emoji characters, switch the current session output encoding to UTF-8.

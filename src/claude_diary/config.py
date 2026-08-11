@@ -16,6 +16,12 @@ DEFAULT_CONFIG = {
         "code_stats": True,
         "session_time": False,
     },
+    "formatting": {
+        # Prefix each commit line with the gitmoji for its Conventional Commit
+        # type. Off by default: the diary is a permanent record and emoji in
+        # it is a taste not everyone shares.
+        "gitmoji": False,
+    },
     "exporters": {},
     "custom_categories": {},
 }
