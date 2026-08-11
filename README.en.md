@@ -215,14 +215,56 @@ working-diary diary-notion ensure
 ```bash
 working-diary diary-notion push --input .diary-notion-<id>.json
 working-diary diary-notion push --input .diary-notion-<id>.json --force
+working-diary diary-notion push --input .diary-notion-<id>.json --dry-run
 ```
 
 - Default push skips rows already recorded with the same `Session ID + Task Index`.
 - `--force` archives prior rows for the session and pushes again.
+- `--dry-run` prints the rows and page bodies that would be created without writing to Notion. Add `--preview-file <path>` to save the same rendering as Markdown.
+- If a `Task Group` already has recorded sessions, the title gets an `(N차)` ordinal. The first session of a group is left alone.
 - If any task fails, the command exits with code `1` and preserves the input JSON.
 - Fully successful pushes and already-skipped pushes exit with code `0`.
 
-### 2-6. Notion Sub-Items
+### 2-6. What A Push Leaves On Disk (Run Artifacts)
+
+Every push writes a record of the run under the current working directory, **by default**. `--dry-run` writes it too.
+
+```text
+<cwd>/.codefleet/runs/<YYYYMMDD-HHMMSS-session>/
+  input.json        the original task JSON
+  git-diff.patch    the working tree diff at push time
+  preview.md        the rendered Notion body
+  manifest.json     the files above with sha256, plus a push result summary
+```
+
+Notion is the destination, not the record. If a push half-fails, or a row is later edited by hand, this local copy is the only way back to what was actually submitted.
+
+**`git-diff.patch` contains your uncommitted code.** Keep it out of your repository:
+
+```gitignore
+.codefleet/runs/
+```
+
+To relocate or disable it:
+
+```bash
+working-diary diary-notion push --input <json> --artifact-dir build/diary-runs
+working-diary diary-notion push --input <json> --no-artifacts
+```
+
+### 2-7. Review Queue
+
+Review is a judgement a person makes after the fact, so no stage of the recording pipeline declares work reviewed on its own. Push files every new row as `Needs Review`, and only this command's `--apply` promotes a row to `Reviewed`.
+
+```bash
+working-diary diary-notion review              # list rows awaiting review (read-only)
+working-diary diary-notion review --apply      # set Reviewed + Last Reviewed=today
+working-diary diary-notion review --year 2026
+```
+
+Without `--apply` nothing is written, matching the `ensure --dry-run` / `ensure` pattern.
+
+### 2-8. Notion Sub-Items
 
 Expandable task hierarchy uses Notion native Sub-items. Enable it once in the Notion UI.
 
@@ -260,8 +302,9 @@ Key modules:
 | CLI entry | `src/claude_diary/cli/__init__.py` | Routes `working-diary` and `claude-diary` commands |
 | Automatic diary core | `src/claude_diary/core.py` | Claude Code Stop Hook diary pipeline |
 | Manual diary core | `src/claude_diary/cli/write.py` | Handles `/diary`, `$diary`, and `working-diary write` |
-| Notion push | `src/claude_diary/cli/notion_push.py` | Pushes task JSON as Notion rows |
-| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | Ensures schema v7 and core/operating views |
+| Notion push | `src/claude_diary/cli/notion_push/` | Pushes task JSON as Notion rows (split into validate/properties/relations/artifacts) |
+| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | Ensures schema v8, 5 core views and 5 operating views |
+| Notion review queue | `src/claude_diary/cli/notion_review.py` | Lists `Needs Review` rows; `--apply` records `Reviewed` |
 | Formatter | `src/claude_diary/formatter.py` | Creates Markdown entries and Notion page bodies |
 
 ### 3-2. Claude Code Logic
@@ -332,11 +375,27 @@ working-diary uninstall --codex
 working-diary uninstall --codex-only
 
 working-diary write
+working-diary write --input .diary-<id>.json
+
 working-diary diary-notion init
 working-diary diary-notion ensure
 working-diary diary-notion ensure --dry-run
-working-diary diary-notion ops
+working-diary diary-notion ensure --year 2026
+
 working-diary diary-notion push --input .diary-notion-<id>.json
+working-diary diary-notion push --input .diary-notion-<id>.json --force
+working-diary diary-notion push --input .diary-notion-<id>.json --dry-run
+working-diary diary-notion push --input .diary-notion-<id>.json --preview-file preview.md
+working-diary diary-notion push --input .diary-notion-<id>.json --artifact-dir build/diary-runs
+working-diary diary-notion push --input .diary-notion-<id>.json --no-artifacts
+
+working-diary diary-notion ops
+working-diary diary-notion ops --stale-days 14
+working-diary diary-notion ops --json
+
+working-diary diary-notion review
+working-diary diary-notion review --apply
+
 working-diary notion push --input .diary-notion-<id>.json
 ```
 
@@ -409,6 +468,10 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 - Search index
 - Notion work log: `working-diary diary-notion init` -> `working-diary diary-notion ensure`
 - Notion operations report: `working-diary diary-notion ops` for blocked/review/next action/stale/work days/today-plan candidates/parent status signals
+- Review queue: `working-diary diary-notion review`. Push always files as `Needs Review`; only `--apply` promotes a row to `Reviewed`
+- Run artifacts: every push preserves `input.json`, `git-diff.patch`, `preview.md` and `manifest.json` locally, each sha256-stamped
+- Automatic `(N차)` ordinals for sessions continuing the same `Task Group`, with no extra column
+- A day's rows read in the order the work was done (`Date` ties broken by `Task Index`)
 - Slack, Discord, Obsidian, GitHub exporters: `working-diary config --add-exporter <name>`
 - HTML dashboard: `working-diary dashboard` or `working-diary dashboard --serve --port 8787`
 - Audit log and source checksum verification
@@ -423,6 +486,8 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 | Notion push reports an auth error | Check the integration token, root page ID, and page sharing |
 | Notion task hierarchy is not nested | Enable Sub-items once in the Notion `Entries` database UI |
 | Re-push might duplicate rows | Default push skips the same `Session ID + Task Index`; use `--force` to rewrite |
+| A `.codefleet/` directory appeared in my project | That is the push run record. Add `.codefleet/runs/` to `.gitignore`, or disable it with `--no-artifacts` (see [2-6](#2-6-what-a-push-leaves-on-disk-run-artifacts)) |
+| I want to drop the `(N차)` suffix from titles | It counts prior sessions of the same `Task Group`. Leave `task_group` empty and no suffix is added |
 | PowerShell text is garbled | Apply the UTF-8 output setting above |
 
 ## 8. Development
@@ -439,9 +504,9 @@ This README focuses on currently usable functionality. Detailed design and plann
 
 | Area | Status |
 |------|--------|
-| Stable now | Claude Code Stop Hook, Codex skills, Markdown diaries, Notion task row push, schema/view ensure |
-| Phase 3 started | `working-diary diary-notion ops` read-only operations report, parent/task group progress, ensure conflict classification and repair plans |
-| Next | Windows install/output experience, Notion sub-item guidance, incremental CI/lint expansion |
+| Available | Claude Code Stop Hook, Codex skills, Markdown diaries, Notion task row push, schema v8 / view ensure, `ops` operations report, `review` queue, push run artifacts |
+| In progress | Notion schema reduction ([#12](https://github.com/solzip/working-diary/issues/12)), dry-run ordinals ([#10](https://github.com/solzip/working-diary/issues/10)), `Schema Version` string fix ([#11](https://github.com/solzip/working-diary/issues/11)) |
+| Next | Windows install/output experience, Notion sub-item guidance |
 | Under review | SQLite search index, Cursor/Windsurf/VS Code integration |
 
 ## 10. Documentation
