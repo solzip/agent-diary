@@ -49,8 +49,6 @@ pythonpath = ["src"]
 [tool.ruff]
 target-version = "py38"
 line-length = 120
-# Deprecated v1.0 standalone scripts, kept for reference only (see DEPRECATED.md).
-extend-exclude = ["working-diary-system"]
 
 [tool.ruff.lint]
 # Correctness rules only. `UP` is deliberately excluded: this codebase uses
@@ -62,6 +60,9 @@ select = ["E4", "E7", "E9", "E501", "F", "B"]
 # Re-exported on purpose so submodules resolve them via claude_diary.cli.*
 # and tests can patch them there.
 "src/claude_diary/cli/__init__.py" = ["F401"]
+# Same reason: splitting notion_push into a package kept the import path, so
+# every name the old module exposed is re-exported from the package root.
+"src/claude_diary/cli/notion_push/__init__.py" = ["F401"]
 # Embedded agent contracts: these long lines are shipped text, and wrapping
 # them would change what the agent is told.
 "src/claude_diary/cli/setup.py" = ["E501"]

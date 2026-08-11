@@ -98,15 +98,6 @@ def test_korean_readme_uses_codex_only_install_flow():
     assert "현재 구현에는 Codex만 단독으로 적용하는 별도 명령이 없습니다" not in text
 
 
-def test_legacy_script_readme_points_to_current_install_flow():
-    text = (ROOT / "working-diary-system" / "README.md").read_text(encoding="utf-8")
-
-    assert "Deprecated v1 Scripts" in text
-    assert "pip install claude-diary" in text
-    assert "working-diary install --force" in text
-    assert "working-diary install --force --codex-only" in text
-
-
 def test_security_policy_matches_current_config_behavior():
     text = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
 
