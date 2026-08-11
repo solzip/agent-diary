@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""claude-diary CLI — search, filter, stats, and manage your work diary."""
+"""agent-diary CLI — search, filter, stats, and manage your work diary."""
 
 import argparse
 import sys
@@ -67,11 +67,11 @@ def _add_diary_notion_parser(sub, name):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="claude-diary",
-        description="Auto-generated work diary from Claude Code sessions",
+        prog="agent-diary",
+        description="Auto-generated work diary from Claude Code and Codex sessions",
     )
     from claude_diary import __version__
-    parser.add_argument("--version", action="version", version="claude-diary %s" % __version__)
+    parser.add_argument("--version", action="version", version="agent-diary %s" % __version__)
 
     sub = parser.add_subparsers(dest="command")
 
@@ -165,7 +165,7 @@ def main():
     p_uninstall = sub.add_parser("uninstall", help="Remove agent-diary hook from Claude Code")
     uninstall_agent = p_uninstall.add_mutually_exclusive_group()
     uninstall_agent.add_argument("--codex", action="store_true",
-                                 help="Also remove Codex skills installed by claude-diary")
+                                 help="Also remove Codex skills installed by agent-diary")
     uninstall_agent.add_argument("--codex-only", action="store_true",
                                  help="Remove only Codex skills; do not modify Claude Code settings")
 

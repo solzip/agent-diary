@@ -1,3 +1,3 @@
 """Claude Code Working Diary — Auto-generate work diaries from Claude Code sessions."""
 
-__version__ = "4.3.0"
+__version__ = "4.3.1"
