@@ -28,7 +28,7 @@ def cmd_team(args):
     config = _cli.load_config()
     repo_path = get_team_repo_path(config)
     if not repo_path or not os.path.isdir(repo_path):
-        print("Team not configured. Run: claude-diary team init --repo <url>")
+        print("Team not configured. Run: agent-diary team init --repo <url>")
         return
 
     if args.action == "stats":

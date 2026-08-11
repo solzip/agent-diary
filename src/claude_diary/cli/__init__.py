@@ -111,7 +111,7 @@ def main():
     p_config.add_argument("--add-exporter", help="Add exporter (interactive)")
 
     # init
-    p_init = sub.add_parser("init", help="Initialize claude-diary setup")
+    p_init = sub.add_parser("init", help="Initialize agent-diary setup")
     init_mode = p_init.add_mutually_exclusive_group()
     init_mode.add_argument("--team", dest="team_repo", help="Team repo URL for team mode")
     init_mode.add_argument("--codex-only", action="store_true",
@@ -153,7 +153,7 @@ def main():
     p_dashboard.add_argument("--months", type=int, default=3, help="Months of data (default: 3)")
 
     # install / uninstall
-    p_install = sub.add_parser("install", help="Register claude-diary hook in Claude Code")
+    p_install = sub.add_parser("install", help="Register agent-diary hook in Claude Code")
     p_install.add_argument("--force", action="store_true",
                            help=("Refresh hook command and overwrite managed slash command files "
                                  "(preserves user-modified ones)"))
@@ -162,7 +162,7 @@ def main():
                                help="Also install Codex skills under ~/.codex/skills")
     install_agent.add_argument("--codex-only", action="store_true",
                                help="Install only Codex skills; do not modify Claude Code settings")
-    p_uninstall = sub.add_parser("uninstall", help="Remove claude-diary hook from Claude Code")
+    p_uninstall = sub.add_parser("uninstall", help="Remove agent-diary hook from Claude Code")
     uninstall_agent = p_uninstall.add_mutually_exclusive_group()
     uninstall_agent.add_argument("--codex", action="store_true",
                                  help="Also remove Codex skills installed by claude-diary")

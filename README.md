@@ -1,23 +1,23 @@
-# Working Diary
+# Agent Diary
 
 **AI와 한 작업을 기억해두는 도구.** Claude Code 세션이 끝나면 자동으로, Codex에서는 명령 한 번으로 그날 무엇을 시켰고 무엇이 바뀌었는지 기록합니다.
 
-[![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/working-diary/actions/workflows/ci.yml)
+[![CI](https://github.com/solzip/agent-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/agent-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Core Dependencies: 0](https://img.shields.io/badge/core%20dependencies-0-brightgreen)](https://github.com/solzip/working-diary)
+[![Core Dependencies: 0](https://img.shields.io/badge/core%20dependencies-0-brightgreen)](https://github.com/solzip/agent-diary)
 
 > [English](README.en.md) | 한국어
 >
 > 커뮤니티 프로젝트입니다. Anthropic 또는 OpenAI의 공식 프로젝트가 아닙니다.
 
-![Working Diary 데모](docs/demo.svg)
+![Agent Diary 데모](docs/demo.svg)
 
 ## 1. 왜 필요한가
 
 AI와 한 작업은 대화창에 남고, 대화창은 닫힙니다. 이틀 뒤 "이 파일 왜 이렇게 고쳤더라"를 되짚을 방법이 없고, 주간 회고나 업무일지를 쓸 때가 되면 기억에 의존하게 됩니다. 커밋 로그는 결과만 남기지 무엇을 요청했고 무엇을 시도했는지는 남기지 않습니다.
 
-Working Diary는 그 맥락을 세션이 끝나는 시점에 자동으로 붙잡습니다. 별도로 기록하는 습관을 만들 필요가 없습니다.
+Agent Diary는 그 맥락을 세션이 끝나는 시점에 자동으로 붙잡습니다. 별도로 기록하는 습관을 만들 필요가 없습니다.
 
 세션 하나가 끝나면 이런 항목이 파일에 append됩니다.
 
@@ -63,20 +63,22 @@ Working Diary는 그 맥락을 세션이 끝나는 시점에 자동으로 붙잡
 - **팀 도구로도 씁니다.** 필요하면 Notion 업무일지 DB로 push하고, Slack·Discord·GitHub으로도 내보냅니다.
 
 ```bash
-pip install claude-diary
-working-diary init
+pip install agent-diary
+agent-diary init
 ```
 
 이후로는 따로 할 일이 없습니다. Claude Code 세션이 끝날 때마다 `~/working-diary/YYYY-MM-DD.md`에 쌓입니다.
 
-> 패키지 이름은 호환성을 위해 `claude-diary`를 유지합니다. 문서에서는 중립 alias인 `working-diary`를 우선 사용하며, 두 명령 모두 동작합니다.
+> 이 프로젝트는 `claude-diary` → `working-diary`를 거쳐 `agent-diary`가 되었습니다. 옛 이름으로 설치했더라도 `working-diary`와 `claude-diary` 명령이 그대로 동작합니다.
+>
+> 내부 Python 패키지는 `claude_diary`로 남아 있습니다. `install`이 사용자의 `settings.json`에 `python -m claude_diary.hook`을 기록해두기 때문에, 이름을 바꾸면 기존 사용자의 Stop Hook이 조용히 멈춥니다. 설치 경로(`pip install agent-diary`)와 import 이름이 다른 건 파이썬에서 흔한 구성입니다.
 
 ### 지원 에이전트
 
 | 에이전트 | 자동 기록 | 수동 Markdown | Notion 업무일지 | 적용/갱신 |
 |----------|-----------|---------------|-----------------|-----------|
-| Claude Code | Stop Hook | `/diary` | `/diary-notion` | `working-diary install --force` |
-| Codex | 없음 | `$diary` | `$diary-notion` | `working-diary install --force --codex-only` |
+| Claude Code | Stop Hook | `/diary` | `/diary-notion` | `agent-diary install --force` |
+| Codex | 없음 | `$diary` | `$diary-notion` | `agent-diary install --force --codex-only` |
 
 패키지 설치는 공통이지만 에이전트에 적용하는 명령은 다릅니다. Codex만 쓰는 경우에는 `--codex-only`를 사용하면 Claude Code 설정을 수정하지 않습니다. `--codex`는 Claude Code hook/slash command도 함께 갱신하는 호환 옵션입니다.
 
@@ -108,44 +110,44 @@ working-diary init
 
 | 목표 | 실행 순서 |
 |------|----------------|
-| Claude Code에서 Markdown 자동/수동 기록 | `pip install claude-diary` -> `working-diary init` -> `working-diary install --force` |
-| Claude Code에서 Notion 업무일지까지 사용 | `pip install "claude-diary[notion]"` -> `working-diary init` -> `working-diary install --force` -> `working-diary diary-notion init` -> `working-diary diary-notion ensure` |
-| Codex에서 Markdown 수동 기록 | `pip install claude-diary` -> `working-diary init --codex-only` -> `working-diary install --force --codex-only` -> 새 Codex 세션 |
-| Codex에서 Notion 업무일지까지 사용 | `pip install "claude-diary[notion]"` -> `working-diary init --codex-only` -> `working-diary install --force --codex-only` -> `working-diary diary-notion init` -> `working-diary diary-notion ensure` -> 새 Codex 세션 |
+| Claude Code에서 Markdown 자동/수동 기록 | `pip install agent-diary` -> `agent-diary init` -> `agent-diary install --force` |
+| Claude Code에서 Notion 업무일지까지 사용 | `pip install "agent-diary[notion]"` -> `agent-diary init` -> `agent-diary install --force` -> `agent-diary diary-notion init` -> `agent-diary diary-notion ensure` |
+| Codex에서 Markdown 수동 기록 | `pip install agent-diary` -> `agent-diary init --codex-only` -> `agent-diary install --force --codex-only` -> 새 Codex 세션 |
+| Codex에서 Notion 업무일지까지 사용 | `pip install "agent-diary[notion]"` -> `agent-diary init --codex-only` -> `agent-diary install --force --codex-only` -> `agent-diary diary-notion init` -> `agent-diary diary-notion ensure` -> 새 Codex 세션 |
 
 ### 2-1. 패키지 설치와 기본 설정
 
 pip 설치:
 
 ```bash
-pip install claude-diary
-working-diary init
+pip install agent-diary
+agent-diary init
 ```
 
 Notion 연동까지 사용할 경우:
 
 ```bash
-pip install "claude-diary[notion]"
-working-diary init
+pip install "agent-diary[notion]"
+agent-diary init
 ```
 
 Claude Code 플러그인 설치는 별도 배포 경로입니다. Claude Code의 plugin marketplace에서 이 프로젝트를 설치할 때 사용합니다.
 
 ```bash
 # Claude Code 안에서 실행
-/plugin marketplace add https://github.com/solzip/working-diary
+/plugin marketplace add https://github.com/solzip/agent-diary
 /plugin install working-diary
 ```
 
-이 플러그인은 Claude Code 쪽 hook 설정을 배포합니다. `working-diary` CLI는 Python 패키지에서 제공되므로, 플러그인 경로를 쓰더라도 Python 패키지 설치와 `working-diary init`이 준비되어 있어야 합니다.
+이 플러그인은 Claude Code 쪽 hook 설정을 배포합니다. `working-diary` CLI는 Python 패키지에서 제공되므로, 플러그인 경로를 쓰더라도 Python 패키지 설치와 `agent-diary init`이 준비되어 있어야 합니다.
 
 소스에서 설치:
 
 ```bash
-git clone https://github.com/solzip/working-diary.git
+git clone https://github.com/solzip/agent-diary.git
 cd working-diary
 pip install -e .
-working-diary init
+agent-diary init
 ```
 
 소스 설치에서 Notion 연동까지 사용할 경우:
@@ -154,7 +156,7 @@ working-diary init
 pip install -e ".[notion]"
 ```
 
-`working-diary init`은 설정 파일과 일지 디렉터리를 만들고 Claude Code Stop Hook도 함께 등록합니다. Codex만 쓰는 경우에는 `working-diary init --codex-only`를 실행하면 Claude Code 설정을 수정하지 않습니다.
+`agent-diary init`은 설정 파일과 일지 디렉터리를 만들고 Claude Code Stop Hook도 함께 등록합니다. Codex만 쓰는 경우에는 `agent-diary init --codex-only`를 실행하면 Claude Code 설정을 수정하지 않습니다.
 
 Claude Code나 Codex에서 slash command 또는 skill을 최신 상태로 쓰려면 아래 에이전트별 적용 명령을 추가로 실행합니다.
 
@@ -165,7 +167,7 @@ Claude Code는 세션 종료 시 자동 기록할 수 있고, 세션 중 수동 
 Claude Code 적용 또는 갱신:
 
 ```bash
-working-diary install --force
+agent-diary install --force
 ```
 
 자동 기록:
@@ -189,7 +191,7 @@ Notion 업무일지:
 /diary-notion
 ```
 
-`/diary`는 현재 프로젝트의 Claude Code transcript를 찾아 `working-diary write` core로 기록합니다. `/diary-notion`은 세션 내용을 task row로 정리한 JSON을 만든 뒤 `working-diary diary-notion push` core로 전달합니다.
+`/diary`는 현재 프로젝트의 Claude Code transcript를 찾아 `agent-diary write` core로 기록합니다. `/diary-notion`은 세션 내용을 task row로 정리한 JSON을 만든 뒤 `agent-diary diary-notion push` core로 전달합니다.
 
 ### 2-3. Codex 사용법
 
@@ -198,7 +200,7 @@ Codex는 자동 hook을 사용하지 않습니다. 사용자가 skill을 호출�
 Codex 적용 또는 갱신:
 
 ```bash
-working-diary install --force --codex-only
+agent-diary install --force --codex-only
 ```
 
 `--codex-only`는 Codex skill만 `~/.codex/skills` 아래에 설치하고 Claude Code hook/slash command는 수정하지 않습니다. `--codex`는 기존 호환 옵션으로 Claude Code hook/slash command를 함께 갱신합니다.
@@ -224,7 +226,7 @@ $diary-notion
 Notion 업무일지를 쓰려면 Notion API용 `requests`가 필요합니다.
 
 ```bash
-pip install "claude-diary[notion]"
+pip install "agent-diary[notion]"
 ```
 
 소스 설치에서 Notion까지 사용할 경우:
@@ -236,12 +238,12 @@ pip install -e ".[notion]"
 설정 절차:
 
 1. https://www.notion.so/my-integrations 에서 Integration을 만들고 토큰을 복사합니다.
-2. Notion에 루트 페이지를 만듭니다. 예: `Working Diary`
+2. Notion에 루트 페이지를 만듭니다. 예: `Agent Diary`
 3. 루트 페이지를 Integration에 공유합니다.
 4. 설정을 저장합니다.
 
 ```bash
-working-diary diary-notion init
+agent-diary diary-notion init
 ```
 
 `diary-notion init`은 입력한 Notion token과 root page ID를 로컬 config에 저장합니다. 이후 `CLAUDE_DIARY_NOTION_TOKEN` 또는 `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` 환경변수를 지정하면 저장된 config 값보다 환경변수가 우선합니다.
@@ -249,7 +251,7 @@ working-diary diary-notion init
 5. 연도별 `Entries` DB와 schema/view를 보장합니다.
 
 ```bash
-working-diary diary-notion ensure
+agent-diary diary-notion ensure
 ```
 
 6. 세션에서 `/diary-notion` 또는 `$diary-notion`을 실행합니다.
@@ -257,9 +259,9 @@ working-diary diary-notion ensure
 ### 2-5. Notion push 동작
 
 ```bash
-working-diary diary-notion push --input .diary-notion-<id>.json
-working-diary diary-notion push --input .diary-notion-<id>.json --force
-working-diary diary-notion push --input .diary-notion-<id>.json --dry-run
+agent-diary diary-notion push --input .diary-notion-<id>.json
+agent-diary diary-notion push --input .diary-notion-<id>.json --force
+agent-diary diary-notion push --input .diary-notion-<id>.json --dry-run
 ```
 
 - 기본 push는 `Session ID + Task Index`로 이미 기록된 row를 skip합니다.
@@ -292,8 +294,8 @@ Notion은 기록의 목적지이지 사본이 아닙니다. push가 중간에 �
 저장 위치를 바꾸거나 아예 끄려면:
 
 ```bash
-working-diary diary-notion push --input <json> --artifact-dir build/diary-runs
-working-diary diary-notion push --input <json> --no-artifacts
+agent-diary diary-notion push --input <json> --artifact-dir build/diary-runs
+agent-diary diary-notion push --input <json> --no-artifacts
 ```
 
 ### 2-7. 검토 큐
@@ -301,9 +303,9 @@ working-diary diary-notion push --input <json> --no-artifacts
 검토는 일이 끝난 뒤 사람이 내리는 판단이므로, 기록 파이프라인의 어느 단계도 스스로 "검토됨"을 선언하지 않습니다. push는 모든 새 row를 `Needs Review`로 기록하고, `Reviewed`로 올릴 수 있는 것은 이 명령의 `--apply`뿐입니다.
 
 ```bash
-working-diary diary-notion review              # 검토 대기 row 나열 (읽기 전용)
-working-diary diary-notion review --apply      # Reviewed + Last Reviewed=오늘 기록
-working-diary diary-notion review --year 2026
+agent-diary diary-notion review              # 검토 대기 row 나열 (읽기 전용)
+agent-diary diary-notion review --apply      # Reviewed + Last Reviewed=오늘 기록
+agent-diary diary-notion review --year 2026
 ```
 
 `--apply` 없이 실행하면 아무것도 쓰지 않습니다. `ensure --dry-run` / `ensure`와 같은 방식입니다.
@@ -314,7 +316,7 @@ working-diary diary-notion review --year 2026
 
 1. 해당 연도의 `Entries` DB를 엽니다.
 2. 우상단 `...` 메뉴에서 `Sub-items`를 활성화합니다.
-3. 다시 `working-diary diary-notion ensure`를 실행합니다.
+3. 다시 `agent-diary diary-notion ensure`를 실행합니다.
 
 Sub-items가 아직 없어도 row 기록은 정상 동작합니다. 다만 계층 nesting만 표시되지 않고, push 명령이 안내를 출력합니다.
 
@@ -343,9 +345,9 @@ core 처리
 
 | 영역 | 파일 | 역할 |
 |------|------|------|
-| CLI entry | `src/claude_diary/cli/__init__.py` | `working-diary`, `claude-diary` 명령 라우팅 |
+| CLI entry | `src/claude_diary/cli/__init__.py` | `agent-diary` 명령과 `working-diary` / `claude-diary` alias 라우팅 |
 | 자동 기록 core | `src/claude_diary/core.py` | Claude Code Stop Hook 자동 일지 pipeline |
-| 수동 기록 core | `src/claude_diary/cli/write.py` | `/diary`, `$diary`, `working-diary write` 처리 |
+| 수동 기록 core | `src/claude_diary/cli/write.py` | `/diary`, `$diary`, `agent-diary write` 처리 |
 | Notion push | `src/claude_diary/cli/notion_push/` | task JSON을 Notion row로 push (validate/properties/relations/artifacts로 분리) |
 | Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | schema v8, core view 5개와 operating view 5개 보장 |
 | Notion 검토 큐 | `src/claude_diary/cli/notion_review.py` | `Needs Review` row 나열, `--apply` 시 `Reviewed` 기록 |
@@ -368,17 +370,17 @@ Claude Code Stop Hook
 
 ```text
 /diary
-  -> claude-diary write
+  -> agent-diary write
   -> 현재 cwd에 맞는 Claude transcript 탐색
   -> manual diary 경로에 append
 
 /diary-notion
   -> agent가 task JSON 생성
-  -> claude-diary diary-notion push --input <json>
+  -> agent-diary diary-notion push --input <json>
   -> Notion Entries DB에 row push
 ```
 
-설치 명령 `working-diary install --force`는 다음을 갱신합니다.
+설치 명령 `agent-diary install --force`는 다음을 갱신합니다.
 
 - `~/.claude/settings.json` Stop Hook
 - `~/.claude/commands/diary.md`
@@ -391,17 +393,17 @@ Codex는 Stop Hook이 없습니다. 전역 skill을 통해 core CLI를 호출합
 ```text
 $diary
   -> Codex가 현재 세션 내용을 .diary-<id>.json으로 작성
-  -> working-diary write --input .diary-<id>.json
+  -> agent-diary write --input .diary-<id>.json
   -> manual diary 경로에 append
 
 $diary-notion
   -> Codex가 현재 세션을 task 단위로 분리
   -> .diary-notion-<id>.json 작성
-  -> working-diary diary-notion push --input .diary-notion-<id>.json
+  -> agent-diary diary-notion push --input .diary-notion-<id>.json
   -> Notion Entries DB에 row push
 ```
 
-설치 명령 `working-diary install --force --codex-only`는 다음을 갱신합니다.
+설치 명령 `agent-diary install --force --codex-only`는 다음을 갱신합니다.
 
 - `~/.codex/skills/diary/SKILL.md`
 - `~/.codex/skills/diary-notion/SKILL.md`
@@ -411,78 +413,78 @@ $diary-notion
 핵심 명령:
 
 ```bash
-working-diary init
-working-diary init --codex-only
-working-diary install --force
-working-diary install --force --codex
-working-diary install --force --codex-only
-working-diary uninstall
-working-diary uninstall --codex
-working-diary uninstall --codex-only
+agent-diary init
+agent-diary init --codex-only
+agent-diary install --force
+agent-diary install --force --codex
+agent-diary install --force --codex-only
+agent-diary uninstall
+agent-diary uninstall --codex
+agent-diary uninstall --codex-only
 
-working-diary write
-working-diary write --input .diary-<id>.json
+agent-diary write
+agent-diary write --input .diary-<id>.json
 
-working-diary diary-notion init
-working-diary diary-notion ensure
-working-diary diary-notion ensure --dry-run
-working-diary diary-notion ensure --year 2026
+agent-diary diary-notion init
+agent-diary diary-notion ensure
+agent-diary diary-notion ensure --dry-run
+agent-diary diary-notion ensure --year 2026
 
-working-diary diary-notion push --input .diary-notion-<id>.json
-working-diary diary-notion push --input .diary-notion-<id>.json --force
-working-diary diary-notion push --input .diary-notion-<id>.json --dry-run
-working-diary diary-notion push --input .diary-notion-<id>.json --preview-file preview.md
-working-diary diary-notion push --input .diary-notion-<id>.json --artifact-dir build/diary-runs
-working-diary diary-notion push --input .diary-notion-<id>.json --no-artifacts
+agent-diary diary-notion push --input .diary-notion-<id>.json
+agent-diary diary-notion push --input .diary-notion-<id>.json --force
+agent-diary diary-notion push --input .diary-notion-<id>.json --dry-run
+agent-diary diary-notion push --input .diary-notion-<id>.json --preview-file preview.md
+agent-diary diary-notion push --input .diary-notion-<id>.json --artifact-dir build/diary-runs
+agent-diary diary-notion push --input .diary-notion-<id>.json --no-artifacts
 
-working-diary diary-notion ops
-working-diary diary-notion ops --stale-days 14
-working-diary diary-notion ops --json
+agent-diary diary-notion ops
+agent-diary diary-notion ops --stale-days 14
+agent-diary diary-notion ops --json
 
-working-diary diary-notion review
-working-diary diary-notion review --apply
+agent-diary diary-notion review
+agent-diary diary-notion review --apply
 
-working-diary notion push --input .diary-notion-<id>.json
+agent-diary notion push --input .diary-notion-<id>.json
 ```
 
 조회와 관리 명령:
 
 ```bash
-working-diary search "키워드"
-working-diary filter --project my-app
-working-diary trace src/main.py
-working-diary stats
-working-diary weekly
-working-diary audit
-working-diary audit --verify
-working-diary config
-working-diary config --set lang=en
-working-diary migrate
-working-diary reindex
-working-diary delete --last
+agent-diary search "키워드"
+agent-diary filter --project my-app
+agent-diary trace src/main.py
+agent-diary stats
+agent-diary weekly
+agent-diary audit
+agent-diary audit --verify
+agent-diary config
+agent-diary config --set lang=en
+agent-diary migrate
+agent-diary reindex
+agent-diary delete --last
 ```
 
 확장 기능 명령:
 
 ```bash
-working-diary config --add-exporter slack
-working-diary config --add-exporter discord
-working-diary config --add-exporter obsidian
-working-diary config --add-exporter github
-working-diary dashboard
-working-diary dashboard --serve --port 8787
-working-diary team stats
-working-diary team weekly
-working-diary team monthly --month 2026-06
-working-diary team init --repo <url> --name <name>
-working-diary team add-member --name <name> --role member
+agent-diary config --add-exporter slack
+agent-diary config --add-exporter discord
+agent-diary config --add-exporter obsidian
+agent-diary config --add-exporter github
+agent-diary dashboard
+agent-diary dashboard --serve --port 8787
+agent-diary team stats
+agent-diary team weekly
+agent-diary team monthly --month 2026-06
+agent-diary team init --repo <url> --name <name>
+agent-diary team add-member --name <name> --role member
 ```
 
 기존 CLI도 계속 지원합니다.
 
 ```bash
-claude-diary write
-claude-diary diary-notion ensure
+agent-diary write
+agent-diary diary-notion ensure
 ```
 
 ## 5. 설정
@@ -512,23 +514,23 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 - Git branch, commit, diff stat 기록
 - secret scan과 masking
 - 검색 인덱스
-- Notion 업무일지: `working-diary diary-notion init` -> `working-diary diary-notion ensure`
-- Notion 운영 진단: `working-diary diary-notion ops`로 blocked/review/next action/stale/work days/today-plan 후보/부모 상태 제안 확인
-- 검토 큐: `working-diary diary-notion review`. push는 항상 `Needs Review`로 기록하고 `--apply`만 `Reviewed`로 승격
+- Notion 업무일지: `agent-diary diary-notion init` -> `agent-diary diary-notion ensure`
+- Notion 운영 진단: `agent-diary diary-notion ops`로 blocked/review/next action/stale/work days/today-plan 후보/부모 상태 제안 확인
+- 검토 큐: `agent-diary diary-notion review`. push는 항상 `Needs Review`로 기록하고 `--apply`만 `Reviewed`로 승격
 - push 실행 기록: 매 push마다 `input.json`, `git-diff.patch`, `preview.md`, `manifest.json`을 로컬에 sha256과 함께 보존
 - 같은 `Task Group`을 이어가는 세션에 `(N차)` 자동 부여 (컬럼 추가 없음)
 - 하루치 row는 작업한 순서대로 정렬 (`Date` 동률을 `Task Index`로 tie-break)
-- Slack, Discord, Obsidian, GitHub exporter: `working-diary config --add-exporter <name>`
-- HTML dashboard: `working-diary dashboard` 또는 `working-diary dashboard --serve --port 8787`
+- Slack, Discord, Obsidian, GitHub exporter: `agent-diary config --add-exporter <name>`
+- HTML dashboard: `agent-diary dashboard` 또는 `agent-diary dashboard --serve --port 8787`
 - audit log와 source checksum 검증
-- team mode: `working-diary team init --repo <url> --name <name>`
+- team mode: `agent-diary team init --repo <url> --name <name>`
 
 ## 7. 문제 해결
 
 | 증상 | 확인할 것 |
 |------|-----------|
-| `/diary` 또는 `/diary-notion`이 최신 지시문을 쓰지 않음 | `working-diary install --force`로 hook과 slash command를 갱신 |
-| `$diary` 또는 `$diary-notion`이 최신 지시문을 쓰지 않음 | `working-diary install --force --codex-only`로 skill을 갱신한 뒤 새 Codex 세션 시작 |
+| `/diary` 또는 `/diary-notion`이 최신 지시문을 쓰지 않음 | `agent-diary install --force`로 hook과 slash command를 갱신 |
+| `$diary` 또는 `$diary-notion`이 최신 지시문을 쓰지 않음 | `agent-diary install --force --codex-only`로 skill을 갱신한 뒤 새 Codex 세션 시작 |
 | Notion push가 인증 오류를 냄 | Integration token, root page ID, page 공유 상태 확인 |
 | Notion 하위항목 nesting이 안 보임 | `Entries` DB에서 Notion UI의 Sub-items를 한 번 활성화 |
 | push 재시도 시 중복이 걱정됨 | 기본 push는 같은 `Session ID + Task Index`를 skip. 다시 쓰려면 `--force` 사용 |
@@ -551,7 +553,7 @@ python -m ruff check .
 | 구분 | 내용 |
 |------|------|
 | 사용 가능 | Claude Code Stop Hook, Codex skill, Markdown 일지, Notion task row push, schema v8 / view ensure, 운영 진단 `ops`, 검토 큐 `review`, push 실행 기록 |
-| 진행 중 | Notion 스키마 축소 ([#12](https://github.com/solzip/working-diary/issues/12)), dry-run 차수 반영 ([#10](https://github.com/solzip/working-diary/issues/10)), `Schema Version` 표기 정정 ([#11](https://github.com/solzip/working-diary/issues/11)) |
+| 진행 중 | Notion 스키마 축소 ([#12](https://github.com/solzip/agent-diary/issues/12)), dry-run 차수 반영 ([#10](https://github.com/solzip/agent-diary/issues/10)), `Schema Version` 표기 정정 ([#11](https://github.com/solzip/agent-diary/issues/11)) |
 | 다음 개선 | Windows 설치/출력 경험 정리, Notion sub-item 안내 개선 |
 | 검토 중 | SQLite 기반 검색 인덱스, Cursor/Windsurf/VS Code 같은 다른 AI IDE 연동 |
 

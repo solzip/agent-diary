@@ -10,7 +10,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
 ## Current Implementation Contract
 
 - `$diary-notion` is a row push workflow only. Do not run schema/view ensure unless the user explicitly asks for it.
-- `working-diary diary-notion ensure` is the separate maintenance command that guarantees schema v8, native sub-items, 5 core views, and 5 operating views.
+- `agent-diary diary-notion ensure` is the separate maintenance command that guarantees schema v8, native sub-items, 5 core views, and 5 operating views.
 - Use Notion native sub-items for containment by setting `parent_index`. If the native relation is not enabled in Notion, still push the rows and report that sub-item activation is needed.
 - Treat legacy `Parent Task` / `Sub-items` as compatibility data only. Do not target them directly in JSON.
 - Use `Depends On` only for prerequisite links between large top-level main tasks. Never use dependencies for child tasks.
@@ -74,14 +74,14 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
      - Use `Test` for tester, QA, validation, and verification-only sessions unless another enum is clearly more accurate
-   - Omit any optional field you cannot ground in what actually happened this session. A guessed value is worse than a blank one: it reads as a real signal in Notion and in `working-diary diary-notion ops`
+   - Omit any optional field you cannot ground in what actually happened this session. A guessed value is worse than a blank one: it reads as a real signal in Notion and in `agent-diary diary-notion ops`
    - `work_period`: only for work that genuinely spans several days, as `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}`. Omit it for single-day work — the CLI records the date the command ran
    - `priority`: `P0`, `P1`, `P2`, or `P3`, only when the session gives a real reason to rank it — `P0` when it blocks other work, `P1` when the user asked for it next. Omit it rather than defaulting everything to `P2`
    - `next_action`: 0-1 concrete Korean action that can be started next
    - `blocked`: `true` only when the task cannot continue without external decision, permission, or information
    - `block_reason`: Korean reason when `blocked` is `true`
    - `carryover`: `true` when this row continues unfinished work from a previous day/session
-   - Do not author review state. Every row is filed as `Needs Review`; only a human running `working-diary diary-notion review --apply` moves it to `Reviewed`
+   - Do not author review state. Every row is filed as `Needs Review`; only a human running `agent-diary diary-notion review --apply` moves it to `Reviewed`
    - `task_group`: stable kebab-case/snake-case group for multi-session work
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy and Notion sub-items
    - `depends_on_indices`: zero-based indices in this push, or `[]`
@@ -151,10 +151,10 @@ Split the current Codex session into task-sized entries and push them to Notion.
 }
 ```
 
-5. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json --dry-run` to validate v2 input, write local artifacts, and preview the compact report body and appendix toggles without writing to Notion.
+5. Run `agent-diary diary-notion push --input .diary-notion-<8-random>.json --dry-run` to validate v2 input, write local artifacts, and preview the compact report body and appendix toggles without writing to Notion.
 6. If the preview is structurally wrong, fix the JSON before pushing.
-7. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
-8. If `working-diary` is not available, run `claude-diary diary-notion push --input .diary-notion-<8-random>.json`.
+7. Run `agent-diary diary-notion push --input .diary-notion-<8-random>.json`.
+8. If `agent-diary` is not available, run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
 9. Report pushed/skipped/failed tasks from the CLI output.
 
 If there are no task-worthy changes, explain that and do not call the CLI.

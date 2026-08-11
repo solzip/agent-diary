@@ -105,7 +105,7 @@ def cmd_filter(args):
     entries = index.get("entries", [])
 
     if not entries:
-        print("No index found. Run 'claude-diary reindex' first.")
+        print("No index found. Run 'agent-diary reindex' first.")
         return
 
     results = []

@@ -1,4 +1,4 @@
-"""Tests for `claude-diary diary-notion ensure` CLI."""
+"""Tests for `agent-diary diary-notion ensure` CLI."""
 
 from argparse import Namespace
 from unittest.mock import ANY, MagicMock, patch
@@ -122,7 +122,7 @@ class TestCmdNotionEnsure:
         assert exc.value.code == 1
         captured = capsys.readouterr()
         assert "conflict[missing_filter]" in captured.out
-        assert "rerun `working-diary diary-notion ensure` to repair the view filter" in captured.out
+        assert "rerun `agent-diary diary-notion ensure` to repair the view filter" in captured.out
         assert "apply: yes" in captured.out
 
 

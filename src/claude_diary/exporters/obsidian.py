@@ -33,7 +33,7 @@ class ObsidianExporter(BaseExporter):
             "date: %s" % date,
             "project: %s" % project,
             "categories: [%s]" % ", ".join(categories),
-            "tags: [claude-diary, %s]" % project,
+            "tags: [agent-diary, %s]" % project,
             "---",
             "",
         ]

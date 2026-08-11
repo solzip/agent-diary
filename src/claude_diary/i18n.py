@@ -79,7 +79,7 @@ LABELS = {
         "cli_checksum_fail": "경고: 체크섬 불일치!",
         "cli_init_done": "완료! Claude Code 세션이 자동으로 기록됩니다.",
         "cli_migrating": "v1.0 환경변수를 config.json으로 마이그레이션 중...",
-        "cli_team_not_configured": "팀이 설정되지 않았습니다. 실행: claude-diary team init --repo <url>",
+        "cli_team_not_configured": "팀이 설정되지 않았습니다. 실행: agent-diary team init --repo <url>",
         "cli_dashboard_generated": "대시보드 생성: %s",
     },
     "en": {
@@ -160,7 +160,7 @@ LABELS = {
         "cli_checksum_fail": "WARNING: Checksum mismatch!",
         "cli_init_done": "Done! Claude Code sessions will be auto-logged.",
         "cli_migrating": "Migrating v1.0 environment variables to config.json...",
-        "cli_team_not_configured": "Team not configured. Run: claude-diary team init --repo <url>",
+        "cli_team_not_configured": "Team not configured. Run: agent-diary team init --repo <url>",
         "cli_dashboard_generated": "Dashboard generated: %s",
     },
 }

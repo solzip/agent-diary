@@ -1,4 +1,4 @@
-"""Tests for `working-diary diary-notion ops` CLI."""
+"""Tests for `agent-diary diary-notion ops` CLI."""
 
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
@@ -247,7 +247,7 @@ class TestCmdNotionOps:
         exporter.query_database_rows.assert_called_once_with("db1")
         exporter.get_database_property_map.assert_called_once_with("db1")
         captured = capsys.readouterr()
-        assert "[working-diary diary-notion ops]" in captured.out
+        assert "[agent-diary diary-notion ops]" in captured.out
         assert "Rows: 2 total, 1 active" in captured.out
         assert "Blocked: 1" in captured.out
         assert "Today-plan candidates:" in captured.out

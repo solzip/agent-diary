@@ -92,6 +92,6 @@ def _validate_push_data(data):
 
 
 def _print_validation_errors(errors, input_path):
-    print("[claude-diary diary-notion push] Invalid input: %s" % input_path, file=sys.stderr)
+    print("[agent-diary diary-notion push] Invalid input: %s" % input_path, file=sys.stderr)
     for error in errors[:20]:
         print("  - %s" % error, file=sys.stderr)

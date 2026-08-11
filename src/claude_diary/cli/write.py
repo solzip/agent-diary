@@ -1,6 +1,6 @@
 """Manual diary write — on-demand structured diary generation.
 
-Triggered by `claude-diary write` (typically via `/diary` or `$diary`).
+Triggered by `agent-diary write` (typically via `/diary` or `$diary`).
 Auto-detects current session's transcript and writes to:
     <manual_diary_dir>/<date>/<project>/<date>.md
 
@@ -124,13 +124,13 @@ def _append_or_create(target_path, date_str, entry_text, lang):
 
 def _read_input_json(path):
     if not path or not os.path.exists(path):
-        print("[claude-diary write] Input file not found: %s" % path, file=sys.stderr)
+        print("[agent-diary write] Input file not found: %s" % path, file=sys.stderr)
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError) as e:
-        print("[claude-diary write] Failed to read JSON: %s" % e, file=sys.stderr)
+        print("[agent-diary write] Failed to read JSON: %s" % e, file=sys.stderr)
         return None
 
 
@@ -215,11 +215,11 @@ def _write_manual_entry(entry_data, manual_dir, lang):
     try:
         _append_or_create(target, date_str, entry_text, lang)
     except OSError as e:
-        print("[claude-diary write] Failed to write diary file.", file=sys.stderr)
+        print("[agent-diary write] Failed to write diary file.", file=sys.stderr)
         print("  target: %s" % target, file=sys.stderr)
         print("  error: %s" % e, file=sys.stderr)
         print("  hint: check CLAUDE_DIARY_MANUAL_DIR or"
-              " `claude-diary config --set manual_diary_dir=<path>`", file=sys.stderr)
+              " `agent-diary config --set manual_diary_dir=<path>`", file=sys.stderr)
         sys.exit(1)
 
     return "appended to" if existed else "created", target
@@ -261,18 +261,18 @@ def cmd_write(args):
             sys.exit(1)
         entry_data = _entry_data_from_input(data, date_str, time_str, cwd, project)
         if not _has_diary_content(entry_data):
-            print("[claude-diary write] Input has no diary-worthy content.", file=sys.stderr)
+            print("[agent-diary write] Input has no diary-worthy content.", file=sys.stderr)
             sys.exit(1)
         _enrich_entry_data(entry_data, config, enrichment, data.get("session_start"))
         action, target = _write_manual_entry(entry_data, manual_dir, lang)
         _cleanup(input_path)
-        print("[claude-diary write] %s %s" % (action, target))
+        print("[agent-diary write] %s %s" % (action, target))
         return
 
     transcript_path = _find_latest_transcript(cwd)
     if not transcript_path:
         encoded = _encode_cwd(os.path.abspath(cwd))
-        print("[claude-diary write] No transcript found for current project.", file=sys.stderr)
+        print("[agent-diary write] No transcript found for current project.", file=sys.stderr)
         print("  cwd: %s" % cwd, file=sys.stderr)
         print("  searched: ~/.claude/projects/%s/" % encoded, file=sys.stderr)
         print("  hint: run /diary inside a Claude Code session that has at least", file=sys.stderr)
@@ -301,9 +301,9 @@ def cmd_write(args):
     }
 
     if not _has_diary_content(entry_data):
-        print("[claude-diary write] Transcript has no diary-worthy content yet.", file=sys.stderr)
+        print("[agent-diary write] Transcript has no diary-worthy content yet.", file=sys.stderr)
         sys.exit(1)
 
     _enrich_entry_data(entry_data, config, enrichment, parsed.get("session_start"))
     action, target = _write_manual_entry(entry_data, manual_dir, lang)
-    print("[claude-diary write] %s %s" % (action, target))
+    print("[agent-diary write] %s %s" % (action, target))

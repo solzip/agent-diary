@@ -1,4 +1,4 @@
-"""Tests for `claude-diary diary-notion init` interactive setup."""
+"""Tests for `agent-diary diary-notion init` interactive setup."""
 
 from unittest.mock import patch, MagicMock
 
