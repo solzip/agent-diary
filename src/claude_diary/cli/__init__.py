@@ -2,7 +2,10 @@
 """agent-diary CLI — search, filter, stats, and manage your work diary."""
 
 import argparse
+import os
 import sys
+
+from claude_diary.cli.notion_push.artifacts import default_artifact_dir
 
 # Re-export dependencies so submodules can access them via claude_diary.cli.*
 # and so that tests can patch them at claude_diary.cli.<name>.
@@ -21,6 +24,7 @@ from claude_diary.cli.maintenance import cmd_reindex, cmd_audit, cmd_delete, cmd
 from claude_diary.cli.setup import cmd_install, cmd_uninstall
 from claude_diary.cli.write import cmd_write
 from claude_diary.cli.backfill import cmd_backfill
+from claude_diary.cli.doctor import cmd_doctor
 from claude_diary.cli.notion_push import cmd_notion_push
 from claude_diary.cli.notion_init import cmd_notion_init
 from claude_diary.cli.notion_ensure import cmd_notion_ensure
@@ -56,8 +60,12 @@ def _add_diary_notion_parser(sub, name):
                           help="Preview push body without writing, or print ensure plan")
     p_notion.add_argument("--preview-file",
                           help="Write push dry-run/preview Markdown to this file")
-    p_notion.add_argument("--artifact-dir", default=".codefleet/runs",
-                          help="Directory for local run artifacts (push only)")
+    # Resolved here rather than inside the command: an absent `--artifact-dir`
+    # on the parsed args means "no artifacts", which is what the tests rely on.
+    p_notion.add_argument("--artifact-dir", default=default_artifact_dir(os.getcwd()),
+                          help=("Directory for local run artifacts (push only). "
+                                "Defaults to .agent-diary/runs, or .codefleet/runs "
+                                "if that already exists here."))
     p_notion.add_argument("--no-artifacts", action="store_true",
                           help="Do not write local run artifacts (push only)")
     p_notion.add_argument("--stale-days", type=int, default=7,
@@ -186,6 +194,14 @@ def main():
     p_backfill.add_argument("--transcripts",
                             help="Transcript directory (default: ~/.claude/projects)")
 
+    # doctor (is it still recording?)
+    p_doctor = sub.add_parser(
+        "doctor",
+        help="Check that the hook is registered and the diary is still being written",
+    )
+    p_doctor.add_argument("--notion", action="store_true",
+                          help="Also make a read-only request to Notion")
+
     # notion (hierarchical Notion DB integration — for /diary-notion slash command)
     _add_diary_notion_parser(sub, "diary-notion")
     _add_diary_notion_parser(sub, "notion")
@@ -214,6 +230,7 @@ def main():
         "uninstall": cmd_uninstall,
         "write": cmd_write,
         "backfill": cmd_backfill,
+        "doctor": cmd_doctor,
         "diary-notion": cmd_notion,
         "notion": cmd_notion,
     }

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`agent-diary doctor`**: 이 도구가 아직 기록하고 있는지 점검한다. postmortem이 지목한 실패 유형 — *일지가 안 쌓이는 것은 조용한 하루와 구별되지 않는다* — 에 대한 탐지 수단이 그동안 없었다. 같은 유형을 오늘 한 번 더 만들 뻔했다(import 패키지를 바꿨다면 사용자 `settings.json`의 hook이 에러 없이 죽었을 것)
+  - Stop Hook 등록 여부, 그 hook이 명시한 모듈이 실제로 임포트되는지, 마지막 기록으로부터 며칠 지났는지(7일 초과 시 경고), config 존재, 일지 경로 쓰기 가능 여부
+  - `--notion`을 주면 Notion에 **읽기 전용** 요청 1회. `ensure_database`는 부르지 않는다 — 없으면 연도 페이지와 DB를 만들기 때문에 상태 점검이 할 일이 아니다
+  - 실패가 있으면 exit code 1이라 cron이나 사전 점검에 그대로 물릴 수 있다
+
+### Changed
+
+- **run artifact 기본 경로 `.codefleet/runs` → `.agent-diary/runs`**: `.codefleet`은 별개 프로젝트 이름이라, 이 도구를 설치한 사람의 저장소에 **자기가 깔지 않은 소프트웨어 이름의 디렉터리**가 생겼다 (로컬에서 무관한 프로젝트 6곳에 만들어져 있었다)
+  - 이미 `.codefleet/runs`가 있는 프로젝트는 계속 그걸 쓴다. 중간에 바꾸면 한 프로젝트의 실행 기록이 두 폴더로 갈라진다
+
 ## [4.6.0] - 2026-08-11
 
 ### Added

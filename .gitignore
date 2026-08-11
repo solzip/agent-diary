@@ -30,4 +30,5 @@ claude-code-working-diary.tar.gz
 .diary-notion-*.json
 
 # Local v2 diary-notion run artifacts
+.agent-diary/runs/
 .codefleet/runs/

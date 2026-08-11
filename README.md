@@ -280,7 +280,7 @@ agent-diary diary-notion push --input .diary-notion-<id>.json --dry-run
 Every push writes a record of the run under the current working directory, **by default**. `--dry-run` writes it too.
 
 ```text
-<cwd>/.codefleet/runs/<YYYYMMDD-HHMMSS-session>/
+<cwd>/.agent-diary/runs/<YYYYMMDD-HHMMSS-session>/
   input.json        the original task JSON
   git-diff.patch    the working tree diff at push time
   preview.md        the rendered Notion body
@@ -292,7 +292,7 @@ Notion is the destination, not the record. If a push half-fails, or a row is lat
 **`git-diff.patch` contains your uncommitted code.** Keep it out of your repository:
 
 ```gitignore
-.codefleet/runs/
+.agent-diary/runs/
 ```
 
 To relocate or disable it:
@@ -435,6 +435,9 @@ agent-diary backfill --since 2026-07-01
 agent-diary backfill --limit 20
 agent-diary backfill --transcripts /path/to/projects
 
+agent-diary doctor
+agent-diary doctor --notion
+
 agent-diary diary-notion init
 agent-diary diary-notion ensure
 agent-diary diary-notion ensure --dry-run
@@ -567,7 +570,9 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 | Notion push reports an auth error | Check the integration token, root page ID, and page sharing |
 | Notion task hierarchy is not nested | Enable Sub-items once in the Notion `Entries` database UI |
 | Re-push might duplicate rows | Default push skips the same `Session ID + Task Index`; use `--force` to rewrite |
-| A `.codefleet/` directory appeared in my project | That is the push run record. Add `.codefleet/runs/` to `.gitignore`, or disable it with `--no-artifacts` (see [2-6](#2-6-what-a-push-leaves-on-disk-run-artifacts)) |
+| A `.agent-diary/` directory appeared in my project | That is the push run record. Add `.agent-diary/runs/` to `.gitignore`, or disable it with `--no-artifacts` (see [2-6](#2-6-what-a-push-leaves-on-disk-run-artifacts)) |
+| Entries stopped appearing and I do not know why | Run `agent-diary doctor`. It checks that the hook is registered, that the module it names still resolves, and how long it has been since the last entry |
+| I used to get `.codefleet/runs/` | That was the old default, named after a separate project. New projects use `.agent-diary/runs/`; an existing `.codefleet/runs/` keeps being used so your history does not split |
 | I want to drop the `(N차)` suffix from titles | It counts prior sessions of the same `Task Group`. Leave `task_group` empty and no suffix is added |
 | PowerShell text is garbled | Apply the UTF-8 output setting above |
 

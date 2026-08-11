@@ -238,7 +238,7 @@ class TestBuildNotionBlocks:
                 "commands_run": ["python -m pytest -q"],
                 "artifacts": [{
                     "kind": "stdout",
-                    "path": ".codefleet/runs/20260605-001/stdout.log",
+                    "path": ".agent-diary/runs/20260605-001/stdout.log",
                     "summary": "test output",
                     "sha256": "abcdef1234567890",
                 }],
@@ -261,7 +261,7 @@ class TestBuildNotionBlocks:
         assert "Prompt Outputs / Verification Artifacts" in texts
         assert "QA finding summary" in texts
         assert "Command / File / Commit Evidence" in texts
-        assert "Artifacts: stdout: .codefleet/runs/20260605-001/stdout.log - test output (sha256: abcdef123456)" in texts
+        assert "Artifacts: stdout: .agent-diary/runs/20260605-001/stdout.log - test output (sha256: abcdef123456)" in texts
         assert "Work Highlights: Short report body" in texts
 
     def test_noop_followups_are_not_rendered_as_next_action_todos(self):

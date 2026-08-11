@@ -110,7 +110,7 @@ class TestDiaryNotionInstructions:
         assert "Notion is the report surface" in codex_content
         assert "appendix.artifacts" in codex_content
         assert "push --input .diary-notion-<8-random>.json --dry-run" in codex_content
-        assert ".codefleet/runs" in codex_content
+        assert ".agent-diary/runs" in codex_content
         # Claude /diary-notion slash command carries the implementation contract
         assert "현재 구현 계약" in DIARY_NOTION_SLASH_COMMAND
         assert "schema v8" in DIARY_NOTION_SLASH_COMMAND
@@ -122,7 +122,7 @@ class TestDiaryNotionInstructions:
         assert "schema v2 normalized fields" in DIARY_NOTION_SLASH_COMMAND
         assert "appendix.artifacts" in DIARY_NOTION_SLASH_COMMAND
         assert "push --input .diary-notion-<8자리>.json --dry-run" in DIARY_NOTION_SLASH_COMMAND
-        assert ".codefleet/runs" in DIARY_NOTION_SLASH_COMMAND
+        assert ".agent-diary/runs" in DIARY_NOTION_SLASH_COMMAND
 
 
 class TestInstallSlashCommandSingle:

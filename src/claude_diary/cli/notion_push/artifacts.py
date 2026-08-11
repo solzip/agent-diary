@@ -14,6 +14,21 @@ import shutil
 import subprocess
 from datetime import datetime
 
+# Named after this tool. It used to be `.codefleet/runs`, borrowed from a
+# separate project, which meant installing agent-diary put a directory named
+# after unrelated software into your repository. An existing `.codefleet/runs`
+# is still honoured so nobody's history splits across two folders mid-stream.
+ARTIFACT_DIR = ".agent-diary/runs"
+LEGACY_ARTIFACT_DIR = ".codefleet/runs"
+
+
+def default_artifact_dir(cwd: str) -> str:
+    """Where run artifacts go when `--artifact-dir` was not given."""
+    legacy = os.path.join(cwd, *LEGACY_ARTIFACT_DIR.split("/"))
+    if os.path.isdir(legacy):
+        return LEGACY_ARTIFACT_DIR
+    return ARTIFACT_DIR
+
 
 def _prepare_run_artifacts(input_path, data, tasks, session_id, date_str, cwd, artifact_dir):
     if not artifact_dir:
