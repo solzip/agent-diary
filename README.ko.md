@@ -67,9 +67,12 @@ Agent Diary는 그 맥락을 세션이 끝나는 시점에 자동으로 붙잡�
 ```bash
 pip install agent-diary
 agent-diary init
+agent-diary backfill      # 선택: 이미 쌓여 있는 세션 가져오기
 ```
 
 이후로는 따로 할 일이 없습니다. Claude Code 세션이 끝날 때마다 `~/working-diary/YYYY-MM-DD.md`에 쌓입니다.
+
+Claude Code는 그동안 transcript를 디스크에 남겨왔습니다. `backfill`은 그걸 읽어서 **이미 한 일**로 채워진 일지를 만들어줍니다 — 빈 디렉터리가 아니라요. 이 도구를 만든 PC에서는 과거 세션 79개가 21일치 기록이 됐습니다. 두 번 실행해도 아무것도 달라지지 않습니다. 이미 들어 있는 세션은 건너뜁니다.
 
 > 이 프로젝트는 `claude-diary` → `working-diary`를 거쳐 `agent-diary`가 되었습니다. 옛 이름으로 설치했더라도 `working-diary`와 `claude-diary` 명령이 그대로 동작합니다.
 >
@@ -429,6 +432,12 @@ agent-diary uninstall --codex-only
 
 agent-diary write
 agent-diary write --input .diary-<id>.json
+
+agent-diary backfill
+agent-diary backfill --dry-run
+agent-diary backfill --since 2026-07-01
+agent-diary backfill --limit 20
+agent-diary backfill --transcripts /path/to/projects
 
 agent-diary diary-notion init
 agent-diary diary-notion ensure

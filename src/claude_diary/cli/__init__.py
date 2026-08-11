@@ -20,6 +20,7 @@ from claude_diary.cli.team import cmd_team
 from claude_diary.cli.maintenance import cmd_reindex, cmd_audit, cmd_delete, cmd_dashboard
 from claude_diary.cli.setup import cmd_install, cmd_uninstall
 from claude_diary.cli.write import cmd_write
+from claude_diary.cli.backfill import cmd_backfill
 from claude_diary.cli.notion_push import cmd_notion_push
 from claude_diary.cli.notion_init import cmd_notion_init
 from claude_diary.cli.notion_ensure import cmd_notion_ensure
@@ -173,6 +174,18 @@ def main():
     p_write = sub.add_parser("write", help="Write current session diary to <manual_dir>/<date>/<project>/")
     p_write.add_argument("--input", help="JSON input file for agent-authored diary entries")
 
+    # backfill (import sessions that predate installation)
+    p_backfill = sub.add_parser(
+        "backfill",
+        help="Import Claude Code sessions recorded before agent-diary was installed",
+    )
+    p_backfill.add_argument("--since", help="Only import sessions from this date onward (YYYY-MM-DD)")
+    p_backfill.add_argument("--limit", type=int, help="Import at most N sessions")
+    p_backfill.add_argument("--dry-run", action="store_true",
+                            help="List what would be imported without writing")
+    p_backfill.add_argument("--transcripts",
+                            help="Transcript directory (default: ~/.claude/projects)")
+
     # notion (hierarchical Notion DB integration — for /diary-notion slash command)
     _add_diary_notion_parser(sub, "diary-notion")
     _add_diary_notion_parser(sub, "notion")
@@ -200,6 +213,7 @@ def main():
         "install": cmd_install,
         "uninstall": cmd_uninstall,
         "write": cmd_write,
+        "backfill": cmd_backfill,
         "diary-notion": cmd_notion,
         "notion": cmd_notion,
     }

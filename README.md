@@ -67,9 +67,12 @@ Categories are inferred from the work. Branch, commits and diff stats are read f
 ```bash
 pip install agent-diary
 agent-diary init
+agent-diary backfill      # optional: import the sessions you already have
 ```
 
 Nothing else is required. Every Claude Code session from then on lands in `~/working-diary/YYYY-MM-DD.md`.
+
+Claude Code has been keeping transcripts on disk all along, so `backfill` gives you a diary of work you already did rather than an empty directory. On the machine this was built on it turned 79 past sessions into 21 days of entries. Running it twice changes nothing — sessions already in the diary are skipped.
 
 > This project was `claude-diary`, then `working-diary`, and is now `agent-diary`. If you installed it under an older name, the `working-diary` and `claude-diary` commands still work.
 >
@@ -425,6 +428,12 @@ agent-diary uninstall --codex-only
 
 agent-diary write
 agent-diary write --input .diary-<id>.json
+
+agent-diary backfill
+agent-diary backfill --dry-run
+agent-diary backfill --since 2026-07-01
+agent-diary backfill --limit 20
+agent-diary backfill --transcripts /path/to/projects
 
 agent-diary diary-notion init
 agent-diary diary-notion ensure

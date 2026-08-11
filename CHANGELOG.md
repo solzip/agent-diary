@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`agent-diary backfill`**: 설치 이전 세션을 가져온다. `init` 직후에는 세션이 하나 끝날 때까지 보여줄 게 없었는데, Claude Code는 그동안 `~/.claude/projects/`에 transcript를 남겨왔다. 이걸 읽어서 **실제로 작업한 날짜**로 일지를 만든다 (가져온 날짜가 아니라)
+  - **재실행 안전**: 이미 일지에 있는 세션은 건너뛴다. 판정 기준은 일지 Markdown에 남은 session id 자체 — audit 로그나 검색 인덱스는 파생물이라 낡으면 중복을 통과시킨다. 실제 트리로 두 번 돌려 결과가 sha256까지 동일함을 확인
+  - **서브에이전트 제외**: 서브에이전트도 각자 transcript 파일을 갖는다. 실측 194개 중 **115개(59%)** 가 그것이었고, 그대로 넣으면 일지 절반이 세션이 아니라 조각이 된다. `agent-` 파일명과 `agentId` 필드가 194개 전부에서 같은 115개를 가리켜 두 신호를 함께 쓴다. 조용히 버리지 않고 몇 개를 걸렀는지 출력한다
+  - `--dry-run`, `--since`, `--limit`, `--transcripts` 지원
+- `core.process_session()`에 `when` 인자 추가. 기본값은 현재 시각이고 Stop Hook에는 그게 맞다(세션 종료 시점에 실행되므로). backfill은 transcript의 시작 시각을 넘긴다
+
 ## [4.4.0] - 2026-08-11
 
 ### Added
