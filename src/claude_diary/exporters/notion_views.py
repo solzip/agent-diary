@@ -500,7 +500,7 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
     # Each view carries at most five columns. Anything a row needs beyond that
     # lives in the page body, and the read-only signals that used to justify
     # their own views (blocked, needs-review, today's priorities) are what
-    # `working-diary diary-notion ops` reports.
+    # `agent-diary diary-notion ops` reports.
     return [
         _view_spec(
             "작업 계층",

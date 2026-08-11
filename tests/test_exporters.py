@@ -154,7 +154,7 @@ class TestObsidianExporter:
         assert content.startswith("---\n")
         assert "date: 2026-03-17" in content
         assert "project: test-app" in content
-        assert "tags: [claude-diary, test-app]" in content
+        assert "tags: [agent-diary, test-app]" in content
 
 
 # ── Rich sample entry with commits and code_stats for testing embeds/fields ──

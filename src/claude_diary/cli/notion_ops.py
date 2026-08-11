@@ -1,4 +1,4 @@
-"""`working-diary diary-notion ops` -- read-only Notion operations report."""
+"""`agent-diary diary-notion ops` -- read-only Notion operations report."""
 
 import json
 import sys
@@ -58,18 +58,18 @@ def cmd_notion_ops(args):
         rows = exporter.query_database_rows(db_id)
         prop_map = exporter.get_database_property_map(db_id)
     except NotionAuthError as e:
-        print("[working-diary diary-notion ops] Auth error: %s" % e, file=sys.stderr)
-        print("  Check: claude-diary config or run `claude-diary diary-notion init`", file=sys.stderr)
+        print("[agent-diary diary-notion ops] Auth error: %s" % e, file=sys.stderr)
+        print("  Check: agent-diary config or run `agent-diary diary-notion init`", file=sys.stderr)
         sys.exit(1)
     except NotionNotFound as e:
-        print("[working-diary diary-notion ops] Not found: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion ops] Not found: %s" % e, file=sys.stderr)
         print("  Check that the root page/database is shared with the integration.", file=sys.stderr)
         sys.exit(1)
     except NotionBadRequest as e:
-        print("[working-diary diary-notion ops] Bad request: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion ops] Bad request: %s" % e, file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print("[working-diary diary-notion ops] Failed: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion ops] Failed: %s" % e, file=sys.stderr)
         sys.exit(1)
 
     native = detect_subitem_relation(prop_map)
@@ -402,15 +402,15 @@ def _print_missing_database(year, json_output):
             "error": "database_missing",
         }, ensure_ascii=False, indent=2))
         return
-    print("[working-diary diary-notion ops]")
+    print("[agent-diary diary-notion ops]")
     print("Year: %s" % year)
     print("Database: missing")
-    print("Run `working-diary diary-notion ensure --year %s` first." % year)
+    print("Run `agent-diary diary-notion ensure --year %s` first." % year)
 
 
 def _print_ops_report(year, db_id, report):
     counts = report["counts"]
-    print("[working-diary diary-notion ops]")
+    print("[agent-diary diary-notion ops]")
     print("Year: %s" % year)
     print("Database: %s" % db_id)
     print("Rows: %d total, %d active" % (counts["total"], counts["active"]))

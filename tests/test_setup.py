@@ -149,15 +149,15 @@ class TestInstallSlashCommandSingle:
 class TestUninstallSlashCommandSingle:
     def test_removes_when_marker_present(self, tmp_path):
         path = tmp_path / "x.md"
-        path.write_text("---\n...!claude-diary write\n", encoding="utf-8")
-        result = _uninstall_slash_command(str(path), "claude-diary write")
+        path.write_text("---\n...!agent-diary write\n", encoding="utf-8")
+        result = _uninstall_slash_command(str(path), "agent-diary write")
         assert result == "removed"
         assert not path.exists()
 
     def test_preserves_when_user_modified(self, tmp_path):
         path = tmp_path / "x.md"
         path.write_text("my custom content", encoding="utf-8")
-        result = _uninstall_slash_command(str(path), "claude-diary write")
+        result = _uninstall_slash_command(str(path), "agent-diary write")
         assert result == "skipped (modified by user)"
         assert path.exists()
 
@@ -170,9 +170,9 @@ class TestUninstallSlashCommandSingle:
 class TestInstallForce:
     def test_force_overwrites_when_marker_present(self, tmp_path):
         path = tmp_path / "x.md"
-        path.write_text("---\nold content with claude-diary write\n", encoding="utf-8")
-        result = _install_slash_command(str(path), "new content with claude-diary write",
-                                        marker="claude-diary write", force=True)
+        path.write_text("---\nold content with agent-diary write\n", encoding="utf-8")
+        result = _install_slash_command(str(path), "new content with agent-diary write",
+                                        marker="agent-diary write", force=True)
         assert result == "overwritten"
         assert "new content" in path.read_text(encoding="utf-8")
 
@@ -180,7 +180,7 @@ class TestInstallForce:
         path = tmp_path / "x.md"
         path.write_text("totally custom — no marker", encoding="utf-8")
         result = _install_slash_command(str(path), "new content",
-                                        marker="claude-diary write", force=True)
+                                        marker="agent-diary write", force=True)
         assert result == "skipped (modified by user)"
         # Original content preserved
         assert path.read_text(encoding="utf-8") == "totally custom — no marker"
@@ -194,7 +194,7 @@ class TestInstallForce:
         commands_dir = tmp_path / ".claude" / "commands"
         commands_dir.mkdir(parents=True)
         (commands_dir / "diary-notion.md").write_text(
-            "---\nold instructions claude-diary diary-notion push\n", encoding="utf-8"
+            "---\nold instructions agent-diary diary-notion push\n", encoding="utf-8"
         )
         args = MagicMock()
         args.force = True
@@ -216,8 +216,8 @@ class TestInstallAll:
         diary_notion = tmp_path / ".claude" / "commands" / "diary-notion.md"
         assert diary.exists()
         assert diary_notion.exists()
-        assert "claude-diary write" in diary.read_text(encoding="utf-8")
-        assert "claude-diary diary-notion push" in diary_notion.read_text(encoding="utf-8")
+        assert "agent-diary write" in diary.read_text(encoding="utf-8")
+        assert "agent-diary diary-notion push" in diary_notion.read_text(encoding="utf-8")
 
     def test_upgrade_path_keeps_existing_diary(self, tmp_path):
         """If user already has /diary from old install, /diary-notion still gets added."""
@@ -244,8 +244,8 @@ class TestInstallAllCodexSkills:
         notion = tmp_path / ".codex" / "skills" / "diary-notion" / "SKILL.md"
         assert diary.exists()
         assert notion.exists()
-        assert "working-diary write --input" in diary.read_text(encoding="utf-8")
-        assert "working-diary diary-notion push" in notion.read_text(encoding="utf-8")
+        assert "agent-diary write --input" in diary.read_text(encoding="utf-8")
+        assert "agent-diary diary-notion push" in notion.read_text(encoding="utf-8")
 
 
 class TestUninstallAll:

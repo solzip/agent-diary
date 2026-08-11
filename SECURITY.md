@@ -4,8 +4,8 @@
 
 - Reads Claude Code transcript files (read-only)
 - Writes diary entries to `~/working-diary/` directory
-- Registers or refreshes Claude Code hook/slash command settings when you run `working-diary init` or `working-diary install`
-- Codex-only setup does not modify Claude Code settings when you use `working-diary init --codex-only` and `working-diary install --codex-only`
+- Registers or refreshes Claude Code hook/slash command settings when you run `agent-diary init` or `agent-diary install`
+- Codex-only setup does not modify Claude Code settings when you use `agent-diary init --codex-only` and `agent-diary install --codex-only`
 - Stores exporter credentials such as API tokens and webhook URLs in local config
 - Scans for secrets before writing (auto-masking)
 - Logs all operations to `.audit.jsonl`
@@ -30,7 +30,7 @@
 
 - **Secret scanning**: Auto-masks passwords, API keys, tokens before writing
 - **Audit log**: Every Hook execution is logged with checksums
-- **Checksum verification**: `claude-diary audit --verify` detects source tampering
+- **Checksum verification**: `agent-diary audit --verify` detects source tampering
 - **Exporter isolation**: Exporters receive processed data only (no transcript access)
 - **Config protection**: File permissions 600 on Unix, tokens masked in CLI output
 - **Exporter trust levels**: Official / Community / Custom classification
@@ -46,8 +46,8 @@
 
 ```bash
 # Verify source code hasn't been tampered with
-claude-diary audit --verify
+agent-diary audit --verify
 
 # Review recent Hook executions
-claude-diary audit --days 7
+agent-diary audit --days 7
 ```

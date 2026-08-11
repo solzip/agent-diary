@@ -1,4 +1,4 @@
-"""Install/uninstall commands — register claude-diary hook in Claude Code settings."""
+"""Install/uninstall commands — register agent-diary hook in Claude Code settings."""
 
 import json
 import os
@@ -18,7 +18,7 @@ allowed-tools:
   - Bash
 ---
 
-!`claude-diary write`
+!`agent-diary write`
 """
 
 DIARY_NOTION_SLASH_COMMAND = """\
@@ -52,7 +52,7 @@ allowed-tools:
 ## 현재 구현 계약
 
 - `/diary-notion`은 작업 row push 전용. 사용자가 명시적으로 요청하지 않는 한 schema/view ensure를 실행하지 말 것
-- `working-diary diary-notion ensure`는 schema v8, native 하위항목, core view 5개, operating view 5개를 보장하는 별도 정비 명령
+- `agent-diary diary-notion ensure`는 schema v8, native 하위항목, core view 5개, operating view 5개를 보장하는 별도 정비 명령
 - 포함 관계는 `parent_index`로 Notion native 하위항목에 기록. native 관계가 아직 활성화돼 있지 않으면 row는 그대로 push하고 하위항목 활성화가 필요함을 보고할 것
 - legacy `Parent Task` / `Sub-items`는 호환용 데이터로만 취급하고 JSON에서 직접 지정하지 말 것
 - `Depends On`은 큰 최상위 메인 작업끼리의 선행 연결에만 사용하고, 하위 작업에는 절대 종속성을 쓰지 말 것
@@ -123,14 +123,14 @@ allowed-tools:
      - 한 task에 여러 단계 섞이면 **가장 진행된 단계로** (Testing 통과까지 했으면 Testing)
      - 결정만 했으면 Design, 코드 작성까지 했으면 Implementation, 테스트까지 했으면 Testing,
        머지/배포까지 했으면 Deployed
-   - 이번 세션에서 실제로 관찰한 근거가 없는 선택 필드는 비워둘 것. 추측해서 채운 값은 빈 값보다 나쁘다 — Notion과 `working-diary diary-notion ops`에서 진짜 신호처럼 읽힌다
+   - 이번 세션에서 실제로 관찰한 근거가 없는 선택 필드는 비워둘 것. 추측해서 채운 값은 빈 값보다 나쁘다 — Notion과 `agent-diary diary-notion ops`에서 진짜 신호처럼 읽힌다
    - `work_period`: 실제로 여러 날에 걸친 수행분일 때만 `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}`로 작성. 하루 안에 끝난 작업이면 생략 — CLI가 명령 실행 날짜로 기록한다
    - `priority`: 순위를 매길 근거가 세션에 있을 때만 `P0`/`P1`/`P2`/`P3` 중 하나. 다른 작업을 막고 있으면 `P0`, 사용자가 다음으로 요청했으면 `P1`. 근거가 없으면 전부 `P2`로 채우지 말고 생략할 것
    - `next_action`: 다음에 바로 실행할 수 있는 구체적 행동 0~1개
    - `blocked`: 외부 결정/권한/정보 없이는 진행할 수 없을 때만 `true`
    - `block_reason`: `blocked`가 `true`이면 원인을 한국어로 작성
    - `carryover`: 전날 또는 이전 세션의 미완료 작업을 오늘 이어서 처리한 row이면 `true`
-   - 검토 상태는 작성하지 않는다. 모든 row는 `Needs Review`로 기록되며, 사람이 `working-diary diary-notion review --apply`를 실행할 때만 `Reviewed`로 바뀐다
+   - 검토 상태는 작성하지 않는다. 모든 row는 `Needs Review`로 기록되며, 사람이 `agent-diary diary-notion review --apply`를 실행할 때만 `Reviewed`로 바뀐다
    - `task_group`: 며칠/여러 세션에 걸치는 큰 작업 단위 식별자 (예: `diary-notion-impl`, `auth-refactor`)
      - 같은 큰 작업의 task들끼리 같은 그룹명 사용 → Notion에서 group view로 묶임
      - 이전 작업의 연속이면 같은 그룹명, 새 작업이면 새 그룹명 (snake-case/kebab-case 권장)
@@ -150,8 +150,8 @@ allowed-tools:
 
 4. **JSON 저장 및 CLI 호출**
    - cwd 에 `.diary-notion-<8자리random>.json` 파일을 Write 도구로 생성
-   - `!claude-diary diary-notion push --input .diary-notion-<8자리>.json --dry-run`으로 본문 구조를 먼저 확인
-   - 구조가 맞으면 `!claude-diary diary-notion push --input .diary-notion-<8자리>.json` 실행
+   - `!agent-diary diary-notion push --input .diary-notion-<8자리>.json --dry-run`으로 본문 구조를 먼저 확인
+   - 구조가 맞으면 `!agent-diary diary-notion push --input .diary-notion-<8자리>.json` 실행
    - 종료 후 임시 파일 삭제 (CLI도 try/finally로 삭제하지만 보험)
 
 ## JSON 형식
@@ -240,8 +240,8 @@ Record the current Codex session as a manual Markdown work diary entry.
 }
 ```
 
-4. Run `working-diary write --input .diary-<8-random>.json`.
-5. If `working-diary` is not available, run `claude-diary write --input .diary-<8-random>.json`.
+4. Run `agent-diary write --input .diary-<8-random>.json`.
+5. If `agent-diary` is not available, run `working-diary write --input .diary-<8-random>.json`.
 6. Report the CLI result. The CLI removes the temp file after a successful write.
 
 Only include content visible in the current conversation or tool history. Do not invent work.
@@ -261,7 +261,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
 ## Current Implementation Contract
 
 - `$diary-notion` is a row push workflow only. Do not run schema/view ensure unless the user explicitly asks for it.
-- `working-diary diary-notion ensure` is the separate maintenance command that guarantees schema v8, native sub-items, 5 core views, and 5 operating views.
+- `agent-diary diary-notion ensure` is the separate maintenance command that guarantees schema v8, native sub-items, 5 core views, and 5 operating views.
 - Use Notion native sub-items for containment by setting `parent_index`. If the native relation is not enabled in Notion, still push the rows and report that sub-item activation is needed.
 - Treat legacy `Parent Task` / `Sub-items` as compatibility data only. Do not target them directly in JSON.
 - Use `Depends On` only for prerequisite links between large top-level main tasks. Never use dependencies for child tasks.
@@ -325,14 +325,14 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `status`: `Discussion`, `Design`, `Implementation`, `Testing`, or `Deployed`
    - `purpose`: `Feature`, `Bugfix`, `Refactor`, `Docs`, `Test`, `Infra`, `Planning`, `Research`, `Review`, `Release`, `Support`, `Maintenance`, or `General`
      - Use `Test` for tester, QA, validation, and verification-only sessions unless another enum is clearly more accurate
-   - Omit any optional field you cannot ground in what actually happened this session. A guessed value is worse than a blank one: it reads as a real signal in Notion and in `working-diary diary-notion ops`
+   - Omit any optional field you cannot ground in what actually happened this session. A guessed value is worse than a blank one: it reads as a real signal in Notion and in `agent-diary diary-notion ops`
    - `work_period`: only for work that genuinely spans several days, as `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}`. Omit it for single-day work — the CLI records the date the command ran
    - `priority`: `P0`, `P1`, `P2`, or `P3`, only when the session gives a real reason to rank it — `P0` when it blocks other work, `P1` when the user asked for it next. Omit it rather than defaulting everything to `P2`
    - `next_action`: 0-1 concrete Korean action that can be started next
    - `blocked`: `true` only when the task cannot continue without external decision, permission, or information
    - `block_reason`: Korean reason when `blocked` is `true`
    - `carryover`: `true` when this row continues unfinished work from a previous day/session
-   - Do not author review state. Every row is filed as `Needs Review`; only a human running `working-diary diary-notion review --apply` moves it to `Reviewed`
+   - Do not author review state. Every row is filed as `Needs Review`; only a human running `agent-diary diary-notion review --apply` moves it to `Reviewed`
    - `task_group`: stable kebab-case/snake-case group for multi-session work
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy and Notion sub-items
    - `depends_on_indices`: zero-based indices in this push, or `[]`
@@ -402,10 +402,10 @@ Split the current Codex session into task-sized entries and push them to Notion.
 }
 ```
 
-5. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json --dry-run` to validate v2 input, write local artifacts, and preview the compact report body and appendix toggles without writing to Notion.
+5. Run `agent-diary diary-notion push --input .diary-notion-<8-random>.json --dry-run` to validate v2 input, write local artifacts, and preview the compact report body and appendix toggles without writing to Notion.
 6. If the preview is structurally wrong, fix the JSON before pushing.
-7. Run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
-8. If `working-diary` is not available, run `claude-diary diary-notion push --input .diary-notion-<8-random>.json`.
+7. Run `agent-diary diary-notion push --input .diary-notion-<8-random>.json`.
+8. If `agent-diary` is not available, run `working-diary diary-notion push --input .diary-notion-<8-random>.json`.
 9. Report pushed/skipped/failed tasks from the CLI output.
 
 If there are no task-worthy changes, explain that and do not call the CLI.
@@ -414,14 +414,14 @@ If there are no task-worthy changes, explain that and do not call the CLI.
 
 SLASH_COMMANDS = {
     # filename: (file content, marker substring used to detect "ours")
-    "diary.md": (DIARY_SLASH_COMMAND, "claude-diary write"),
-    "diary-notion.md": (DIARY_NOTION_SLASH_COMMAND, "claude-diary diary-notion push"),
+    "diary.md": (DIARY_SLASH_COMMAND, "agent-diary write"),
+    "diary-notion.md": (DIARY_NOTION_SLASH_COMMAND, "agent-diary diary-notion push"),
 }
 
 
 CODEX_SKILLS = {
-    "diary": (CODEX_DIARY_SKILL, "working-diary write --input"),
-    "diary-notion": (CODEX_DIARY_NOTION_SKILL, "working-diary diary-notion push"),
+    "diary": (CODEX_DIARY_SKILL, "agent-diary write --input"),
+    "diary-notion": (CODEX_DIARY_NOTION_SKILL, "agent-diary diary-notion push"),
 }
 
 
@@ -463,13 +463,13 @@ def _save_claude_settings(path, settings):
 
 
 def _is_diary_hook(hook):
-    """Check if a hook entry is a claude-diary hook."""
+    """Check if a hook entry is a agent-diary hook."""
     command = hook.get("command", "")
     return "claude_diary.hook" in command
 
 
 def _find_existing_hook(settings):
-    """Return the first claude-diary hook entry if one is registered."""
+    """Return the first agent-diary hook entry if one is registered."""
     hooks = settings.get("hooks", {})
     stop_hooks = hooks.get("Stop", [])
     for group in stop_hooks:
@@ -483,13 +483,13 @@ def cmd_install(args):
     """Register claude-diary Stop hook + all slash commands.
 
     With --force, refresh the managed hook command and overwrite existing slash
-    command files (useful after a claude-diary upgrade).
+    command files (useful after a agent-diary upgrade).
     """
     force = getattr(args, "force", False) is True
     codex_only = getattr(args, "codex_only", False) is True
     if codex_only:
         codex_statuses = _install_all_codex_skills(force=force)
-        print("claude-diary install (codex-only):")
+        print("agent-diary install (codex-only):")
         for skill_name, (path, status) in codex_statuses.items():
             print("  Codex skill $%s: %s (%s)" % (skill_name, path, status))
         print()
@@ -523,7 +523,7 @@ def cmd_install(args):
     slash_statuses = _install_all_slash_commands(force=force)
     codex_statuses = _install_all_codex_skills(force=force) if install_codex else {}
 
-    print("claude-diary install:")
+    print("agent-diary install:")
     print("  Hook: %s (%s)" % (HOOK_COMMAND, hook_status))
     print("  Settings: %s" % settings_path)
     for filename, (path, status) in slash_statuses.items():
@@ -624,7 +624,7 @@ def cmd_uninstall(args):
     codex_only = getattr(args, "codex_only", False) is True
     if codex_only:
         codex_statuses = _uninstall_all_codex_skills()
-        print("claude-diary uninstall (codex-only):")
+        print("agent-diary uninstall (codex-only):")
         for skill_name, (path, status) in codex_statuses.items():
             print("  Codex skill $%s: %s (%s)" % (skill_name, path, status))
         return
@@ -633,7 +633,7 @@ def cmd_uninstall(args):
     settings = _load_claude_settings(settings_path)
 
     if not _find_existing_hook(settings):
-        print("claude-diary hook is not installed.")
+        print("agent-diary hook is not installed.")
         # Still clean up slash commands if any are present
         slash_statuses = _uninstall_all_slash_commands()
         for filename, (path, status) in slash_statuses.items():
@@ -667,7 +667,7 @@ def cmd_uninstall(args):
     slash_statuses = _uninstall_all_slash_commands()
     codex_statuses = _uninstall_all_codex_skills() if uninstall_codex else {}
 
-    print("claude-diary hook uninstalled.")
+    print("agent-diary hook uninstalled.")
     print("  Settings: %s" % settings_path)
     for filename, (path, status) in slash_statuses.items():
         print("  Slash command %s: %s (%s)" % (filename, path, status))

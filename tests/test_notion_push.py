@@ -1,4 +1,4 @@
-"""Tests for `claude-diary diary-notion push` CLI."""
+"""Tests for `agent-diary diary-notion push` CLI."""
 
 import json
 import os
@@ -803,7 +803,7 @@ class TestCmdNotionPush:
             cmd_notion_push(args)
 
         out = capsys.readouterr().out
-        assert "[claude-diary diary-notion push --dry-run]" in out
+        assert "[agent-diary diary-notion push --dry-run]" in out
         assert "dry run v2" in out
         assert "[Callout] Compact report preview" in out
         assert "## 결과" in out

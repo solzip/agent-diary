@@ -27,8 +27,8 @@ Record the current Codex session as a manual Markdown work diary entry.
 }
 ```
 
-4. Run `working-diary write --input .diary-<8-random>.json`.
-5. If `working-diary` is not available, run `claude-diary write --input .diary-<8-random>.json`.
+4. Run `agent-diary write --input .diary-<8-random>.json`.
+5. If `agent-diary` is not available, run `working-diary write --input .diary-<8-random>.json`.
 6. Report the CLI result. The CLI removes the temp file after a successful write.
 
 Only include content visible in the current conversation or tool history. Do not invent work.

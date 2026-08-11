@@ -1,4 +1,4 @@
-"""`claude-diary diary-notion push` — push tasks JSON to the Notion hierarchical DB.
+"""`agent-diary diary-notion push` — push tasks JSON to the Notion hierarchical DB.
 
 Driven by the `/diary-notion` slash command or `$diary-notion` Codex skill:
   1. The agent writes `.diary-notion-<id>.json` in cwd
@@ -127,7 +127,7 @@ def cmd_notion_push(args):
         _print_validation_errors(validation_errors, input_path)
         sys.exit(1)
     if not tasks:
-        print("[claude-diary diary-notion push] No tasks to push.")
+        print("[agent-diary diary-notion push] No tasks to push.")
         if not dry_run:
             _cleanup(input_path)
         return
@@ -162,7 +162,7 @@ def cmd_notion_push(args):
         preview = _build_dry_run_preview(tasks, session_id, date_str, cwd, lang)
         if preview_file:
             _write_text_file(preview_file, preview)
-            print("[claude-diary diary-notion push --dry-run] Preview file: %s" % preview_file)
+            print("[agent-diary diary-notion push --dry-run] Preview file: %s" % preview_file)
         print(preview)
         return
 
@@ -189,10 +189,10 @@ def cmd_notion_push(args):
         try:
             db_id = exporter.ensure_database(year)
             archived = exporter.archive_rows_for_session(db_id, session_id)
-            print("[claude-diary diary-notion push] --force: archived %d existing row(s)" % archived)
+            print("[agent-diary diary-notion push] --force: archived %d existing row(s)" % archived)
         except NotionAuthError as e:
-            print("[claude-diary diary-notion push] Auth error: %s" % e, file=sys.stderr)
-            print("  Check: claude-diary config or run `claude-diary diary-notion init`", file=sys.stderr)
+            print("[agent-diary diary-notion push] Auth error: %s" % e, file=sys.stderr)
+            print("  Check: agent-diary config or run `agent-diary diary-notion init`", file=sys.stderr)
             sys.exit(1)
 
     # Resolve after --force archiving so re-pushed rows are not counted twice.
@@ -239,7 +239,7 @@ def cmd_notion_push(args):
     _print_report(results, input_path)
     if run_artifacts:
         _finalize_artifact_manifest(run_artifacts, tasks, results)
-        print("[claude-diary diary-notion push] Artifacts: %s" % run_artifacts["run_dir"])
+        print("[agent-diary diary-notion push] Artifacts: %s" % run_artifacts["run_dir"])
 
     if not results["failed"]:
         _cleanup(input_path)
@@ -263,13 +263,13 @@ def _resolve_credentials(config):
 
 def _read_json(path):
     if not path or not os.path.exists(path):
-        print("[claude-diary diary-notion push] Input file not found: %s" % path, file=sys.stderr)
+        print("[agent-diary diary-notion push] Input file not found: %s" % path, file=sys.stderr)
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError) as e:
-        print("[claude-diary diary-notion push] Failed to read JSON: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion push] Failed to read JSON: %s" % e, file=sys.stderr)
         return None
 
 
@@ -320,7 +320,7 @@ def _gather_git_info(cwd, commit_hashes):
 
 def _build_dry_run_preview(tasks, session_id, date_str, cwd, lang):
     lines = [
-        "[claude-diary diary-notion push --dry-run]",
+        "[agent-diary diary-notion push --dry-run]",
         "Session ID: %s" % session_id,
         "Tasks: %d" % len(tasks),
     ]
@@ -366,7 +366,7 @@ def _print_report(results, input_path):
     pushed = len(results["pushed"])
     skipped = len(results["skipped"])
     failed = len(results["failed"])
-    print("[claude-diary diary-notion push] Pushed %d, skipped %d, failed %d" %
+    print("[agent-diary diary-notion push] Pushed %d, skipped %d, failed %d" %
           (pushed, skipped, failed))
     for _, title in results["pushed"]:
         print("  + %s" % title)
@@ -377,7 +377,7 @@ def _print_report(results, input_path):
     if failed > 0:
         print()
         print("Failed tasks preserved in: %s" % input_path)
-        print("Retry: claude-diary diary-notion push --input %s --force" % input_path)
+        print("Retry: agent-diary diary-notion push --input %s --force" % input_path)
 
 
 def _cleanup(input_path):
@@ -390,8 +390,8 @@ def _cleanup(input_path):
 
 
 def _print_setup_hint():
-    print("[claude-diary diary-notion push] Notion hierarchical exporter not configured.",
+    print("[agent-diary diary-notion push] Notion hierarchical exporter not configured.",
           file=sys.stderr)
-    print("  Run: claude-diary diary-notion init", file=sys.stderr)
+    print("  Run: agent-diary diary-notion init", file=sys.stderr)
     print("  Or set CLAUDE_DIARY_NOTION_TOKEN and CLAUDE_DIARY_NOTION_ROOT_PAGE_ID",
           file=sys.stderr)

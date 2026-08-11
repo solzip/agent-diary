@@ -1,4 +1,4 @@
-"""`claude-diary diary-notion init` — interactive Notion setup.
+"""`agent-diary diary-notion init` — interactive Notion setup.
 
 Walks the user through:
   1. Pasting their integration token (https://www.notion.so/my-integrations)
@@ -48,7 +48,7 @@ def cmd_notion_init(args):
     page_id = parse_page_id(page_input)
     if not page_id:
         print(
-            "\n[claude-diary] Could not parse a page ID from input.\n"
+            "\n[agent-diary] Could not parse a page ID from input.\n"
             "  Expected: a Notion URL or a 32-character page ID.",
             file=sys.stderr,
         )

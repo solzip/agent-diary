@@ -1,4 +1,4 @@
-"""Tests for `working-diary diary-notion review`."""
+"""Tests for `agent-diary diary-notion review`."""
 
 from unittest.mock import MagicMock, patch
 

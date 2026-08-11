@@ -112,8 +112,8 @@ def _wire_parent_tasks(exporter, year, tasks, row_ids):
 def _print_enable_subitems_hint(count):
     """Tell the user how to turn on native sub-items (a one-time UI action)."""
     print(
-        "[claude-diary diary-notion push] %d task(s) have a parent, but this "
+        "[agent-diary diary-notion push] %d task(s) have a parent, but this "
         "database has no native Sub-items relation yet — nesting skipped." % count
     )
     print("  Enable it once in Notion: open the database -> ⋯ menu -> Sub-items,")
-    print("  then re-run push or `working-diary diary-notion ensure` to nest them.")
+    print("  then re-run push or `agent-diary diary-notion ensure` to nest them.")

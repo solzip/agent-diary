@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "claude-diary"
+name = "agent-diary"
 version = "4.3.0"
 description = "Record Claude Code and Codex work sessions as Markdown or Notion work diaries"
 readme = "README.en.md"
@@ -32,12 +32,17 @@ all = ["requests>=2.28"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.4.0"]
 
 [project.scripts]
-claude-diary = "claude_diary.cli:main"
+# The import package stays `claude_diary`: `python -m claude_diary.hook` is
+# written into every user's Claude Code settings.json by `install`, and
+# renaming it would stop their Stop Hook silently. Both older command names
+# keep working.
+agent-diary = "claude_diary.cli:main"
 working-diary = "claude_diary.cli:main"
+claude-diary = "claude_diary.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/solzip/working-diary"
-Repository = "https://github.com/solzip/working-diary"
+Homepage = "https://github.com/solzip/agent-diary"
+Repository = "https://github.com/solzip/agent-diary"
 
 [tool.setuptools.packages.find]
 where = ["src"]

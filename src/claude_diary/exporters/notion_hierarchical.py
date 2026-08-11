@@ -9,7 +9,7 @@ Structure (on Notion):
      ├─ 2027
      └─ ...
 
-Used by `/diary-notion` and `$diary-notion` via `claude-diary diary-notion push`.
+Used by `/diary-notion` and `$diary-notion` via `agent-diary diary-notion push`.
 Separate from the flat-mode NotionExporter (Stop Hook auto-push).
 
 Error handling policy:

@@ -125,7 +125,7 @@ def cmd_init(args):
     if getattr(args, "codex_only", False) is True:
         print("  [ok] Codex-only init: Claude Code Stop Hook not registered")
         print()
-        print("Done! Run `working-diary install --force --codex-only` to install Codex skills.")
+        print("Done! Run `agent-diary install --force --codex-only` to install Codex skills.")
         return
 
     # Register Stop Hook

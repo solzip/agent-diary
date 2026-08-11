@@ -1,4 +1,4 @@
-"""Tests for manual diary write CLI (claude-diary write / /diary slash command)."""
+"""Tests for manual diary write CLI (agent-diary write / /diary slash command)."""
 
 import json
 import os

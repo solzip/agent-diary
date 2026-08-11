@@ -1,4 +1,4 @@
-"""`working-diary diary-notion review` -- the human review queue.
+"""`agent-diary diary-notion review` -- the human review queue.
 
 Review is a judgement a person makes after the fact, so nothing in the record
 pipeline may declare work reviewed: `push` files every new row as
@@ -52,23 +52,23 @@ def cmd_notion_review(args):
     try:
         db_id = exporter.resolve_existing_database(year)
         if not db_id:
-            print("[working-diary diary-notion review] No Entries database for %d." % year)
-            print("  Run `working-diary diary-notion ensure` first.")
+            print("[agent-diary diary-notion review] No Entries database for %d." % year)
+            print("  Run `agent-diary diary-notion ensure` first.")
             sys.exit(1)
         rows = exporter.query_database_rows(db_id)
     except NotionAuthError as e:
-        print("[working-diary diary-notion review] Auth error: %s" % e, file=sys.stderr)
-        print("  Check: claude-diary config or run `claude-diary diary-notion init`", file=sys.stderr)
+        print("[agent-diary diary-notion review] Auth error: %s" % e, file=sys.stderr)
+        print("  Check: agent-diary config or run `agent-diary diary-notion init`", file=sys.stderr)
         sys.exit(1)
     except NotionNotFound as e:
-        print("[working-diary diary-notion review] Not found: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion review] Not found: %s" % e, file=sys.stderr)
         print("  Check that the root page/database is shared with the integration.", file=sys.stderr)
         sys.exit(1)
     except NotionBadRequest as e:
-        print("[working-diary diary-notion review] Bad request: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion review] Bad request: %s" % e, file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print("[working-diary diary-notion review] Failed: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion review] Failed: %s" % e, file=sys.stderr)
         sys.exit(1)
 
     queue = build_review_queue(rows)
@@ -120,7 +120,7 @@ def _mark_reviewed(exporter, queue, today):
 
 
 def _print_review_queue(year, queue, apply_changes):
-    header = "[working-diary diary-notion review%s]" % (" --apply" if apply_changes else "")
+    header = "[agent-diary diary-notion review%s]" % (" --apply" if apply_changes else "")
     print(header)
     print("Year: %d" % year)
     if not queue:
@@ -136,7 +136,7 @@ def _print_review_queue(year, queue, apply_changes):
         print("  - %s (%s)" % (item["title"], " | ".join(detail)))
     if not apply_changes:
         print("")
-        print("Run `working-diary diary-notion review --apply` to mark these reviewed.")
+        print("Run `agent-diary diary-notion review --apply` to mark these reviewed.")
 
 
 def _print_apply_result(queue, failures, today):

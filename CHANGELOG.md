@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [4.3.0] - 2026-08-11
 
+### Changed — 이름
+
+- **`claude-diary` → `agent-diary`**: 저장소, PyPI 배포명, 기본 CLI 명령을 한 이름으로 통일. 저장소가 `working-diary`, 설치가 `pip install claude-diary`, 명령이 `working-diary`로 갈라져 있어 README가 그 불일치를 해명해야 했고, 실제로 PyPI trusted publisher가 저장소 이름 변경 때문에 깨진 적이 있다
+  - `working-diary`, `claude-diary` 명령은 alias로 계속 동작
+  - **import 패키지는 `claude_diary`로 유지**. `install`이 사용자 `settings.json`에 `python -m claude_diary.hook`을 기록하므로, 바꾸면 기존 사용자의 Stop Hook이 조용히 멈춘다
+  - config 디렉터리(`claude-diary/`)와 일지 디렉터리(`~/working-diary/`)도 유지. 사용자 데이터와 자격증명이 들어 있고, 옮기면 조용히 갈라진다
+
 ### Added
 - **`/diary-notion` 슬래시 커맨드**: 현재 세션을 작업 단위로 분리해 Notion 업무일지 DB에 push
   - 계층 구조: 루트 페이지 → 연도 페이지 → 단일 Entries DB (자동 생성)

@@ -1,4 +1,4 @@
-"""`claude-diary diary-notion ensure` -- ensure Notion DB schema and core views."""
+"""`agent-diary diary-notion ensure` -- ensure Notion DB schema and core views."""
 
 import sys
 
@@ -55,18 +55,18 @@ def cmd_notion_ensure(args):
         client = NotionViewsClient({"api_token": token})
         result = CoreViewsEnsurer(client).ensure(db_id, today, dry_run=dry_run)
     except NotionAuthError as e:
-        print("[working-diary diary-notion ensure] Auth error: %s" % e, file=sys.stderr)
-        print("  Check: claude-diary config or run `claude-diary diary-notion init`", file=sys.stderr)
+        print("[agent-diary diary-notion ensure] Auth error: %s" % e, file=sys.stderr)
+        print("  Check: agent-diary config or run `agent-diary diary-notion init`", file=sys.stderr)
         sys.exit(1)
     except NotionNotFound as e:
-        print("[working-diary diary-notion ensure] Not found: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion ensure] Not found: %s" % e, file=sys.stderr)
         print("  Check that the root page/database is shared with the integration.", file=sys.stderr)
         sys.exit(1)
     except NotionBadRequest as e:
-        print("[working-diary diary-notion ensure] Bad request: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion ensure] Bad request: %s" % e, file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print("[working-diary diary-notion ensure] Failed: %s" % e, file=sys.stderr)
+        print("[agent-diary diary-notion ensure] Failed: %s" % e, file=sys.stderr)
         sys.exit(1)
 
     _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_run)
@@ -75,7 +75,7 @@ def cmd_notion_ensure(args):
 
 
 def _print_missing_database_plan(root_page_id, year):
-    print("[working-diary diary-notion ensure --dry-run]")
+    print("[agent-diary diary-notion ensure --dry-run]")
     print("Root page: %s" % root_page_id)
     print("Year: %s" % year)
     print("Database: missing")
@@ -89,7 +89,7 @@ def _print_missing_database_plan(root_page_id, year):
 
 def _print_ensure_report(root_page_id, year, db_id, schema_status, result, dry_run):
     suffix = " --dry-run" if dry_run else ""
-    print("[working-diary diary-notion ensure%s]" % suffix)
+    print("[agent-diary diary-notion ensure%s]" % suffix)
     print("Root page: %s" % root_page_id)
     print("Year: %s" % year)
     print("Database: %s" % db_id)
@@ -141,10 +141,10 @@ def build_conflict_plan(name, reason):
     category = classify_conflict_reason(reason)
     if category == "missing_filter":
         return _plan(name, reason, category,
-                     "rerun `working-diary diary-notion ensure` to repair the view filter", True)
+                     "rerun `agent-diary diary-notion ensure` to repair the view filter", True)
     if category == "missing_property":
         return _plan(name, reason, category,
-                     "rerun `working-diary diary-notion ensure` to add the missing schema property", True)
+                     "rerun `agent-diary diary-notion ensure` to add the missing schema property", True)
     if category == "subitem_missing":
         return _plan(name, reason, category, "enable Notion Sub-items in the Entries DB UI, then rerun ensure", False)
     if category == "retired_view":

@@ -18,7 +18,7 @@ def test_shipped_skill_matches_the_installed_copy(skill_name):
     """`skills/` and the `setup.py` constants are two copies of one contract.
 
     The Codex plugin marketplace ships `skills/<name>/SKILL.md`, while
-    `working-diary install --codex-only` writes the embedded constant to
+    `agent-diary install --codex-only` writes the embedded constant to
     `~/.codex/skills/`. A change applied to only one of them means two agents
     following two different contracts, with nothing at runtime to notice.
     """
@@ -40,11 +40,11 @@ def test_codex_plugin_manifest_points_to_skills():
     manifest_path = ROOT / ".codex-plugin" / "plugin.json"
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert data["name"] == "working-diary"
-    assert data["homepage"] == "https://github.com/solzip/working-diary"
-    assert data["repository"] == "https://github.com/solzip/working-diary"
+    assert data["name"] == "agent-diary"
+    assert data["homepage"] == "https://github.com/solzip/agent-diary"
+    assert data["repository"] == "https://github.com/solzip/agent-diary"
     assert data["skills"] == "./skills/"
-    assert data["interface"]["displayName"] == "Working Diary"
+    assert data["interface"]["displayName"] == "Agent Diary"
     assert "hooks" not in data
 
 
@@ -52,8 +52,8 @@ def test_claude_plugin_manifest_uses_current_repository():
     manifest_path = ROOT / ".claude-plugin" / "plugin.json"
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert data["name"] == "working-diary"
-    assert data["repository"] == "https://github.com/solzip/working-diary"
+    assert data["name"] == "agent-diary"
+    assert data["repository"] == "https://github.com/solzip/agent-diary"
     assert data["hooks"] == "hooks.json"
     assert "claude-code-hooks-diary" not in manifest_path.read_text(encoding="utf-8")
 
@@ -81,10 +81,10 @@ def test_english_readme_uses_current_install_flow():
 
     assert "working-diary-system" not in text
     assert "install.sh" not in text
-    assert "working-diary init --codex-only" in text
-    assert "working-diary install --force --codex-only" in text
-    assert "Apply or refresh Codex setup:\n\n```bash\nworking-diary install --force --codex-only" in text
-    assert 'pip install "claude-diary[notion]"' in text
+    assert "agent-diary init --codex-only" in text
+    assert "agent-diary install --force --codex-only" in text
+    assert "Apply or refresh Codex setup:\n\n```bash\nagent-diary install --force --codex-only" in text
+    assert 'pip install "agent-diary[notion]"' in text
     assert "stores the Notion token and root page ID" in text
     assert "API tokens, webhook URLs, and root page IDs are stored in this local config" in text
 
@@ -92,9 +92,9 @@ def test_english_readme_uses_current_install_flow():
 def test_korean_readme_uses_codex_only_install_flow():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "working-diary init --codex-only" in text
-    assert "working-diary install --force --codex-only" in text
-    assert "Codex 적용 또는 갱신:\n\n```bash\nworking-diary install --force --codex-only" in text
+    assert "agent-diary init --codex-only" in text
+    assert "agent-diary install --force --codex-only" in text
+    assert "Codex 적용 또는 갱신:\n\n```bash\nagent-diary install --force --codex-only" in text
     assert "현재 구현에는 Codex만 단독으로 적용하는 별도 명령이 없습니다" not in text
 
 
@@ -117,9 +117,9 @@ def test_codex_skills_exist_and_cover_diary_workflows():
     diary_text = diary.read_text(encoding="utf-8")
     notion_text = notion.read_text(encoding="utf-8")
 
-    assert "working-diary write --input" in diary_text
-    assert "claude-diary write --input" in diary_text
-    assert "working-diary diary-notion push" in notion_text
+    assert "agent-diary write --input" in diary_text
+    assert "agent-diary write --input" in diary_text
+    assert "agent-diary diary-notion push" in notion_text
     assert '"schema_version": 2' in notion_text
     assert '"purpose": "Feature"' in notion_text
     assert '"summary": {' in notion_text
