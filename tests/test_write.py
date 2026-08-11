@@ -24,7 +24,7 @@ class TestEncodeCwd:
     def test_non_ascii_collapses(self):
         # Korean chars → '-' each
         result = write_mod._encode_cwd("/Users/유저/dev")
-        assert result == "-Users----dev"  # 윤=- 솔=- + surrounding /=-
+        assert result == "-Users----dev"  # 유=- 저=- + surrounding /=-
 
     def test_empty(self):
         assert write_mod._encode_cwd("") == ""
