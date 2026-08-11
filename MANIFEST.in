@@ -2,6 +2,6 @@ include LICENSE
 include CHANGELOG.md
 include SECURITY.md
 include README.md
-include README.en.md
+include README.ko.md
 recursive-include .codex-plugin *.json
 recursive-include skills *.md *.yaml

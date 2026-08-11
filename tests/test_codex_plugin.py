@@ -77,7 +77,7 @@ def test_claude_plugin_hook_uses_installer_command():
 
 
 def test_english_readme_uses_current_install_flow():
-    text = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "working-diary-system" not in text
     assert "install.sh" not in text
@@ -90,7 +90,7 @@ def test_english_readme_uses_current_install_flow():
 
 
 def test_korean_readme_uses_codex_only_install_flow():
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    text = (ROOT / "README.ko.md").read_text(encoding="utf-8")
 
     assert "agent-diary init --codex-only" in text
     assert "agent-diary install --force --codex-only" in text
