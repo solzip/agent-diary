@@ -282,7 +282,7 @@ agent-diary diary-notion push --input .diary-notion-<id>.json --dry-run
 push는 **기본적으로** 실행할 때마다 현재 작업 디렉터리 아래에 실행 기록을 남깁니다. `--dry-run`에서도 남깁니다.
 
 ```text
-<cwd>/.codefleet/runs/<YYYYMMDD-HHMMSS-session>/
+<cwd>/.agent-diary/runs/<YYYYMMDD-HHMMSS-session>/
   input.json        원본 task JSON
   git-diff.patch    push 시점의 작업 트리 diff
   preview.md        Notion 본문 렌더링 결과
@@ -294,7 +294,7 @@ Notion은 기록의 목적지이지 사본이 아닙니다. push가 중간에 �
 **`git-diff.patch`에는 커밋하지 않은 코드가 그대로 들어갑니다.** 저장소에 딸려 올라가지 않도록 `.gitignore`에 추가하세요.
 
 ```gitignore
-.codefleet/runs/
+.agent-diary/runs/
 ```
 
 저장 위치를 바꾸거나 아예 끄려면:
@@ -439,6 +439,9 @@ agent-diary backfill --since 2026-07-01
 agent-diary backfill --limit 20
 agent-diary backfill --transcripts /path/to/projects
 
+agent-diary doctor
+agent-diary doctor --notion
+
 agent-diary diary-notion init
 agent-diary diary-notion ensure
 agent-diary diary-notion ensure --dry-run
@@ -571,7 +574,9 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 | Notion push가 인증 오류를 냄 | Integration token, root page ID, page 공유 상태 확인 |
 | Notion 하위항목 nesting이 안 보임 | `Entries` DB에서 Notion UI의 Sub-items를 한 번 활성화 |
 | push 재시도 시 중복이 걱정됨 | 기본 push는 같은 `Session ID + Task Index`를 skip. 다시 쓰려면 `--force` 사용 |
-| 프로젝트에 `.codefleet/` 디렉터리가 생김 | push가 남기는 실행 기록입니다. `.gitignore`에 `.codefleet/runs/`를 추가하거나 `--no-artifacts`로 끕니다 ([2-6](#2-6-push가-남기는-로컬-기록-run-artifacts)) |
+| 프로젝트에 `.agent-diary/` 디렉터리가 생김 | push가 남기는 실행 기록입니다. `.gitignore`에 `.agent-diary/runs/`를 추가하거나 `--no-artifacts`로 끕니다 ([2-6](#2-6-push가-남기는-로컬-기록-run-artifacts)) |
+| 어느 순간부터 일지가 안 쌓이는데 이유를 모르겠음 | `agent-diary doctor`를 실행하세요. hook 등록 여부, 그 hook이 가리키는 모듈이 아직 존재하는지, 마지막 기록이 며칠 전인지를 확인합니다 |
+| 예전엔 `.codefleet/runs/` 였는데 | 별개 프로젝트 이름을 빌려 쓰던 옛 기본값입니다. 새 프로젝트는 `.agent-diary/runs/`를 쓰고, 이미 `.codefleet/runs/`가 있으면 기록이 갈라지지 않도록 그대로 씁니다 |
 | 제목에 붙은 `(N차)`를 없애고 싶음 | 같은 `Task Group`의 이전 세션 수로 매겨집니다. `task_group`을 비우면 붙지 않습니다 |
 | PowerShell에서 글자가 깨짐 | 위 UTF-8 출력 설정 적용 |
 

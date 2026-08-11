@@ -47,6 +47,9 @@ from claude_diary.exporters.notion_hierarchical import (
 )
 
 from claude_diary.cli.notion_push.artifacts import (
+    ARTIFACT_DIR,
+    LEGACY_ARTIFACT_DIR,
+    default_artifact_dir,
     _artifact_ref,
     _finalize_artifact_manifest,
     _git_diff,

@@ -903,6 +903,28 @@ class TestCmdNotionPush:
         assert any(a["kind"] == "manifest" for a in manifest["artifacts"]) is False
 
 
+class TestArtifactDirDefault:
+    """The default used to be `.codefleet/runs`, named after a separate
+    project, so installing this tool put a directory named after unrelated
+    software into your repository."""
+
+    def test_a_fresh_project_gets_the_tool_s_own_name(self, tmp_path):
+        from claude_diary.cli.notion_push.artifacts import default_artifact_dir
+        assert default_artifact_dir(str(tmp_path)) == ".agent-diary/runs"
+
+    def test_an_existing_legacy_directory_is_honoured(self, tmp_path):
+        """Switching mid-stream would split one project's run history across
+        two folders, so an existing .codefleet/runs keeps being used."""
+        from claude_diary.cli.notion_push.artifacts import default_artifact_dir
+        (tmp_path / ".codefleet" / "runs").mkdir(parents=True)
+        assert default_artifact_dir(str(tmp_path)) == ".codefleet/runs"
+
+    def test_a_bare_codefleet_without_runs_does_not_count(self, tmp_path):
+        from claude_diary.cli.notion_push.artifacts import default_artifact_dir
+        (tmp_path / ".codefleet").mkdir()
+        assert default_artifact_dir(str(tmp_path)) == ".agent-diary/runs"
+
+
 class TestDryRunTaskGroupOrdinal:
     """A dry run has to predict the title the push will write, suffix included."""
 

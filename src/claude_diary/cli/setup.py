@@ -61,7 +61,7 @@ allowed-tools:
 
 ## Local Artifact Store
 
-- `diary-notion push` stores local run artifacts under `.codefleet/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`.
+- `diary-notion push` stores local run artifacts under `.agent-diary/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`.
 - Use `--preview-file` for an extra Markdown preview path or `--no-artifacts` to disable local artifact writes.
 
 ## 단계
@@ -268,7 +268,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
 - Never write `"unknown"` as `project`; omit it or leave it blank so the CLI falls back to the command cwd folder name.
 - Page bodies render as compact work reports: summary, results, work table, decisions, issues/risks, next actions/support, and appendix toggles.
 - Notion is the report surface; raw logs, long diffs, and bulky evidence belong in local artifact files and should be referenced by path/hash instead of pasted.
-- `diary-notion push` writes local run artifacts under `.codefleet/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`. Use `--preview-file` for an extra Markdown preview path or `--no-artifacts` to disable local artifact writes.
+- `diary-notion push` writes local run artifacts under `.agent-diary/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`. Use `--preview-file` for an extra Markdown preview path or `--no-artifacts` to disable local artifact writes.
 - For testing, QA, review, validation, or verification sessions, create a row even without code changes; keep `verification` short and place the meaningful prompt-result document in `prompt_outputs` or `verification_artifacts` so it renders inside a toggle.
 
 ## Workflow
@@ -379,7 +379,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
         "artifacts": [
           {
             "kind": "stdout",
-            "path": ".codefleet/runs/<run-id>/stdout.log",
+            "path": ".agent-diary/runs/<run-id>/stdout.log",
             "summary": "raw command output",
             "sha256": "..."
           }
