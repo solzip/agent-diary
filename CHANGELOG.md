@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-08-11
+
 ### Added
 
 - **커밋 줄 Gitmoji** (`formatting.gitmoji`, 기본 꺼짐): 켜면 각 커밋 줄에 Conventional Commit 타입에 해당하는 [gitmoji](https://gitmoji.dev)가 붙는다. 타입을 알아볼 수 없는 커밋은 그대로 두고, 이미 이모지로 시작하는 메시지에는 덧붙이지 않는다 (`ai-commit` 같은 도구가 먼저 붙였을 수 있으므로)
