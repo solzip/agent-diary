@@ -1,6 +1,6 @@
 # Working Diary
 
-Claude Code와 Codex 작업 세션을 Markdown 일지 또는 Notion 업무일지로 기록하는 CLI 도구입니다.
+**AI와 한 작업을 기억해두는 도구.** Claude Code 세션이 끝나면 자동으로, Codex에서는 명령 한 번으로 그날 무엇을 시켰고 무엇이 바뀌었는지 기록합니다.
 
 [![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/working-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,23 +11,65 @@ Claude Code와 Codex 작업 세션을 Markdown 일지 또는 Notion 업무일지
 >
 > 커뮤니티 프로젝트입니다. Anthropic 또는 OpenAI의 공식 프로젝트가 아닙니다.
 
-## 1. 설명
+![Working Diary 데모](docs/demo.svg)
 
-Working Diary는 AI 코딩 세션에서 사라지기 쉬운 작업 맥락을 남깁니다.
+## 1. 왜 필요한가
 
-- 사용자가 요청한 작업
-- 생성/수정된 파일
-- 실행한 주요 명령
-- Git branch, commit, diff 통계
-- 작업 요약과 오류
-- Notion 업무 DB용 task row
+AI와 한 작업은 대화창에 남고, 대화창은 닫힙니다. 이틀 뒤 "이 파일 왜 이렇게 고쳤더라"를 되짚을 방법이 없고, 주간 회고나 업무일지를 쓸 때가 되면 기억에 의존하게 됩니다. 커밋 로그는 결과만 남기지 무엇을 요청했고 무엇을 시도했는지는 남기지 않습니다.
 
-패키지 이름은 호환성을 위해 `claude-diary`를 유지합니다. 사용자 문서에서는 중립 alias인 `working-diary`를 우선 사용합니다.
+Working Diary는 그 맥락을 세션이 끝나는 시점에 자동으로 붙잡습니다. 별도로 기록하는 습관을 만들 필요가 없습니다.
+
+세션 하나가 끝나면 이런 항목이 파일에 append됩니다.
+
+```markdown
+### ⏰ 14:30:15 | 📁 `my-app`
+
+**🏷️ 카테고리:** `feature` `test`
+
+**📋 작업 요청:**
+  1. 로그인에 JWT 인증을 붙여줘
+  2. 테스트도 같이 작성해줘
+
+**📄 생성된 파일:**
+  - `src/auth/jwt_handler.py`
+  - `tests/test_auth.py`
+
+**✏️ 수정된 파일:**
+  - `src/api/routes.py`
+
+**🔀 Git:**
+  - 🌿 브랜치: `feat/jwt-auth`
+  - 커밋: `a1b2c3d` feat: verify tokens and cover login
+
+**📊 변경 통계:** +145 / -12 lines (5 files)
+
+**⚡ 주요 명령어:**
+  - `export API_KEY=****`
+  - `pytest -q`
+
+**📝 작업 요약:**
+  - JWT 검증 미들웨어를 추가하고 로그인 실패 경로를 테스트로 덮음
+
+**🔒 1 시크릿 마스킹됨**
+```
+
+카테고리는 작업 내용에서 추론하고, 브랜치·커밋·diff 통계는 저장소에서 직접 읽습니다. 위 `API_KEY`처럼 시크릿으로 보이는 값은 **파일에 쓰기 전에** 마스킹합니다.
+
+### 이런 점이 다릅니다
+
+- **자동입니다.** Claude Code에서는 Stop Hook이 세션 종료를 받아 기록합니다. 기록하겠다고 결심할 필요가 없습니다.
+- **코어 의존성이 0개입니다.** 표준 라이브러리만 씁니다. Notion 연동을 쓸 때만 `requests`가 추가됩니다.
+- **로컬 파일입니다.** 평범한 Markdown이라 grep도 되고 Obsidian에도 들어가고, 서비스가 사라져도 남습니다.
+- **팀 도구로도 씁니다.** 필요하면 Notion 업무일지 DB로 push하고, Slack·Discord·GitHub으로도 내보냅니다.
 
 ```bash
 pip install claude-diary
 working-diary init
 ```
+
+이후로는 따로 할 일이 없습니다. Claude Code 세션이 끝날 때마다 `~/working-diary/YYYY-MM-DD.md`에 쌓입니다.
+
+> 패키지 이름은 호환성을 위해 `claude-diary`를 유지합니다. 문서에서는 중립 alias인 `working-diary`를 우선 사용하며, 두 명령 모두 동작합니다.
 
 ### 지원 에이전트
 
