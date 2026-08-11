@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-08-11
+
+### Added
+
+- **[Architecture 문서](docs/ARCHITECTURE.md)**: 멱등성 키와 캐시 무효화, 원인별로 갈리는 재시도 정책, 스키마 버전 관리, 부분 실패의 의미, 의존성 0개를 택한 이유. 코드에 이미 있던 판단들이 README에서는 보이지 않던 것을 드러냄
+- **[Postmortem: 2026-08-07 ensure 사고](docs/postmortem/2026-08-07-ensure-wipe.md)**: 스키마 PATCH 하나가 497 row에서 6개 속성을 지운 경위. 원인을 좁힌 측정(`Project`·`Branch`가 무사했던 것), 수정, 회귀 테스트를 그렇게 짠 이유, 아직 복구되지 않은 것까지
+- **타입 검사**: `mypy`가 CI에서 주석 처리된 코어 모듈을 검사한다. `pyproject.toml`의 목록이 검사 범위이고, 저장소 전체에 켜고 나머지를 `ignore_errors`로 덮는 방식은 택하지 않았다
+
+### Changed
+
+- **`types.py`가 주석이 아니라 실제 타입이 됨**: `EntryData`, `GitInfo`, `DiffStat`, `CommitInfo`, `Config` 등을 `TypedDict`로 정의. 기존 주석은 Python 3.7 호환을 이유로 들었지만 하한은 이미 3.8이었고, 그 사이 주석이 실제와 어긋나 있었다(커밋의 `short_hash` 누락, parser가 만드는 키 3개 누락). 주석은 실패할 수 없다는 게 문제였다
+  - 코어에 타입을 붙이자 **타입이 실제로는 흐르지 않던 6곳**이 드러났다. `entry_data`가 dict 리터럴로 만들어져서 `_supplement_from_git`·`scan_entry_data`·`format_entry`·`_run_exporters`가 전부 `dict[str, Any]`를 받고 있었다
+  - 시그니처만 변경. 함수 본문은 손대지 않아 동작 변화는 없다
+- **`Schema Version`의 `vlegacy`를 우연이 아니라 의도로** ([#11](https://github.com/solzip/agent-diary/issues/11)): 값은 그대로 유지한다. 실측 결과 509 row 중 350개가 쓰는 실존 select 옵션이라, 다른 문자열을 쓰면 세 번째 옵션이 생기고 기존 row가 옛 옵션에 남는다. 이름 변경은 여기서 할 편집이 아니라 데이터베이스 마이그레이션이다. 이제 `LEGACY_SCHEMA_VERSION` 상수로 명시하고 테스트로 고정했다
+
 ### Fixed
 
 - **dry-run이 실제 push와 다른 제목을 보여주던 문제** ([#10](https://github.com/solzip/agent-diary/issues/10)): 미리보기가 자격증명 해석 **전에** 끝나서 차수 조회를 못 했고, 결과적으로 이어지는 task group인데도 `(N차)` 없이 렌더링됐다. 미리보기가 예측 대상과 어긋나는 상태였다
