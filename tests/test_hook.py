@@ -38,8 +38,8 @@ class TestHookStdinParsing:
         mock_process.return_value = True
         input_data = {
             "session_id": "sess-한글",
-            "transcript_path": "C:/Users/윤솔/transcript.jsonl",
-            "cwd": "C:/Users/윤솔/프로젝트",
+            "transcript_path": "C:/Users/유저/transcript.jsonl",
+            "cwd": "C:/Users/유저/프로젝트",
         }
         raw = json.dumps(input_data, ensure_ascii=False).encode("utf-8")
 
@@ -50,8 +50,8 @@ class TestHookStdinParsing:
 
         mock_process.assert_called_once_with(
             "sess-한글",
-            "C:/Users/윤솔/transcript.jsonl",
-            "C:/Users/윤솔/프로젝트",
+            "C:/Users/유저/transcript.jsonl",
+            "C:/Users/유저/프로젝트",
         )
 
     def test_invalid_json_exits_gracefully(self):

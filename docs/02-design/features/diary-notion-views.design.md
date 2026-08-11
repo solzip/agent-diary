@@ -379,7 +379,7 @@ Group by Project
 
 활용:
 
-- `working-diary`, `flow-chatbot`, `zelotek` 등 여러 작업이 섞여도 프로젝트별 흐름을 확인한다.
+- `working-diary`, `api-server`, `admin-web` 등 여러 작업이 섞여도 프로젝트별 흐름을 확인한다.
 - 최종 Multi-project OS의 기본 진입점이 된다.
 - 프로젝트별 기간 계산은 2차 MVP에서 하지 않고, `Work Period` 표시만 보장한다.
 
