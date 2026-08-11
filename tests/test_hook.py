@@ -1,9 +1,8 @@
 """Tests for hook.py — stdin parsing, type validation, error handling."""
 
 import json
-import sys
 from io import BytesIO, StringIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 

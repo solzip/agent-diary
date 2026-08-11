@@ -1,6 +1,5 @@
 """Tests for team security module."""
 
-import os
 from claude_diary.lib.team_security import (
     mask_paths, filter_content, filter_entry_data,
     should_skip_session, check_access, apply_access_filter,

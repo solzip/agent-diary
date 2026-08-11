@@ -1,7 +1,5 @@
 """Tests for audit log system."""
 
-import json
-import os
 
 from claude_diary.lib.audit import log_entry, read_audit_log, verify_checksum
 

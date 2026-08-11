@@ -23,6 +23,8 @@ from claude_diary.cli.write import cmd_write
 from claude_diary.cli.notion_push import cmd_notion_push
 from claude_diary.cli.notion_init import cmd_notion_init
 from claude_diary.cli.notion_ensure import cmd_notion_ensure
+from claude_diary.cli.notion_ops import cmd_notion_ops
+from claude_diary.cli.notion_review import cmd_notion_review
 
 
 def cmd_notion(args):
@@ -33,17 +35,34 @@ def cmd_notion(args):
         cmd_notion_init(args)
     elif args.action == "ensure":
         cmd_notion_ensure(args)
+    elif args.action == "ops":
+        cmd_notion_ops(args)
+    elif args.action == "review":
+        cmd_notion_review(args)
 
 
 def _add_diary_notion_parser(sub, name):
     p_notion = sub.add_parser(name, help="Notion hierarchical work diary integration")
-    p_notion.add_argument("action", choices=["init", "push", "ensure"], help="Action to perform")
+    p_notion.add_argument("action", choices=["init", "push", "ensure", "ops", "review"],
+                          help="Action to perform")
     p_notion.add_argument("--input", help="JSON input file (push only)")
     p_notion.add_argument("--force", action="store_true",
                           help="Archive prior rows for the session before pushing (push only)")
-    p_notion.add_argument("--year", type=int, help="Target year (ensure only)")
+    p_notion.add_argument("--year", type=int, help="Target year (ensure/ops/review only)")
+    p_notion.add_argument("--apply", action="store_true",
+                          help="Mark the listed rows reviewed (review only)")
     p_notion.add_argument("--dry-run", action="store_true",
-                          help="Print the Notion schema/view plan without writing (ensure only)")
+                          help="Preview push body without writing, or print ensure plan")
+    p_notion.add_argument("--preview-file",
+                          help="Write push dry-run/preview Markdown to this file")
+    p_notion.add_argument("--artifact-dir", default=".codefleet/runs",
+                          help="Directory for local run artifacts (push only)")
+    p_notion.add_argument("--no-artifacts", action="store_true",
+                          help="Do not write local run artifacts (push only)")
+    p_notion.add_argument("--stale-days", type=int, default=7,
+                          help="Mark active rows stale after N days (ops only)")
+    p_notion.add_argument("--json", dest="json_output", action="store_true",
+                          help="Output operations report as JSON (ops only)")
 
 
 def main():

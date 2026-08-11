@@ -17,8 +17,10 @@ _src_dir = os.path.dirname(_script_dir)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from claude_diary.core import process_session
-from claude_diary.log import get_logger
+# E402: these must follow the sys.path setup above so the package resolves when
+# Claude Code runs this file as a standalone script.
+from claude_diary.core import process_session  # noqa: E402
+from claude_diary.log import get_logger  # noqa: E402
 
 logger = get_logger("claude_diary.hook")
 

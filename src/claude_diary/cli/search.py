@@ -11,7 +11,9 @@ import claude_diary.cli as _cli
 def cmd_search(args):
     config = _cli.load_config()
     lang = config.get("lang", "ko")
-    L = lambda key: _cli.get_label(key, lang)
+    def L(key):
+        return _cli.get_label(key, lang)
+
     diary_dir = os.path.expanduser(config["diary_dir"])
     keyword = args.keyword.lower()
 

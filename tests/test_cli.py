@@ -2,7 +2,6 @@
 
 import json
 import os
-import sys
 from argparse import Namespace
 
 import pytest
@@ -518,6 +517,25 @@ class TestMain:
         args = mock_cmd.call_args.args[0]
         assert args.action == "ensure"
         assert args.dry_run is True
+
+    @patch("claude_diary.cli.cmd_notion_push")
+    def test_main_dispatches_diary_notion_push_platform_options(self, mock_cmd, capsys):
+        with patch("sys.argv", [
+            "claude-diary", "diary-notion", "push",
+            "--input", "in.json",
+            "--dry-run",
+            "--preview-file", "preview.md",
+            "--artifact-dir", ".codefleet/runs",
+        ]):
+            main()
+        mock_cmd.assert_called_once()
+        args = mock_cmd.call_args.args[0]
+        assert args.action == "push"
+        assert args.input == "in.json"
+        assert args.dry_run is True
+        assert args.preview_file == "preview.md"
+        assert args.artifact_dir == ".codefleet/runs"
+        assert args.no_artifacts is False
 
 
 # ── cmd_trace tests ──

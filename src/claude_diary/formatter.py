@@ -1,14 +1,20 @@
 """Markdown formatter — converts entry_data to diary markdown."""
 
-import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 from claude_diary.i18n import get_label
 
 
+DEFAULT_VERIFICATION_LIMIT = 3
+PROMPT_OUTPUT_LIMIT = 15
+APPENDIX_ITEM_LIMIT = 10
+
+
 def format_entry(entry_data, lang="ko"):
     """Format entry_data into a markdown diary entry."""
-    L = lambda key: get_label(key, lang)
+    def L(key):
+        return get_label(key, lang)
+
     time = entry_data.get("time", "")
     project = entry_data.get("project", "unknown")
 
@@ -120,30 +126,35 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
 
     Body layout:
       [body_intro callout]   - one top-level executive summary
-      ## 결과                 - up to 3 checked outcome items
-      ## 작업 한눈에          - context/scope/approach/outcome table
-      ## 영향                 - impact bullets
-      ## 검증                 - checked verification items
-      ## 리스크 / 다음 액션    - one risk callout + unchecked next-step/support items
-      ## 부록                 - collapsed developer/raw evidence toggles
+      ## 결과                 - outcomes, verification, then what is still open
+      ## 결정 / 트레이드오프   - decision bullets
+      ## 이슈 / 리스크        - risk bullets
+      ## 다음 액션 / 지원      - unchecked next-step/support items
+      ## 부록                 - collapsed work snapshot + developer/raw evidence
+
+    What the page opens on is what the session produced. The context / scope /
+    approach / state narrative says the same thing four more ways, so it is
+    folded into the appendix instead of sitting above the results.
 
     Skipped sections render no heading (page doesn't get noisy with empty heads).
     Long strings are truncated to RICH_TEXT_LIMIT (Notion rich_text caps at 2000).
     """
-    L = lambda key: get_label(key, lang)
-    blocks = []
+    def L(key):
+        return get_label(key, lang)
 
-    intro = (task.get("body_intro") or "").strip()
+    blocks = []
+    normalized = normalize_notion_task(task)
+
+    intro = (normalized["summary"].get("intro") or "").strip()
     if intro:
         blocks.append(_callout(intro, "📌"))
 
-    _add_results_section(blocks, task, L)
-    _add_snapshot_section(blocks, task, L)
-    _add_bullet_section(blocks, L("impact"), task.get("impact"), 3)
-    _add_verification_section(blocks, task, L)
-    _add_risks_next_actions_section(blocks, task, L)
+    _add_results_section(blocks, normalized, L)
+    _add_bullet_section(blocks, L("decisions"), normalized.get("decisions"), 2)
+    _add_bullet_section(blocks, L("issues_risks"), normalized.get("risks"), 2)
+    _add_next_actions_support_section(blocks, normalized, L)
 
-    appendix = _build_appendix_blocks(task, git_info, L)
+    appendix = _build_appendix_blocks(normalized, git_info, L)
     if appendix:
         blocks.append(_heading(L("appendix")))
         blocks.extend(appendix)
@@ -151,92 +162,208 @@ def build_notion_blocks(task, git_info=None, lang="ko"):
     return blocks
 
 
+def normalize_notion_task(task):
+    """Normalize legacy flat task JSON and v2 nested task JSON for rendering."""
+    summary = _dict_value(task.get("summary"))
+    work = _dict_value(task.get("work"))
+    appendix = _dict_value(task.get("appendix"))
+
+    verification = _merge_texts(
+        summary.get("verification"),
+        task.get("verification"),
+    )
+    outcomes = _merge_texts(
+        summary.get("outcomes"),
+        summary.get("outcome"),
+        task.get("summary_hints"),
+        task.get("outcome"),
+    )
+    next_actions = _filter_noop_texts(_merge_texts(
+        task.get("next_actions"),
+        task.get("next_steps"),
+        task.get("next_action"),
+    ))
+    risks = _merge_texts(
+        task.get("risks"),
+        task.get("cautions"),
+        task.get("errors"),
+        task.get("errors_encountered"),
+    )
+    appendix_errors = _merge_texts(
+        appendix.get("errors"),
+        task.get("errors"),
+        task.get("errors_encountered"),
+    )
+    prompt_outputs = _merge_texts(
+        appendix.get("prompt_outputs"),
+        task.get("prompt_outputs"),
+        task.get("test_results"),
+        task.get("validation_results"),
+        task.get("findings"),
+    )
+    verification_artifacts = _merge_texts(
+        appendix.get("verification_artifacts"),
+        task.get("verification_artifacts"),
+    )
+    if _is_verification_session_task(task):
+        prompt_outputs = _merge_texts(verification, prompt_outputs)
+
+    return {
+        "summary": {
+            "intro": _first_text(summary.get("intro"), task.get("body_intro")),
+            "outcomes": outcomes,
+            "verification": verification,
+            "remaining": _filter_noop_texts(_merge_texts(summary.get("remaining"), task.get("remaining_work"))),
+        },
+        "work": {
+            "context": _first_text(work.get("context"), task.get("work_context"), task.get("context")),
+            "scope": _first_text(work.get("scope"), task.get("work_scope"), task.get("scope")),
+            "approach": _first_text(work.get("approach"), task.get("approach")),
+            "state": _first_text(work.get("state"), task.get("work_state"), task.get("outcome"), task.get("status")),
+            "highlights": _merge_texts(work.get("highlights"), task.get("impact")),
+        },
+        "decisions": _merge_texts(task.get("decisions")),
+        "risks": risks,
+        "next_actions": next_actions,
+        "support_needed": _filter_noop_texts(_merge_texts(task.get("support_needed"))),
+        "appendix": {
+            "key_changes": _merge_texts(
+                appendix.get("key_changes"),
+                task.get("key_changes"),
+                task.get("code_change_highlights"),
+                task.get("code_changes"),
+            ),
+            "implementation_notes": _merge_texts(
+                appendix.get("implementation_notes"),
+                task.get("implementation_notes"),
+            ),
+            "prompt_outputs": prompt_outputs,
+            "verification_artifacts": verification_artifacts,
+            "user_prompts": _merge_texts(appendix.get("user_prompts"), task.get("user_prompts")),
+            "files_modified": _merge_texts(appendix.get("files_modified"), task.get("files_modified")),
+            "files_created": _merge_texts(appendix.get("files_created"), task.get("files_created")),
+            "commands_run": _merge_texts(appendix.get("commands_run"), task.get("commands_run")),
+            "commit_hashes": _merge_texts(appendix.get("commit_hashes"), task.get("commit_hashes")),
+            "errors": appendix_errors,
+            "artifacts": appendix.get("artifacts") or task.get("artifacts") or [],
+        },
+        "status": task.get("status"),
+        "purpose": task.get("purpose"),
+        "task_group": task.get("task_group"),
+        "categories": _as_text_list(task.get("categories")),
+    }
+
+
 def _add_results_section(blocks, task, L):
-    items = _limited_texts(task.get("summary_hints") or task.get("summary"), 3)
-    if not items:
-        items = _limited_texts(task.get("outcome"), 1)
+    """Render what the session produced — the reason the page exists.
+
+    Given more room than the narrative sections: outcomes and verification are
+    the concrete record, and `remaining` is the only unchecked item so an open
+    box always means work that is genuinely still open.
+    """
+    summary = task.get("summary") or {}
+    outcome_items = _limited_texts(summary.get("outcomes"), 4)
+    verification_items = _limited_texts(summary.get("verification"), 3)
+    remaining_items = _limited_texts(summary.get("remaining"), 2)
+    items = []
+    items.extend((item, True) for item in outcome_items)
+    items.extend((item, True) for item in verification_items)
+    items.extend((item, False) for item in remaining_items)
     if not items:
         return
     blocks.append(_heading(L("results")))
-    for item in items:
-        blocks.append(_to_do(item, checked=True))
+    for item, checked in items[:7]:
+        blocks.append(_to_do(item, checked=checked))
 
 
-def _add_snapshot_section(blocks, task, L):
+def _build_work_snapshot_toggle(task, L):
+    """Fold the context / scope / approach / state narrative into one toggle.
+
+    Four prose restatements of the same session used to sit between the intro
+    callout and the results. Kept for the record, collapsed so they no longer
+    bury what was actually produced.
+    """
+    work = task.get("work") or {}
     pairs = [
-        (L("context"), task.get("work_context") or task.get("context")),
-        (L("scope"), task.get("work_scope") or task.get("scope")),
-        (L("approach"), task.get("approach")),
-        (L("outcome"), task.get("outcome")),
+        (L("context"), work.get("context")),
+        (L("scope"), work.get("scope")),
+        (L("approach"), work.get("approach")),
+        (L("work_state"), work.get("state")),
     ]
-    rows = [[L("item"), L("content")]]
+    items = []
     for label, value in pairs:
         texts = _limited_texts(value, 1)
         if texts:
-            rows.append([label, texts[0]])
-    if len(rows) > 1:
-        blocks.append(_heading(L("work_snapshot")))
-        blocks.append(_table(rows))
+            items.append("%s: %s" % (label, texts[0]))
+    if not items:
+        return None
+    return _toggle(L("work_snapshot"), [_bullet(item) for item in items])
 
 
-def _add_verification_section(blocks, task, L):
+def _add_next_actions_support_section(blocks, task, L):
     section_blocks = []
-    for v in _limited_texts(task.get("verification"), 3):
-        section_blocks.append(_to_do(v, checked=True))
-    if section_blocks:
-        blocks.append(_heading(L("verification")))
-        blocks.extend(section_blocks)
-
-
-def _add_risks_next_actions_section(blocks, task, L):
-    section_blocks = []
-    risks = _limited_texts(task.get("risks") or task.get("cautions"), 2)
-    if risks:
-        section_blocks.append(_callout("\n".join(risks), "⚠️"))
-    for n in _limited_texts(task.get("next_steps"), 2):
-        section_blocks.append(_to_do("%s: %s" % (L("next_steps"), n), checked=False))
-    for s in _limited_texts(task.get("support_needed"), 1):
+    for n in _limited_texts(task.get("next_actions"), 3):
+        section_blocks.append(_to_do("%s: %s" % (L("next_actions"), n), checked=False))
+    for s in _limited_texts(task.get("support_needed"), 2):
         section_blocks.append(_to_do("%s: %s" % (L("support_needed"), s), checked=False))
     if section_blocks:
-        blocks.append(_heading(L("risks_next_actions")))
+        blocks.append(_heading(L("next_actions_support")))
         blocks.extend(section_blocks)
 
 
 def _build_appendix_blocks(task, git_info, L):
     blocks = []
-    developer = _build_developer_evidence_items(task, git_info, L)
+    prompt_outputs = _build_prompt_output_items(task)
+    developer = _build_developer_evidence_items(task, L)
+    command_file_commit = _build_command_file_commit_items(task, git_info, L)
     raw = _build_raw_evidence_items(task, L)
 
+    snapshot = _build_work_snapshot_toggle(task, L)
+    if snapshot:
+        blocks.append(snapshot)
     if developer:
         blocks.append(_toggle(L("developer_evidence"), [_bullet(item) for item in developer]))
+    if prompt_outputs:
+        blocks.append(_toggle(L("prompt_outputs"), [_bullet(item) for item in prompt_outputs]))
     if raw:
         blocks.append(_toggle(L("raw_evidence"), [_bullet(item) for item in raw]))
+    if command_file_commit:
+        blocks.append(_toggle(
+            L("command_file_commit_evidence"),
+            [_bullet(item) for item in command_file_commit],
+        ))
     return blocks
 
 
-def _build_developer_evidence_items(task, git_info, L):
+def _build_developer_evidence_items(task, L):
     evidence = []
+    appendix = task.get("appendix") or {}
+    work = task.get("work") or {}
 
-    for c in _limited_texts(task.get("key_changes"), 3):
+    for c in _limited_texts(work.get("highlights"), 3):
+        evidence.append("%s: %s" % (L("work_highlights"), c))
+
+    for c in _limited_texts(appendix.get("key_changes"), APPENDIX_ITEM_LIMIT):
         evidence.append("%s: %s" % (L("key_changes"), c))
 
-    for c in _limited_texts(task.get("code_change_highlights") or task.get("code_changes"), 3):
-        evidence.append("%s: %s" % (L("code_change_highlights"), c))
-
-    for d in _limited_texts(task.get("decisions"), 2):
-        evidence.append("%s: %s" % (L("decisions"), d))
-
-    for n in _limited_texts(task.get("implementation_notes"), 2):
+    for n in _limited_texts(appendix.get("implementation_notes"), APPENDIX_ITEM_LIMIT):
         evidence.append("%s: %s" % (L("implementation_notes"), n))
 
-    modified = _as_text_list(task.get("files_modified"))
-    created = _as_text_list(task.get("files_created"))
+    return evidence
+
+
+def _build_command_file_commit_items(task, git_info, L):
+    evidence = []
+    appendix = task.get("appendix") or {}
+
+    modified = _as_text_list(appendix.get("files_modified"))
+    created = _as_text_list(appendix.get("files_created"))
     if modified:
         evidence.append("%s: %s" % (L("files_modified"), _join_limited(modified, 6)))
     if created:
         evidence.append("%s: %s" % (L("files_created"), _join_limited(created, 6)))
 
-    commands = _significant_commands(task.get("commands_run"))
+    commands = _significant_commands(appendix.get("commands_run"))
     for c in commands[:3]:
         evidence.append("%s: %s" % (L("commands"), _truncate(c, 500)))
 
@@ -255,18 +382,78 @@ def _build_developer_evidence_items(task, git_info, L):
                 L("code_stats"), stat.get("added", 0), stat.get("deleted", 0), stat.get("files", 0)
             ))
 
-    errors = _as_text_list(task.get("errors") or task.get("errors_encountered"))
+    for h in _limited_texts(appendix.get("commit_hashes"), 3):
+        evidence.append("%s: %s" % (L("commit"), h))
+
+    errors = _as_text_list(appendix.get("errors"))
     for e in errors[:2]:
         evidence.append("%s: %s" % (L("issues"), _truncate(e, 500)))
+
+    for a in _format_artifacts(appendix.get("artifacts"))[:5]:
+        evidence.append("%s: %s" % (L("artifacts"), a))
 
     return evidence
 
 
 def _build_raw_evidence_items(task, L):
     raw = []
-    for p in _limited_texts(task.get("user_prompts"), 3):
+    appendix = task.get("appendix") or {}
+    for p in _limited_texts(appendix.get("user_prompts"), 3):
         raw.append("%s: %s" % (L("task_requests"), p))
     return raw
+
+
+def _dict_value(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _first_text(*values):
+    for value in values:
+        for item in _as_text_list(value):
+            text = item.replace("\n", " ").strip()
+            if text:
+                return text
+    return ""
+
+
+def _merge_texts(*values):
+    items = []
+    for value in values:
+        items.extend(_as_text_list(value))
+    return dedupe_texts([item.replace("\n", " ").strip() for item in items if item and item.strip()])
+
+
+def _format_artifacts(value):
+    formatted = []
+    if isinstance(value, dict):
+        artifacts = [value]
+    elif isinstance(value, (list, tuple)):
+        artifacts = value
+    else:
+        artifacts = _as_text_list(value)
+    for artifact in artifacts:
+        if isinstance(artifact, dict):
+            path = str(artifact.get("path") or "").strip()
+            kind = str(artifact.get("kind") or "").strip()
+            summary = str(artifact.get("summary") or "").strip()
+            sha = str(artifact.get("sha256") or artifact.get("hash") or "").strip()
+            parts = []
+            if kind:
+                parts.append(kind)
+            if path:
+                parts.append(path)
+            text = ": ".join(parts) if parts else summary
+            if summary and text != summary:
+                text = "%s - %s" % (text, summary)
+            if sha:
+                text = "%s (sha256: %s)" % (text, sha[:12])
+            if text:
+                formatted.append(text)
+        else:
+            text = str(artifact).strip()
+            if text:
+                formatted.append(text)
+    return formatted
 
 
 def _significant_commands(commands):
@@ -277,6 +464,81 @@ def _significant_commands(commands):
         if first and first not in trivial:
             sig.append(c)
     return sig
+
+
+def _build_prompt_output_items(task):
+    appendix = task.get("appendix") or {}
+    items = []
+    items.extend(_as_text_list(appendix.get("prompt_outputs")))
+    items.extend(_as_text_list(appendix.get("verification_artifacts")))
+    return dedupe_texts(_limited_texts(items, PROMPT_OUTPUT_LIMIT, limit=1000))
+
+
+def _is_verification_session_task(task):
+    tokens = [
+        task.get("status"),
+        task.get("purpose"),
+        task.get("task_group"),
+    ]
+    tokens.extend(_as_text_list(task.get("categories")))
+    haystack = " ".join(str(token or "").lower() for token in tokens)
+    keywords = (
+        "testing",
+        "test",
+        "qa",
+        "verify",
+        "verification",
+        "validation",
+        "review",
+        "검증",
+        "테스트",
+        "테스터",
+    )
+    return any(keyword in haystack for keyword in keywords)
+
+
+def dedupe_texts(items):
+    seen = set()
+    result = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def _filter_noop_texts(items):
+    return [item for item in _as_text_list(items) if not _is_noop_text(item)]
+
+
+def _is_noop_text(value):
+    text = str(value or "").strip().lower().strip(".")
+    normalized = " ".join(text.split())
+    noop_prefixes = (
+        "no follow-up needed",
+        "no follow up needed",
+        "no further action",
+        "no action needed",
+        "not needed",
+    )
+    if any(normalized.startswith(prefix) for prefix in noop_prefixes):
+        return True
+    return normalized in {
+        "",
+        "none",
+        "n/a",
+        "na",
+        "no follow-up needed",
+        "no follow up needed",
+        "no further action",
+        "no action needed",
+        "not needed",
+        "없음",
+        "해당 없음",
+        "후속 조치 없음",
+        "추가 조치 없음",
+    }
 
 
 def _labeled_texts(label, items, max_items, limit=500):
@@ -424,7 +686,9 @@ def _truncate(text, n):
 
 def format_daily_header(date_str, lang="ko"):
     """Create daily diary file header."""
-    L = lambda key: get_label(key, lang)
+    def L(key):
+        return get_label(key, lang)
+
 
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")

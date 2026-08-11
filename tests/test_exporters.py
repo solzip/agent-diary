@@ -1,8 +1,9 @@
 """Tests for exporters (base, loader, slack, obsidian, discord, notion, github)."""
 
 import json
-import os
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
+
+import pytest
 
 from claude_diary.exporters.base import BaseExporter
 from claude_diary.exporters.loader import load_exporters, run_exporters, retry_queued
@@ -27,11 +28,8 @@ SAMPLE_ENTRY = {
 class TestBaseExporter:
     def test_not_implemented(self):
         exp = BaseExporter({})
-        try:
+        with pytest.raises(NotImplementedError):
             exp.export({})
-            assert False, "Should raise"
-        except NotImplementedError:
-            pass
 
     def test_trust_level_default(self):
         assert BaseExporter.TRUST_LEVEL == "custom"

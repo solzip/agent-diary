@@ -1,6 +1,5 @@
 """Git information collector — branch, commits, diff stats."""
 
-import os
 import subprocess
 
 

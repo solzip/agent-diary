@@ -86,7 +86,6 @@ def cmd_stats(args):
         print()
 
     # Daily activity
-    weekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
     print("  Daily:")
     week_line = "  "
     for day in range(1, days_in_month + 1):
