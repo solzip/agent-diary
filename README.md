@@ -136,16 +136,16 @@ Claude Code 플러그인 설치는 별도 배포 경로입니다. Claude Code의
 ```bash
 # Claude Code 안에서 실행
 /plugin marketplace add https://github.com/solzip/agent-diary
-/plugin install working-diary
+/plugin install agent-diary
 ```
 
-이 플러그인은 Claude Code 쪽 hook 설정을 배포합니다. `working-diary` CLI는 Python 패키지에서 제공되므로, 플러그인 경로를 쓰더라도 Python 패키지 설치와 `agent-diary init`이 준비되어 있어야 합니다.
+이 플러그인은 Claude Code 쪽 hook 설정을 배포합니다. `agent-diary` CLI는 Python 패키지에서 제공되므로, 플러그인 경로를 쓰더라도 Python 패키지 설치와 `agent-diary init`이 준비되어 있어야 합니다.
 
 소스에서 설치:
 
 ```bash
 git clone https://github.com/solzip/agent-diary.git
-cd working-diary
+cd agent-diary
 pip install -e .
 agent-diary init
 ```
@@ -491,15 +491,21 @@ agent-diary diary-notion ensure
 
 설정 파일은 OS별 사용자 config 경로의 `claude-diary/config.json`에 저장됩니다. Notion 같은 exporter를 설정하면 API token, webhook URL, root page ID도 이 로컬 config에 저장됩니다. CLI 출력에서는 긴 token과 webhook 값을 masking해서 보여줍니다.
 
-| 환경변수 | 설명 | 기본값 |
-|----------|------|--------|
-| `CLAUDE_DIARY_LANG` | 일지 언어. `ko` 또는 `en` | `ko` |
-| `CLAUDE_DIARY_DIR` | 자동 일지 저장 경로 | `~/working-diary` |
-| `CLAUDE_DIARY_MANUAL_DIR` | 수동 일지 저장 경로 | `~/working-diary/manual` |
-| `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` |
-| `CLAUDE_DIARY_NOTION_TOKEN` | Notion token. config보다 우선 | - |
-| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID. config보다 우선 | - |
-| `CLAUDE_DIARY_SKIP` | `1`, `true`, `yes`이면 Claude Code Stop Hook 자동 기록 skip | - |
+환경변수는 **두 부류로 우선순위가 반대**입니다. 아래 표의 "우선순위" 열을 먼저 보세요.
+
+| 환경변수 | 설명 | 기본값 | 우선순위 |
+|----------|------|--------|----------|
+| `CLAUDE_DIARY_LANG` | 일지 언어. `ko` 또는 `en` | `ko` | config.json이 이김 |
+| `CLAUDE_DIARY_DIR` | 자동 일지 저장 경로 | `~/working-diary` | config.json이 이김 |
+| `CLAUDE_DIARY_MANUAL_DIR` | 수동 일지 저장 경로 | `~/working-diary/manual` | config.json이 이김 |
+| `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` | config.json이 이김 |
+| `CLAUDE_DIARY_NOTION_TOKEN` | Notion token | - | **환경변수가 이김** |
+| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID | - | **환경변수가 이김** |
+| `CLAUDE_DIARY_SKIP` | `1`, `true`, `yes`이면 Claude Code Stop Hook 자동 기록 skip | - | 환경변수 전용 |
+
+앞의 네 개는 `config.json > 환경변수 > 기본값` 순서로 병합됩니다. 즉 `init`을 한 번이라도 실행했다면 해당 키가 config에 기록돼 있어서 **환경변수를 지정해도 무시됩니다.** 저장 경로를 임시로 바꾸려면 환경변수가 아니라 `config.json`을 고쳐야 합니다.
+
+Notion 자격증명 두 개만 반대로, 환경변수가 config를 덮어씁니다. CI나 여러 워크스페이스를 오갈 때 토큰을 파일에 남기지 않기 위한 예외입니다.
 
 PowerShell에서 한글이나 이모지가 깨져 보이면 현재 세션 출력 인코딩을 UTF-8로 바꿉니다.
 

@@ -7,7 +7,7 @@ labels: bug
 ## Environment
 - OS:
 - Python version:
-- claude-diary version:
+- agent-diary version (`agent-diary --version`):
 
 ## Steps to Reproduce
 1.
@@ -22,5 +22,5 @@ labels: bug
 
 ## Logs
 ```
-# Paste output of: claude-diary audit -n 5
+# Paste output of: agent-diary audit -n 5
 ```

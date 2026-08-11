@@ -392,7 +392,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
       "blocked": false,
       "block_reason": "",
       "carryover": false,
-      "task_group": "working-diary-notion",
+      "task_group": "agent-diary-notion",
       "parent_index": null,
       "depends_on_indices": [],
       "categories": ["feature"],

@@ -136,16 +136,16 @@ Claude Code plugin installation is a separate distribution path for Claude Code 
 ```bash
 # Run inside Claude Code
 /plugin marketplace add https://github.com/solzip/agent-diary
-/plugin install working-diary
+/plugin install agent-diary
 ```
 
-The plugin distributes Claude Code hook settings. The `working-diary` CLI comes from the Python package, so Python package installation and `agent-diary init` are still required.
+The plugin distributes Claude Code hook settings. The `agent-diary` CLI comes from the Python package, so Python package installation and `agent-diary init` are still required.
 
 Install from source:
 
 ```bash
 git clone https://github.com/solzip/agent-diary.git
-cd working-diary
+cd agent-diary
 pip install -e .
 agent-diary init
 ```
@@ -487,15 +487,21 @@ agent-diary diary-notion ensure
 
 The config file is stored at the OS-specific user config path under `claude-diary/config.json`. If you configure exporters such as Notion, Slack, or Discord, API tokens, webhook URLs, and root page IDs are stored in this local config. CLI output masks long token and webhook values.
 
-| Environment variable | Description | Default |
-|----------------------|-------------|---------|
-| `CLAUDE_DIARY_LANG` | Diary language, `ko` or `en` | `ko` |
-| `CLAUDE_DIARY_DIR` | Automatic diary path | `~/working-diary` |
-| `CLAUDE_DIARY_MANUAL_DIR` | Manual diary path | `~/working-diary/manual` |
-| `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` |
-| `CLAUDE_DIARY_NOTION_TOKEN` | Notion token, overrides config | - |
-| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID, overrides config | - |
-| `CLAUDE_DIARY_SKIP` | `1`, `true`, or `yes` skips Claude Code Stop Hook auto diary | - |
+These variables fall into **two groups whose precedence runs in opposite directions**. Read the last column first.
+
+| Environment variable | Description | Default | Precedence |
+|----------------------|-------------|---------|------------|
+| `CLAUDE_DIARY_LANG` | Diary language, `ko` or `en` | `ko` | config.json wins |
+| `CLAUDE_DIARY_DIR` | Automatic diary path | `~/working-diary` | config.json wins |
+| `CLAUDE_DIARY_MANUAL_DIR` | Manual diary path | `~/working-diary/manual` | config.json wins |
+| `CLAUDE_DIARY_TZ_OFFSET` | UTC offset | `9` | config.json wins |
+| `CLAUDE_DIARY_NOTION_TOKEN` | Notion token | - | **env wins** |
+| `CLAUDE_DIARY_NOTION_ROOT_PAGE_ID` | Notion root page ID | - | **env wins** |
+| `CLAUDE_DIARY_SKIP` | `1`, `true`, or `yes` skips Claude Code Stop Hook auto diary | - | env only |
+
+The first four merge as `config.json > environment > defaults`. So if you have ever run `init`, the key is already written to the config and **setting the environment variable has no effect.** To move the diary path, edit `config.json` rather than exporting a variable.
+
+The two Notion credentials are the exception and override the config, so a token need not be written to a file in CI or when moving between workspaces.
 
 If PowerShell output shows broken Korean or emoji characters, switch the current session output encoding to UTF-8.
 

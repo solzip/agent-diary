@@ -1,10 +1,10 @@
-# Contributing to claude-diary
+# Contributing to agent-diary
 
 > [한국어](#한국어) | [English](#english)
 
 ## English
 
-Thank you for your interest in contributing to claude-diary!
+Thank you for your interest in contributing to agent-diary!
 
 ### How to Contribute
 
@@ -33,7 +33,7 @@ Thank you for your interest in contributing to claude-diary!
 
 ```bash
 git clone https://github.com/solzip/agent-diary.git
-cd working-diary
+cd agent-diary
 pip install pytest
 PYTHONPATH=src pytest tests/ -v
 ```
@@ -50,7 +50,7 @@ PYTHONPATH=src pytest tests/ -v
 
 ## 한국어
 
-claude-diary에 기여해 주셔서 감사합니다!
+agent-diary에 기여해 주셔서 감사합니다!
 
 ### 기여 방법
 
