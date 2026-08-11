@@ -178,6 +178,42 @@ class TestCmdDoctor:
         out = capsys.readouterr().out
         assert "agent-diary init" in out
 
+    def test_privacy_line_says_plainly_when_nothing_is_excluded(self, tmp_path, capsys):
+        """Prompts are stored as written and both limits are opt-in, so the
+        default state is worth stating rather than leaving to memory."""
+        diary = tmp_path / "diary"
+        diary.mkdir()
+        cfg = tmp_path / "config.json"
+        cfg.write_text("{}", encoding="utf-8")
+
+        with patch("claude_diary.cli.doctor.load_config", return_value=_config(diary)), \
+             patch("claude_diary.cli.doctor.get_config_path", return_value=str(cfg)), \
+             patch("claude_diary.cli.setup._get_claude_settings_path",
+                   return_value=str(tmp_path / "none.json")):
+            cmd_doctor(_args())
+
+        out = capsys.readouterr().out
+        assert "recording everything" in out
+
+    def test_privacy_line_counts_the_rules_in_force(self, tmp_path, capsys):
+        diary = tmp_path / "diary"
+        diary.mkdir()
+        cfg = tmp_path / "config.json"
+        cfg.write_text("{}", encoding="utf-8")
+        conf = _config(diary, skip_projects=["~/clients", "scratch"],
+                       security={"additional_secret_patterns": ["acme-corp"]})
+
+        with patch("claude_diary.cli.doctor.load_config", return_value=conf), \
+             patch("claude_diary.cli.doctor.get_config_path", return_value=str(cfg)), \
+             patch("claude_diary.cli.setup._get_claude_settings_path",
+                   return_value=str(tmp_path / "none.json")):
+            cmd_doctor(_args())
+
+        out = capsys.readouterr().out
+        assert "2 skipped project rule(s)" in out
+        assert "1 extra redaction pattern(s)" in out
+        assert "recording everything" not in out
+
     def test_notion_is_not_contacted_unless_asked(self, tmp_path, capsys):
         diary = tmp_path / "diary"
         diary.mkdir()

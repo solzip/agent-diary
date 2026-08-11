@@ -123,27 +123,69 @@ def filter_entry_data(entry_data, filter_keywords, mode="redact"):
 # ── Session Opt-out ──
 
 def should_skip_session(cwd, config):
-    """Check if the current session should be skipped.
+    """Decide whether this session is recorded at all.
 
-    Checks:
-    1. CLAUDE_DIARY_SKIP=1 environment variable
-    2. Project name in config.skip_projects list
+    This is the coarsest privacy control the tool has, and the only one that
+    prevents a prompt from ever reaching disk. Three ways to trigger it:
+
+    1. `CLAUDE_DIARY_SKIP=1` in the environment — one session, no config edit
+    2. A bare name in `skip_projects`, matched against the directory name
+    3. A path in `skip_projects` — anything containing a separator is treated
+       as a path and matches the directory or anything beneath it
+
+    (3) exists because names alone cannot tell `~/work/acme` from
+    `~/personal/acme`, and because listing every client repository by hand is
+    the kind of chore that gets skipped right up until the session you most
+    wanted excluded.
 
     Returns:
         True if session should be skipped
     """
-    # Env var check
     if os.environ.get("CLAUDE_DIARY_SKIP", "").strip() in ("1", "true", "yes"):
         return True
 
-    # Project skip list
     skip_projects = config.get("skip_projects", [])
-    if skip_projects and cwd:
-        project = os.path.basename(cwd.replace("\\", "/").rstrip("/"))
-        if project in skip_projects:
-            return True
+    if not skip_projects or not cwd:
+        return False
 
+    normalized = _normalize_path(cwd)
+    project = normalized.rsplit("/", 1)[-1]
+
+    for rule in skip_projects:
+        rule = str(rule or "").strip()
+        if not rule:
+            continue
+        if "/" in rule or "\\" in rule:
+            if _cwd_under_rule(normalized, rule):
+                return True
+        elif project == rule:
+            return True
     return False
+
+
+def _normalize_path(path):
+    """Lower-case on Windows, forward slashes, no trailing slash, ~ expanded."""
+    text = os.path.expanduser(str(path or "")).replace("\\", "/").rstrip("/")
+    if os.name == "nt":
+        text = text.lower()
+    return text
+
+
+def _cwd_under_rule(normalized_cwd, rule):
+    """True when cwd is the ruled directory, or sits beneath it.
+
+    A trailing `/**` is accepted and means the same thing, since that is what
+    people write when they mean "and everything under here".
+
+    Named apart from `_path_matches` above deliberately: that one answers a
+    different question (does a file path match any mask pattern) and shares
+    nothing with this but the word "path".
+    """
+    rule = rule.rstrip("*")
+    prefix = _normalize_path(rule)
+    if not prefix:
+        return False
+    return normalized_cwd == prefix or normalized_cwd.startswith(prefix + "/")
 
 
 # ── Access Control ──

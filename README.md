@@ -518,6 +518,50 @@ These variables fall into **two groups whose precedence runs in opposite directi
 
 The first four merge as `config.json > environment > defaults`. So if you have ever run `init`, the key is already written to the config and **setting the environment variable has no effect.** To move the diary path, edit `config.json` rather than exporting a variable.
 
+### What gets recorded, and how to limit it
+
+**Your prompts are stored as written.** That is the point of the tool, and it is also the thing to think about before running it at work: a prompt routinely contains a client name, an internal URL, or business context you would not put in a file you forget about.
+
+Three controls, all off by default.
+
+**Skip one session** — nothing is written, no config change:
+
+```bash
+CLAUDE_DIARY_SKIP=1 claude
+```
+
+**Skip a project permanently.** A bare name matches the directory name; anything with a separator is treated as a path and covers everything beneath it:
+
+```json
+{
+  "skip_projects": [
+    "personal-notes",        // any directory with this name
+    "~/clients",             // this directory and everything under it
+    "C:\\work\\acme"
+  ]
+}
+```
+
+The path form exists because a name alone cannot tell `~/work/acme` from `~/personal/acme`, and because listing every client repository by hand is the sort of chore that gets skipped until the session you most wanted excluded.
+
+**Redact more than the built-in patterns.** Secrets are masked before anything is written — 11+ patterns for API keys, tokens and private keys. Add your own regexes for names that are not secrets but are still yours:
+
+```json
+{
+  "security": {
+    "additional_secret_patterns": [
+      "acme-corp",
+      "internal\\.example\\.com",
+      "PROJ-\\d{4}"
+    ]
+  }
+}
+```
+
+Matches become `****` in the diary, in Notion, and in every exporter, because masking happens before the entry is formatted.
+
+`agent-diary doctor` reports how many of each rule are active, so "what is this recording" has an answer you can check rather than remember.
+
 ### Gitmoji on commit lines
 
 Off by default. Turn it on in `config.json` and each commit line gains the [gitmoji](https://gitmoji.dev) for its Conventional Commit type:
