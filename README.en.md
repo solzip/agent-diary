@@ -562,6 +562,13 @@ This README focuses on currently usable functionality. Detailed design and plann
 
 ## 10. Documentation
 
+If you are deciding whether the code is worth reading, start with these two.
+
+- **[Architecture](docs/ARCHITECTURE.md)** — the idempotency model, the retry and error-taxonomy policy, cache invalidation, schema versioning, what partial failure means, and why the core has no dependencies
+- **[Postmortem: `ensure` emptied six properties across 497 rows](docs/postmortem/2026-08-07-ensure-wipe.md)** — symptom, measurement against production, root cause, fix, regression tests, and why it went unseen for two months
+
+Detailed design notes:
+
 - [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
 - [Notion views design](docs/02-design/features/diary-notion-views.design.md)
 - [Distribution plan](docs/plans/phase-d-distribution.md)
