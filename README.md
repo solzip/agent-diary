@@ -268,6 +268,7 @@ agent-diary diary-notion push --input .diary-notion-<id>.json --dry-run
 - `--force`는 같은 세션의 기존 row를 archive한 뒤 다시 push합니다.
 - `--dry-run`은 Notion에 쓰지 않고 만들어질 row와 page 본문을 출력합니다. `--preview-file <path>`를 함께 주면 같은 내용을 Markdown 파일로 저장합니다.
 - 같은 `Task Group`에 이미 기록된 세션이 있으면 제목에 `(N차)`가 붙습니다. 첫 세션에는 붙지 않습니다.
+- `--dry-run`도 차수를 반영하려고 Notion을 **읽습니다**(조회만). 자격증명이 없거나 아직 해당 연도 DB를 만든 적이 없으면 차수 없이 렌더링하고 그 사실을 출력 상단에 밝힙니다. 미리보기가 데이터베이스나 페이지를 새로 만드는 일은 없습니다.
 - 실패한 task가 하나라도 있으면 exit code `1`로 종료하고 입력 JSON을 보존합니다.
 - 전체 성공 또는 이미 push된 task만 skip된 경우 exit code `0`으로 종료합니다.
 

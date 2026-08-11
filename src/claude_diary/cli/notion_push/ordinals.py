@@ -12,7 +12,7 @@ from claude_diary.log import get_logger
 logger = get_logger("claude_diary.cli.notion_push")
 
 
-def _resolve_task_group_ordinals(exporter, year, tasks, session_id):
+def _resolve_task_group_ordinals(exporter, year, tasks, session_id, db_id=None):
     """Return {task_group: ordinal} — which session of that group this push is.
 
     A task group is the only thing tying several days of the same work
@@ -20,6 +20,10 @@ def _resolve_task_group_ordinals(exporter, year, tasks, session_id):
     distinct sessions already filed under the name turns it into a readable
     sequence without adding a database column. Best-effort: a query failure
     just means no ordinal, never a failed push.
+
+    `db_id` lets a caller supply a database it already knows about. That
+    matters for `--dry-run`: `ensure_database` creates the year page and the
+    database when they are missing, which a preview must never do.
     """
     groups = []
     for task in tasks:
@@ -29,11 +33,12 @@ def _resolve_task_group_ordinals(exporter, year, tasks, session_id):
     if not groups:
         return {}
 
-    try:
-        db_id = exporter.ensure_database(year)
-    except Exception as e:
-        logger.warning("Task group ordinal lookup skipped: %s", e)
-        return {}
+    if db_id is None:
+        try:
+            db_id = exporter.ensure_database(year)
+        except Exception as e:
+            logger.warning("Task group ordinal lookup skipped: %s", e)
+            return {}
 
     ordinals = {}
     for group in groups:

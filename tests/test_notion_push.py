@@ -885,6 +885,103 @@ class TestCmdNotionPush:
         assert any(a["kind"] == "preview" for a in manifest["artifacts"])
         assert any(a["kind"] == "manifest" for a in manifest["artifacts"]) is False
 
+
+class TestDryRunTaskGroupOrdinal:
+    """A dry run has to predict the title the push will write, suffix included."""
+
+    def _input(self, tmp_path):
+        input_path = tmp_path / "in.json"
+        _write_json(str(input_path), {
+            "session_id": "s2",
+            "tasks": [{"title": "이어지는 작업", "project": "diary", "task_group": "cleanup"}],
+        })
+        return input_path
+
+    def test_dry_run_shows_the_ordinal_the_push_would_add(self, tmp_path, capsys):
+        input_path = self._input(tmp_path)
+        args = _make_args(str(input_path))
+        args.dry_run = True
+        config = {"exporters": {"notion_hierarchical": {"api_token": "t", "root_page_id": "p"}}}
+
+        mock_exp = MagicMock()
+        mock_exp._cache = {"databases": {"2026": "db_1"}, "rows": {}, "years": {}}
+        mock_exp.get_task_group_session_ids.return_value = ["older-1", "older-2"]
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter", return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.notion_cache.get_database", return_value="db_1"), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"):
+            cmd_notion_push(args)
+
+        out = capsys.readouterr().out
+        assert "이어지는 작업 (3차)" in out
+        assert "ordinals were not resolved" not in out
+        assert input_path.exists()
+
+    def test_dry_run_never_creates_the_database(self, tmp_path, capsys):
+        """`ensure_database` creates the year page and the database when they
+        are missing. A preview must not bring anything into existence, so the
+        dry-run path reads the cache and gives up when it is empty."""
+        input_path = self._input(tmp_path)
+        args = _make_args(str(input_path))
+        args.dry_run = True
+        config = {"exporters": {"notion_hierarchical": {"api_token": "t", "root_page_id": "p"}}}
+
+        mock_exp = MagicMock()
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter", return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.notion_cache.get_database", return_value=None), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"):
+            cmd_notion_push(args)
+
+        out = capsys.readouterr().out
+        mock_exp.ensure_database.assert_not_called()
+        mock_exp.ensure_year_page.assert_not_called()
+        mock_exp.create_row.assert_not_called()
+        mock_exp.archive_rows_for_session.assert_not_called()
+        mock_exp.save_cache.assert_not_called()
+        assert "ordinals were not resolved" in out
+        assert input_path.exists()
+
+    def test_dry_run_without_credentials_says_the_suffix_is_unresolved(self, tmp_path, capsys):
+        input_path = self._input(tmp_path)
+        args = _make_args(str(input_path))
+        args.dry_run = True
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value={}), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter") as mock_exporter, \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"):
+            cmd_notion_push(args)
+
+        out = capsys.readouterr().out
+        assert "ordinals were not resolved" in out
+        assert "(3차)" not in out
+        mock_exporter.assert_not_called()
+
+    def test_dry_run_survives_a_failing_ordinal_lookup(self, tmp_path, capsys):
+        input_path = self._input(tmp_path)
+        args = _make_args(str(input_path))
+        args.dry_run = True
+        config = {"exporters": {"notion_hierarchical": {"api_token": "t", "root_page_id": "p"}}}
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter",
+                   side_effect=RuntimeError("network down")), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"):
+            cmd_notion_push(args)
+
+        out = capsys.readouterr().out
+        assert "[agent-diary diary-notion push --dry-run]" in out
+        assert "이어지는 작업" in out
+        assert "ordinals were not resolved" in out
+
+
+class TestPushCwdFallback:
     def test_missing_project_uses_command_cwd(self, tmp_path, monkeypatch):
         input_path = tmp_path / "in.json"
         _write_json(str(input_path), {
