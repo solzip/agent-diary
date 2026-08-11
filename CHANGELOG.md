@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-08-11
+
 ### Added
 
 - **`agent-diary report`**: 기간·프로젝트 단위로 문서 하나를 만든다. `search`는 항목을 찾고 `stats`는 개수를 세고 `weekly`는 이번 주 고정에 옵션도 없어서, "스탠드업·월간 보고·청구 근거로 쓸 문서"를 만드는 명령이 없었다
