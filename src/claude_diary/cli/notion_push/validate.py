@@ -16,6 +16,19 @@ from claude_diary.cli.notion_push.properties import (
 from claude_diary.cli.notion_push.tasks import _get_parent_index
 
 
+# Input predating the normalized v2 report shape files under this value.
+#
+# It reads like a typo, and it began as one: this function returned "legacy"
+# and `_clean_schema_version` prefixed a "v" to anything not already starting
+# with one. The string is kept because it is load-bearing — it is a live
+# select option carrying the majority of rows in existing databases, and
+# emitting a different string would strand them under the old option while
+# new rows accumulate under the new one. Renaming it is a database migration,
+# not an edit here. It is now written out explicitly so no one has to trace
+# the prefixing to understand where it comes from.
+LEGACY_SCHEMA_VERSION = "vlegacy"
+
+
 def _report_schema_version(data, tasks):
     raw = data.get("schema_version")
     if raw is not None:
@@ -27,7 +40,7 @@ def _report_schema_version(data, tasks):
             or isinstance(task.get("appendix"), dict)
         ):
             return "v2"
-    return "legacy"
+    return LEGACY_SCHEMA_VERSION
 
 
 def _stamp_report_schema_version(tasks, version):

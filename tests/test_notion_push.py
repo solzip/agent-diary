@@ -160,6 +160,23 @@ class TestBuildProperties:
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
         assert props["Next Action"]["rich_text"][0]["text"]["content"] == "Run dry-run preview"
 
+    def test_legacy_schema_version_string_is_pinned(self):
+        """`vlegacy` is a live select option carrying most rows in existing
+        databases. Emitting anything else strands them under the old option
+        while new rows collect under the new one, so this string may only
+        change alongside a database migration."""
+        from claude_diary.cli.notion_push.validate import (
+            LEGACY_SCHEMA_VERSION,
+            _report_schema_version,
+        )
+        from claude_diary.cli.notion_push.properties import _clean_schema_version
+
+        assert LEGACY_SCHEMA_VERSION == "vlegacy"
+        resolved = _report_schema_version({}, [{"title": "pre-v2 input"}])
+        assert resolved == "vlegacy"
+        # and it must survive the normalizer on the way into the row
+        assert _clean_schema_version(resolved) == "vlegacy"
+
     def test_report_schema_version_property_included_when_stamped(self):
         task = dict(self._base_task(), _report_schema_version="v2")
         props = _build_properties(task, "2026-05-26", "main", {}, "sess1", 0)
