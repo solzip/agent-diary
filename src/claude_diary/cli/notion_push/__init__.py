@@ -152,14 +152,17 @@ def cmd_notion_push(args):
         artifact_dir = ""
     preview_file = _arg_str(args, "preview_file")
     if dry_run:
+        ordinals_resolved = _resolve_dry_run_ordinals(config, year, tasks, session_id)
         run_artifacts = _prepare_run_artifacts(
             input_path, data, tasks, session_id, date_str, cwd, artifact_dir
         )
         if run_artifacts:
             _complete_run_artifacts_before_render(
-                run_artifacts, tasks, session_id, date_str, cwd, lang
+                run_artifacts, tasks, session_id, date_str, cwd, lang, ordinals_resolved
             )
-        preview = _build_dry_run_preview(tasks, session_id, date_str, cwd, lang)
+        preview = _build_dry_run_preview(
+            tasks, session_id, date_str, cwd, lang, ordinals_resolved
+        )
         if preview_file:
             _write_text_file(preview_file, preview)
             print("[agent-diary diary-notion push --dry-run] Preview file: %s" % preview_file)
@@ -318,12 +321,56 @@ def _gather_git_info(cwd, commit_hashes):
     return info
 
 
-def _build_dry_run_preview(tasks, session_id, date_str, cwd, lang):
+def _resolve_dry_run_ordinals(config, year, tasks, session_id):
+    """Stamp task-group ordinals for a dry run. Returns whether it managed to.
+
+    The ordinal counts the sessions already filed under a task group, which
+    only Notion can answer, so a dry run that skipped the lookup printed
+    titles without the `(N차)` suffix the real push goes on to add — a
+    preview that disagreed with the thing it was previewing.
+
+    Strictly read-only. Without credentials no exporter is built at all, which
+    keeps `--dry-run` usable before `diary-notion init`. The database is taken
+    from the local cache and never through `ensure_database`, which creates
+    the year page and the database when they are missing — a preview must not
+    bring anything into existence.
+
+    When any of that is unavailable the titles are left alone and the caller
+    says so, rather than quietly rendering a title that will not match.
+    """
+    token, root_page_id = _resolve_credentials(config)
+    if not token or not root_page_id:
+        return False
+    try:
+        exporter = NotionHierarchicalExporter({
+            "api_token": token,
+            "root_page_id": root_page_id,
+        })
+        exporter.load_cache()
+        db_id = notion_cache.get_database(exporter._cache, year)
+        if not db_id:
+            return False
+        _stamp_task_group_ordinals(
+            tasks,
+            _resolve_task_group_ordinals(exporter, year, tasks, session_id, db_id=db_id),
+        )
+    except Exception as e:
+        logger.warning("Dry-run task group ordinal lookup skipped: %s", e)
+        return False
+    return True
+
+
+def _build_dry_run_preview(tasks, session_id, date_str, cwd, lang, ordinals_resolved=True):
     lines = [
         "[agent-diary diary-notion push --dry-run]",
         "Session ID: %s" % session_id,
         "Tasks: %d" % len(tasks),
     ]
+    if not ordinals_resolved:
+        lines.append(
+            "Note: task group ordinals were not resolved, so a continuing task "
+            "group will gain a (N차) suffix on the real push."
+        )
     for idx, task in enumerate(tasks):
         title = task.get("title") or "(untitled)"
         git_info = _gather_git_info(cwd, _task_commit_hashes(task))
@@ -346,10 +393,13 @@ def _build_dry_run_preview(tasks, session_id, date_str, cwd, lang):
     return "\n".join(lines)
 
 
-def _complete_run_artifacts_before_render(run_artifacts, tasks, session_id, date_str, cwd, lang):
+def _complete_run_artifacts_before_render(run_artifacts, tasks, session_id, date_str, cwd, lang,
+                                          ordinals_resolved=True):
     preview_tasks = deepcopy(tasks)
     _set_run_artifacts(preview_tasks, run_artifacts)
-    preview = _build_dry_run_preview(preview_tasks, session_id, date_str, cwd, lang)
+    preview = _build_dry_run_preview(
+        preview_tasks, session_id, date_str, cwd, lang, ordinals_resolved
+    )
     _write_artifact_preview(run_artifacts, preview)
     _finalize_artifact_manifest(run_artifacts, tasks)
     _set_run_artifacts(tasks, run_artifacts)

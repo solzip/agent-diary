@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **dry-run이 실제 push와 다른 제목을 보여주던 문제** ([#10](https://github.com/solzip/agent-diary/issues/10)): 미리보기가 자격증명 해석 **전에** 끝나서 차수 조회를 못 했고, 결과적으로 이어지는 task group인데도 `(N차)` 없이 렌더링됐다. 미리보기가 예측 대상과 어긋나는 상태였다
+  - 자격증명이 있으면 dry-run도 차수를 조회해 제목에 반영한다
+  - **`ensure_database`는 호출하지 않는다.** 이 함수는 없으면 연도 페이지와 데이터베이스를 *생성*하므로 미리보기가 불러선 안 된다. DB ID는 로컬 캐시에서만 읽고, 캐시가 없으면 조회를 포기한다
+  - 자격증명이 없거나 캐시가 비었거나 조회가 실패하면 제목을 건드리지 않고, 미리보기 상단에 "차수가 확정되지 않았다"고 밝힌다. `diary-notion init` 전에도 dry-run은 그대로 쓸 수 있다
+
+### Known
+
+- 실제 push가 저장하는 `preview.md`는 차수 부여 **전에** 렌더링된다. `--force` archive 이후에 차수를 매겨야 하고, 미리보기는 네트워크 호출 전에 남겨야 push가 중간에 실패해도 기록이 보존되기 때문이다. 화면 출력과 Notion row는 정확하지만 저장된 `preview.md`의 제목에는 `(N차)`가 빠진다
+
 ## [4.3.1] - 2026-08-11
 
 ### Fixed

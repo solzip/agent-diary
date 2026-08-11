@@ -266,6 +266,7 @@ agent-diary diary-notion push --input .diary-notion-<id>.json --dry-run
 - `--force` archives prior rows for the session and pushes again.
 - `--dry-run` prints the rows and page bodies that would be created without writing to Notion. Add `--preview-file <path>` to save the same rendering as Markdown.
 - If a `Task Group` already has recorded sessions, the title gets an `(N차)` ordinal. The first session of a group is left alone.
+- `--dry-run` **reads** from Notion to resolve that ordinal — a query, nothing more. Without credentials, or before that year's database exists, it renders without the ordinal and says so at the top of the output. A preview never creates a page or a database.
 - If any task fails, the command exits with code `1` and preserves the input JSON.
 - Fully successful pushes and already-skipped pushes exit with code `0`.
 
