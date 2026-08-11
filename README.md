@@ -438,6 +438,14 @@ agent-diary backfill --transcripts /path/to/projects
 agent-diary doctor
 agent-diary doctor --notion
 
+agent-diary report
+agent-diary report --days 14
+agent-diary report --month 2026-07
+agent-diary report --from 2026-07-01 --to 2026-07-15
+agent-diary report --project my-app --output july.md
+agent-diary report --month 2026-07 --detail
+agent-diary report --month 2026-07 --json
+
 agent-diary diary-notion init
 agent-diary diary-notion ensure
 agent-diary diary-notion ensure --dry-run
@@ -517,6 +525,34 @@ These variables fall into **two groups whose precedence runs in opposite directi
 | `CLAUDE_DIARY_SKIP` | `1`, `true`, or `yes` skips Claude Code Stop Hook auto diary | - | env only |
 
 The first four merge as `config.json > environment > defaults`. So if you have ever run `init`, the key is already written to the config and **setting the environment variable has no effect.** To move the diary path, edit `config.json` rather than exporting a variable.
+
+### Reports for a period
+
+`search` finds an entry and `stats` counts things. `report` writes one document for a stretch of work, for a standup, a monthly summary, an invoice, or evidence of what a period consisted of.
+
+```bash
+agent-diary report                                  # the last 7 days
+agent-diary report --month 2026-07 --project my-app
+agent-diary report --from 2026-07-01 --to 2026-07-15 --output july.md
+```
+
+```markdown
+# Work report — 2026-07-01 ~ 2026-07-31
+
+640 session(s) · 16 day(s) · 1 project(s) · +21871 / -11431 lines · 11272 file(s) · 2305 commit(s)
+
+`docs` 197 · `bugfix` 177 · `test` 169 · `feature` 88
+
+## my-app — 640 session(s)
+
+### 2026-07-01
+- Added JWT verification middleware and covered the login failure path
+- …
+```
+
+It draws the session list from the search index and the prose from the diary, joined on session id, so a report filtered to one project does not inherit another project's sentences from the same day.
+
+The work summary is preferred over the requests you typed — the summary is the synthesised record, the requests are raw input. `--detail` includes both. When a day has no summary the requests are used and the report says so.
 
 ### What gets recorded, and how to limit it
 

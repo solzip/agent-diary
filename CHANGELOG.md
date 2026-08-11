@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`agent-diary report`**: 기간·프로젝트 단위로 문서 하나를 만든다. `search`는 항목을 찾고 `stats`는 개수를 세고 `weekly`는 이번 주 고정에 옵션도 없어서, "스탠드업·월간 보고·청구 근거로 쓸 문서"를 만드는 명령이 없었다
+  - 세션 목록은 검색 인덱스, 서술은 일지에서 가져와 **session id로 조인**한다. 한 프로젝트로 필터링하면 같은 날 다른 프로젝트 문장이 섞이지 않는다. `parse_daily_file`을 재사용하지 않은 이유가 이것 — 그건 하루를 통째로 뭉쳐서 어느 문장이 어느 프로젝트 것인지 말할 수 없다
+  - 작업 요약을 우선하고 원본 요청은 fallback. 요약이 없으면 요청을 쓰되 그 사실을 문서에 밝힌다. `--detail`로 둘 다
+  - `--from/--to`, `--month`, `--days`, `--project`, `--output`, `--json`
+
+### Fixed
+
+- **`reindex`가 인덱스를 조용히 열화시키던 문제**: `reindex_all`이 `session_id`·`git_commits`·`lines_added`·`lines_deleted` 네 필드를 하드코딩으로 비워 썼다. 증분 경로(`update_index`)는 채우는 값들이라, 유지보수 명령을 한 번 돌리면 인덱스가 더 얇아지고 그 필드를 읽는 쪽은 **0과 빈 값을 그럴듯하게** 받았다
+  - 네 값 모두 일지 Markdown에 있으므로 재구성 시 복원한다 (KO/EN 라벨 모두)
+  - 실측: 6816개 엔트리에서 session_id 85 → 6816, 라인 수 보유 7 → 4082, 커밋 보유 66 → 3119
+  - 이 결함 때문에 `report`가 서술을 하나도 못 붙이고 라인 수를 0으로 보고했다
+
 ## [4.7.0] - 2026-08-11
 
 ### Added
