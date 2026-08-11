@@ -67,6 +67,8 @@ class TestDiaryNotionInstructions:
             "decisions",
             "implementation_notes",
             "verification",
+            "prompt_outputs",
+            "verification_artifacts",
             "risks",
             "next_steps",
             "support_needed",
@@ -76,8 +78,6 @@ class TestDiaryNotionInstructions:
             "blocked",
             "block_reason",
             "carryover",
-            "review_status",
-            "last_reviewed",
             "parent_index",
             "depends_on_indices",
         ]
@@ -86,21 +86,43 @@ class TestDiaryNotionInstructions:
         for field in fields:
             assert field in DIARY_NOTION_SLASH_COMMAND
             assert field in codex_content
+
+        # Review state is a human judgement made later, so the contract must
+        # not invite the agent to author it.
+        for field in ("review_status", "last_reviewed"):
+            assert field not in DIARY_NOTION_SLASH_COMMAND
+            assert field not in codex_content
         assert "full diff" in DIARY_NOTION_SLASH_COMMAND
         assert "formatting-only" in codex_content
         assert "반드시 한국어로 작성" in DIARY_NOTION_SLASH_COMMAND
-        assert "Write `title`, `body_intro`" in codex_content
+        assert "Write `title`, `summary`" in codex_content
         assert "in Korean" in codex_content
         assert "Notion task database record" in codex_content
         assert "Current Implementation Contract" in codex_content
-        assert "schema v7" in codex_content
+        assert "schema v8" in codex_content
         assert "native sub-items" in codex_content
         assert "Never write `\"unknown\"` as `project`" in codex_content
+        assert "testing, QA, review, validation, or verification sessions" in codex_content
+        assert "verification-only work" in codex_content
+        assert "prompt-result document" in codex_content
+        assert "prompt_outputs" in codex_content
+        assert "schema v2 normalized fields" in codex_content
+        assert "Notion is the report surface" in codex_content
+        assert "appendix.artifacts" in codex_content
+        assert "push --input .diary-notion-<8-random>.json --dry-run" in codex_content
+        assert ".codefleet/runs" in codex_content
         # Claude /diary-notion slash command carries the implementation contract
         assert "현재 구현 계약" in DIARY_NOTION_SLASH_COMMAND
-        assert "schema v7" in DIARY_NOTION_SLASH_COMMAND
+        assert "schema v8" in DIARY_NOTION_SLASH_COMMAND
         assert "native 하위항목" in DIARY_NOTION_SLASH_COMMAND
         assert "carryover=true" in DIARY_NOTION_SLASH_COMMAND
+        assert "Testing / Verification Sessions" in DIARY_NOTION_SLASH_COMMAND
+        assert "prompt-output artifact fields" in DIARY_NOTION_SLASH_COMMAND
+        assert "Core Report Schema" in DIARY_NOTION_SLASH_COMMAND
+        assert "schema v2 normalized fields" in DIARY_NOTION_SLASH_COMMAND
+        assert "appendix.artifacts" in DIARY_NOTION_SLASH_COMMAND
+        assert "push --input .diary-notion-<8자리>.json --dry-run" in DIARY_NOTION_SLASH_COMMAND
+        assert ".codefleet/runs" in DIARY_NOTION_SLASH_COMMAND
 
 
 class TestInstallSlashCommandSingle:

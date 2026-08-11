@@ -6,9 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 from claude_diary.config import load_config
 from claude_diary.log import get_logger, configure_from_config
-
-logger = get_logger("claude_diary.core")
-from claude_diary.lib.parser import parse_transcript, get_session_time_range
+from claude_diary.lib.parser import parse_transcript
 from claude_diary.lib.git_info import collect_git_info
 from claude_diary.lib.categorizer import categorize
 from claude_diary.lib.secret_scanner import scan_entry_data
@@ -16,6 +14,8 @@ from claude_diary.formatter import format_entry
 from claude_diary.lib.audit import log_entry as audit_log
 from claude_diary.writer import append_entry, update_session_count, ensure_diary_dir
 from claude_diary.indexer import update_index
+
+logger = get_logger("claude_diary.core")
 
 
 def process_session(session_id, transcript_path, cwd):

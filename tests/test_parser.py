@@ -3,7 +3,6 @@
 import json
 import os
 import tempfile
-import pytest
 
 from claude_diary.lib.parser import parse_transcript, get_session_time_range
 

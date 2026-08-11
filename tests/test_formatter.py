@@ -165,20 +165,19 @@ class TestBuildNotionBlocks:
 
         assert texts[0] == "Implemented richer Notion body content."
         assert "Results" in headings
-        assert "Work Snapshot" in headings
-        assert "Impact" in headings
-        assert "Verification" in headings
-        assert "Risks / Next Actions" in headings
+        assert "Work" not in headings  # narrative lives in the appendix toggle
+        assert "Decisions / Trade-offs" in headings
+        assert "Issues / Risks" in headings
+        assert "Next Actions / Support" in headings
         assert "Appendix" in headings
         assert "Added structured body sections" in texts
         assert "Key Changes: Notion entries now read as developer work records" in texts
-        assert "Context | The previous body looked like a raw log." in texts
-        assert "Impact" in headings
-        assert "Managers can scan the result quickly" in texts
-        assert "Code Change Highlights: `formatter.py`: renders high-signal code change bullets without full diff" in texts
+        assert "Context: The previous body looked like a raw log." in texts
+        assert "Key Changes: `formatter.py`: renders high-signal code change bullets without full diff" in texts
         assert "pytest passed" in texts
         assert "Existing sessions need refreshed installed commands" in texts
-        assert "Next Steps: Install refreshed Codex skills" in texts
+        assert "Next Actions: Install refreshed Codex skills" in texts
+        assert "Decisions / Trade-offs" in texts
         assert "Developer Evidence" in texts
         assert "Original Requests" in texts
         assert texts.index("Results") < texts.index("Appendix")
@@ -189,27 +188,159 @@ class TestBuildNotionBlocks:
         }, lang="en")
         texts = [_block_text(b) for b in _flatten_blocks(blocks)]
 
-        assert "summary-2" in texts
-        assert "summary-3" not in texts
-        assert [b["type"] for b in blocks[:4]] == ["heading_2", "to_do", "to_do", "to_do"]
+        assert "summary-3" in texts
+        assert "summary-4" not in texts
+        assert [b["type"] for b in blocks[:3]] == ["heading_2", "to_do", "to_do"]
 
-    def test_work_snapshot_uses_table_not_callouts(self):
+    def test_results_section_stays_compact(self):
+        blocks = build_notion_blocks({
+            "summary": {
+                "outcomes": ["outcome-%d" % i for i in range(4)],
+                "verification": ["verify-%d" % i for i in range(3)],
+                "remaining": ["remaining-0", "remaining-1"],
+            },
+        }, lang="en")
+        todos = [_block_text(b) for b in _flatten_blocks(blocks) if b["type"] == "to_do"]
+
+        # Results carry the page: 4 outcomes + 3 verifications + 2 remaining,
+        # capped at 7 so a long session cannot flood the top of the page.
+        assert todos == [
+            "outcome-0", "outcome-1", "outcome-2", "outcome-3",
+            "verify-0", "verify-1", "verify-2",
+        ]
+
+    def test_normalized_schema_renders_report_and_artifact_toggles(self):
+        blocks = build_notion_blocks({
+            "summary": {
+                "intro": "Report summary.",
+                "outcomes": ["Feature completed"],
+                "verification": ["pytest passed"],
+                "remaining": ["Publish refreshed skill"],
+            },
+            "work": {
+                "context": "Started from reporting review.",
+                "scope": "Notion renderer.",
+                "approach": "Normalize fields before rendering.",
+                "state": "Implementation complete.",
+                "highlights": ["Short report body"],
+            },
+            "decisions": ["Keep Notion as report surface"],
+            "risks": ["Raw logs should stay outside Notion"],
+            "next_actions": ["Run dry-run preview later"],
+            "support_needed": ["No external support"],
+            "appendix": {
+                "key_changes": ["Normalized task adapter"],
+                "implementation_notes": ["Flat fields remain compatible"],
+                "prompt_outputs": ["QA finding summary"],
+                "verification_artifacts": ["Skipped check documented"],
+                "user_prompts": ["Use compact report format"],
+                "files_modified": ["src/claude_diary/formatter.py"],
+                "commands_run": ["python -m pytest -q"],
+                "artifacts": [{
+                    "kind": "stdout",
+                    "path": ".codefleet/runs/20260605-001/stdout.log",
+                    "summary": "test output",
+                    "sha256": "abcdef1234567890",
+                }],
+            },
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+
+        assert texts[0] == "Report summary."
+        assert "Feature completed" in texts
+        assert "pytest passed" in texts
+        assert "Publish refreshed skill" in texts
+        # The work narrative moved into the collapsed appendix snapshot.
+        assert "Work Snapshot" in texts
+        assert "State: Implementation complete." in texts
+        assert "Decisions / Trade-offs" in texts
+        assert "Keep Notion as report surface" in texts
+        assert "Issues / Risks" in texts
+        assert "Raw logs should stay outside Notion" in texts
+        assert "Next Actions / Support" in texts
+        assert "Prompt Outputs / Verification Artifacts" in texts
+        assert "QA finding summary" in texts
+        assert "Command / File / Commit Evidence" in texts
+        assert "Artifacts: stdout: .codefleet/runs/20260605-001/stdout.log - test output (sha256: abcdef123456)" in texts
+        assert "Work Highlights: Short report body" in texts
+
+    def test_noop_followups_are_not_rendered_as_next_action_todos(self):
+        blocks = build_notion_blocks({
+            "summary": {
+                "intro": "Done.",
+                "outcomes": ["Completed"],
+                "remaining": ["None"],
+            },
+            "work": {"state": "Reviewed"},
+            "next_action": "No follow-up needed.",
+            "next_actions": ["없음"],
+            "support_needed": ["해당 없음"],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+        todos = [_block_text(b) for b in _flatten_blocks(blocks) if b["type"] == "to_do"]
+
+        assert "Next Actions / Support" not in texts
+        assert "No follow-up needed." not in todos
+        assert "None" not in todos
+
+    def test_testing_tasks_move_full_verification_results_to_prompt_output_toggle(self):
+        blocks = build_notion_blocks({
+            "status": "Testing",
+            "purpose": "Test",
+            "categories": ["qa"],
+            "verification": ["result-%d" % i for i in range(8)],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+        todos = [_block_text(b) for b in _flatten_blocks(blocks) if b["type"] == "to_do"]
+        bullets = [_block_text(b) for b in _flatten_blocks(blocks) if b["type"] == "bulleted_list_item"]
+
+        assert "Prompt Outputs / Verification Artifacts" in texts
+        assert "result-0" in texts
+        assert todos == ["result-0", "result-1", "result-2"]
+        assert "result-3" in bullets
+        assert "result-7" in bullets
+
+    def test_default_tasks_keep_three_verification_results_in_summary(self):
+        blocks = build_notion_blocks({
+            "status": "Implementation",
+            "purpose": "Feature",
+            "verification": ["verify-%d" % i for i in range(8)],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+
+        assert "verify-2" in texts
+        assert "verify-3" not in texts
+
+    def test_verification_aliases_render_for_qa_tasks(self):
+        blocks = build_notion_blocks({
+            "categories": ["validation"],
+            "test_results": ["suite passed"],
+            "findings": ["missing error handling"],
+        }, lang="en")
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+
+        assert "Prompt Outputs / Verification Artifacts" in texts
+        assert "suite passed" in texts
+        assert "missing error handling" in texts
+
+    def test_work_narrative_is_collapsed_into_appendix_toggle(self):
         blocks = build_notion_blocks({
             "work_context": "Started from UX feedback.",
             "work_scope": "Changed the Notion body renderer.",
             "approach": "Use a compact table.",
             "outcome": "The page scans faster.",
         }, lang="en")
-        flat = list(_flatten_blocks(blocks))
-        texts = [_block_text(b) for b in flat]
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
+        top_level = [_block_text(b) for b in blocks]
 
         assert "Work Snapshot" in texts
-        assert any(b["type"] == "table" for b in blocks)
-        assert "Item | Content" in texts
-        assert "Context | Started from UX feedback." in texts
+        assert "Context: Started from UX feedback." in texts
+        assert "State: The page scans faster." in texts
+        # None of the narrative sits at the top level any more.
+        assert "Context: Started from UX feedback." not in top_level
         assert not any(b["type"] == "callout" for b in blocks)
 
-    def test_callout_count_is_limited_to_intro_and_combined_risks(self):
+    def test_callout_count_is_limited_to_intro_and_risks_are_bullets(self):
         blocks = build_notion_blocks({
             "body_intro": "핵심 요약.",
             "summary_hints": ["결과 1", "결과 2"],
@@ -220,20 +351,22 @@ class TestBuildNotionBlocks:
             "next_steps": ["다음 작업"],
         })
         callouts = [b for b in _flatten_blocks(blocks) if b["type"] == "callout"]
+        texts = [_block_text(b) for b in _flatten_blocks(blocks)]
 
-        assert len(callouts) == 2
+        assert len(callouts) == 1
         assert _block_text(callouts[0]) == "핵심 요약."
-        assert _block_text(callouts[1]) == "리스크 1\n리스크 2"
+        assert "리스크 1" in texts
+        assert "리스크 2" in texts
 
-    def test_code_changes_alias_limits_to_three_bullets(self):
+    def test_code_changes_alias_renders_as_developer_evidence(self):
         blocks = build_notion_blocks({
             "code_changes": ["change-%d" % i for i in range(8)],
         }, lang="en")
         texts = [_block_text(b) for b in _flatten_blocks(blocks)]
 
         assert "Appendix" in texts
-        assert "Code Change Highlights: change-2" in texts
-        assert "Code Change Highlights: change-3" not in texts
+        assert "Developer Evidence" in texts
+        assert "Key Changes: change-7" in texts
 
     def test_files_section_marks_created_with_plus(self):
         blocks = build_notion_blocks({

@@ -32,7 +32,7 @@ NOTION_API_VERSION = "2022-06-28"
 NOTION_API_BASE = "https://api.notion.com/v1"
 MAX_RETRIES = 3
 RICH_TEXT_LIMIT = 2000
-SCHEMA_VERSION = "v7"
+SCHEMA_VERSION = "v8"
 DATABASE_TITLE = "Entries"
 
 # Relation property names this tool creates itself. Notion's *native* sub-item
@@ -83,7 +83,7 @@ class NotionHierarchicalExporter:
         except ImportError:
             raise RuntimeError(
                 "Notion exporter requires 'requests'. Install with: pip install requests"
-            )
+            ) from None
 
     def _headers(self):
         return {
@@ -114,7 +114,7 @@ class NotionHierarchicalExporter:
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(2 ** attempt)
                     continue
-                raise RuntimeError("Notion API network error: %s" % e)
+                raise RuntimeError("Notion API network error: %s" % e) from e
 
             status = resp.status_code
             if status == 200:
@@ -122,17 +122,17 @@ class NotionHierarchicalExporter:
 
             if status == 401 or status == 403:
                 raise NotionAuthError(
-                    "Notion API %d: %s" % (status, _short_error(resp))
+                    "Notion API %d: %s" % (status, short_error(resp))
                 )
 
             if status == 404:
                 raise NotionNotFound(
-                    "Notion API 404: %s" % _short_error(resp)
+                    "Notion API 404: %s" % short_error(resp)
                 )
 
             if status == 400:
                 raise NotionBadRequest(
-                    "Notion API 400: %s" % _short_error(resp)
+                    "Notion API 400: %s" % short_error(resp)
                 )
 
             if status == 429:
@@ -148,12 +148,12 @@ class NotionHierarchicalExporter:
                     continue
                 raise RuntimeError(
                     "Notion API %d after %d retries: %s" %
-                    (status, MAX_RETRIES, _short_error(resp))
+                    (status, MAX_RETRIES, short_error(resp))
                 )
 
             raise RuntimeError(
                 "Notion API unexpected status %d: %s" %
-                (status, _short_error(resp))
+                (status, short_error(resp))
             )
 
         raise RuntimeError("Notion API failed after retries: %s" % last_error)
@@ -290,25 +290,28 @@ class NotionHierarchicalExporter:
             cursor = data.get("next_cursor")
 
     def _ensure_db_schema_extensions(self, db_id, force=False):
-        """Add current schema extensions if not yet recorded in cache.
+        """Add any schema extension property the database is missing.
 
-        Patching the same property twice is harmless (Notion treats existing
-        properties as no-ops), but we still gate by a cache flag to skip the
-        API call on the happy path.
+        Only missing properties are sent. Re-patching one that already exists
+        is NOT a no-op: `{"select": {}}` replaces its option list with an empty
+        one, and Notion then clears that property on every row referencing the
+        removed options. Patching the full extension set on each run therefore
+        wiped Status/Purpose/Task Group/Priority/Review Status/Schema Version
+        across the whole database.
         """
         schema_v = self._cache.setdefault("schema_v", {})
         current = schema_v.get(db_id)
         if current == SCHEMA_VERSION and not force:
             return
-        if current == SCHEMA_VERSION and force:
-            self._request("PATCH", "/databases/%s" % db_id, {
-                "properties": _current_schema_extensions(db_id)
-            })
-            schema_v[db_id] = SCHEMA_VERSION
-            return
-        self._request("PATCH", "/databases/%s" % db_id, {
-            "properties": _current_schema_extensions(db_id)
-        })
+
+        existing = set(self.get_database_property_map(db_id))
+        missing = {
+            name: spec
+            for name, spec in _current_schema_extensions(db_id).items()
+            if name not in existing
+        }
+        if missing:
+            self._request("PATCH", "/databases/%s" % db_id, {"properties": missing})
         schema_v[db_id] = SCHEMA_VERSION
 
     def _create_database(self, parent_page_id):
@@ -396,6 +399,54 @@ class NotionHierarchicalExporter:
         notion_cache.invalidate_rows_for_session(self._cache, session_id)
         return archived
 
+    def query_database_rows(self, db_id, page_size=100):
+        """Return all rows in an Entries database without mutating Notion."""
+        rows = []
+        body = {
+            "page_size": page_size,
+        }
+        cursor = None
+        while True:
+            if cursor:
+                body["start_cursor"] = cursor
+            elif "start_cursor" in body:
+                del body["start_cursor"]
+            resp = self._request("POST", "/databases/%s/query" % db_id, dict(body))
+            rows.extend(resp.get("results", []))
+            if not resp.get("has_more"):
+                return rows
+            cursor = resp.get("next_cursor")
+
+    def get_task_group_session_ids(self, db_id, task_group):
+        """Return the distinct Session IDs already filed under a task group.
+
+        Continuation work is recorded as a new row sharing the previous row's
+        `Task Group` (never by widening the earlier row), so the number of
+        distinct sessions under that name is how far along the group is.
+        Archived rows are excluded by Notion's query, so `--force` re-pushes
+        do not inflate the count.
+        """
+        body = {
+            "filter": {"property": "Task Group", "select": {"equals": task_group}},
+            "page_size": 100,
+        }
+        session_ids = set()
+        cursor = None
+        while True:
+            if cursor:
+                body["start_cursor"] = cursor
+            resp = self._request("POST", "/databases/%s/query" % db_id, dict(body))
+            for row in resp.get("results", []):
+                prop = (row.get("properties") or {}).get("Session ID") or {}
+                text = "".join(
+                    part.get("plain_text", "") for part in prop.get("rich_text") or []
+                ).strip()
+                if text:
+                    session_ids.add(text)
+            if not resp.get("has_more"):
+                return session_ids
+            cursor = resp.get("next_cursor")
+
     def create_row(self, db_id, properties, body_blocks):
         """Create a new row (page) in the database with properties + body blocks."""
         body = {
@@ -427,6 +478,19 @@ class NotionHierarchicalExporter:
                 "Parent Task": {
                     "relation": [{"id": parent_row_id}]
                 }
+            }
+        })
+
+    def update_row_review(self, row_id, status, reviewed_date):
+        """PATCH a row's review state.
+
+        Only `diary-notion review --apply` calls this: review is a human
+        judgement, so no automatic path may set it.
+        """
+        self._request("PATCH", "/pages/%s" % row_id, {
+            "properties": {
+                "Review Status": {"select": {"name": status}},
+                "Last Reviewed": {"date": {"start": reviewed_date}},
             }
         })
 
@@ -487,13 +551,19 @@ class NotionHierarchicalExporter:
         ]
 
 
-def _short_error(resp):
-    """Extract a one-line error description from a Notion error response."""
+def short_error(resp):
+    """Extract a one-line error description from a Notion error response.
+
+    Capped: Notion's select-option errors enumerate every existing option,
+    which runs to thousands of characters and buries the actual message.
+    """
     try:
         data = resp.json()
-        return data.get("message") or data.get("code") or resp.text[:200]
+        message = data.get("message") or data.get("code") or resp.text
     except Exception:
-        return resp.text[:200]
+        message = resp.text
+    message = (message or "")[:200]
+    return message
 
 
 def _self_relation(db_id):
@@ -536,6 +606,7 @@ def _current_schema_extensions(db_id):
         "Carryover": {"checkbox": {}},
         "Review Status": {"select": {}},
         "Last Reviewed": {"date": {}},
+        "Schema Version": {"select": {}},
     }
 
 

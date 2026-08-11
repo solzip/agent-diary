@@ -335,6 +335,7 @@ working-diary write
 working-diary diary-notion init
 working-diary diary-notion ensure
 working-diary diary-notion ensure --dry-run
+working-diary diary-notion ops
 working-diary diary-notion push --input .diary-notion-<id>.json
 working-diary notion push --input .diary-notion-<id>.json
 ```
@@ -407,6 +408,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 - Secret scanning and masking
 - Search index
 - Notion work log: `working-diary diary-notion init` -> `working-diary diary-notion ensure`
+- Notion operations report: `working-diary diary-notion ops` for blocked/review/next action/stale/work days/today-plan candidates/parent status signals
 - Slack, Discord, Obsidian, GitHub exporters: `working-diary config --add-exporter <name>`
 - HTML dashboard: `working-diary dashboard` or `working-diary dashboard --serve --port 8787`
 - Audit log and source checksum verification
@@ -438,6 +440,7 @@ This README focuses on currently usable functionality. Detailed design and plann
 | Area | Status |
 |------|--------|
 | Stable now | Claude Code Stop Hook, Codex skills, Markdown diaries, Notion task row push, schema/view ensure |
+| Phase 3 started | `working-diary diary-notion ops` read-only operations report, parent/task group progress, ensure conflict classification and repair plans |
 | Next | Windows install/output experience, Notion sub-item guidance, incremental CI/lint expansion |
 | Under review | SQLite search index, Cursor/Windsurf/VS Code integration |
 

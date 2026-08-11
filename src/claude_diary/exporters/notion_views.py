@@ -11,13 +11,24 @@ from claude_diary.exporters.notion_hierarchical import (
     NotionBadRequest,
     NotionNotFound,
     detect_subitem_relation,
+    short_error,
 )
 
 
 NOTION_VIEWS_API_VERSION = "2026-03-11"
-CORE_VIEW_NAMES = ("작업 계층", "오늘 작업", "상태별", "목적별", "프로젝트별")
-OPERATION_VIEW_NAMES = ("오늘 우선순위", "전날 미완료", "Blocked", "리뷰 필요", "작업 그룹별")
+# One view per question the vision (§1) says this database exists to answer —
+# what did I do today, what is blocked, what is next — plus the structure and
+# continuity views that give those answers their shape. Order matches
+# _build_core_view_specs, which is the tab order in Notion.
+CORE_VIEW_NAMES = ("작업 계층", "오늘 작업", "Blocked")
+OPERATION_VIEW_NAMES = ("전날 미완료", "작업 그룹별")
 ENSURED_VIEW_NAMES = CORE_VIEW_NAMES + OPERATION_VIEW_NAMES
+
+# Views earlier versions created that this spec no longer manages: pure
+# group-by duplicates of one another. `ensure` reports them so they can be
+# deleted by hand — deleting a Notion view could discard a layout the user
+# customised, so it is never done automatically.
+RETIRED_VIEW_NAMES = ("상태별", "목적별", "프로젝트별", "오늘 우선순위", "리뷰 필요")
 
 REQUIRED_PROPERTIES = (
     "Name",
@@ -104,7 +115,7 @@ class NotionViewsClient:
         except ImportError:
             raise RuntimeError(
                 "Notion views client requires 'requests'. Install with: pip install requests"
-            )
+            ) from None
 
     def _headers(self):
         return {
@@ -132,7 +143,7 @@ class NotionViewsClient:
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(2 ** attempt)
                     continue
-                raise RuntimeError("Notion Views API network error: %s" % e)
+                raise RuntimeError("Notion Views API network error: %s" % e) from e
 
             status = resp.status_code
             if status in (200, 201):
@@ -140,15 +151,15 @@ class NotionViewsClient:
 
             if status == 401 or status == 403:
                 raise NotionAuthError(
-                    "Notion Views API %d: %s" % (status, _short_error(resp))
+                    "Notion Views API %d: %s" % (status, short_error(resp))
                 )
             if status == 404:
                 raise NotionNotFound(
-                    "Notion Views API 404: %s" % _short_error(resp)
+                    "Notion Views API 404: %s" % short_error(resp)
                 )
             if status == 400:
                 raise NotionBadRequest(
-                    "Notion Views API 400: %s" % _short_error(resp)
+                    "Notion Views API 400: %s" % short_error(resp)
                 )
             if status == 429:
                 retry_after = int(resp.headers.get("Retry-After", "1"))
@@ -162,12 +173,12 @@ class NotionViewsClient:
                     continue
                 raise RuntimeError(
                     "Notion Views API %d after %d retries: %s" %
-                    (status, MAX_RETRIES, _short_error(resp))
+                    (status, MAX_RETRIES, short_error(resp))
                 )
 
             raise RuntimeError(
                 "Notion Views API unexpected status %d: %s" %
-                (status, _short_error(resp))
+                (status, short_error(resp))
             )
 
         raise RuntimeError("Notion Views API failed after retries: %s" % last_error)
@@ -265,7 +276,7 @@ class CoreViewsEnsurer:
             if dry_run:
                 result.updates_planned.append("작업 계층")
                 result.warnings.append(
-                    "schema v7 would convert Parent Task to a dual-property "
+                    "schema v8 would convert Parent Task to a dual-property "
                     "Sub-items relation"
                 )
                 return result
@@ -296,6 +307,13 @@ class CoreViewsEnsurer:
             for view in self.client.list_views(database_id)
             if view.get("name")
         }
+
+        retired = [name for name in RETIRED_VIEW_NAMES if name in existing_by_name]
+        if retired:
+            result.warnings.append(
+                "no longer managed — delete by hand in Notion if unused: %s" %
+                ", ".join(retired)
+            )
 
         for spec in specs:
             existing = existing_by_name.get(spec["name"])
@@ -475,23 +493,23 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             "filter_scope": "parents_and_subitems",
             "toggle_column_id": _prop_id(prop_map, "Name"),
         }
-    native_parent = native["parent_name"] if native else "Parent Task"
     # Hide the legacy Parent Task column only once a native relation supersedes it.
     hierarchy_hidden = ["Depends On", "Sub-items"]
     if native:
         hierarchy_hidden.append("Parent Task")
+    # Each view carries at most five columns. Anything a row needs beyond that
+    # lives in the page body, and the read-only signals that used to justify
+    # their own views (blocked, needs-review, today's priorities) are what
+    # `working-diary diary-notion ops` reports.
     return [
         _view_spec(
             "작업 계층",
             database_id,
             data_source_id,
             prop_map,
-            visible=[
-                "Name", "Status", "Project", "Purpose", "Task Group",
-                native_parent, "Work Period", "Date",
-            ],
+            visible=["Name", "Status", "Project", "Task Group", "Date"],
             hidden=hierarchy_hidden,
-            sorts=[_date_desc_sort()],
+            sorts=[_date_desc_sort(), _task_index_asc_sort()],
             subtasks=hierarchy_subtasks,
         ),
         _view_spec(
@@ -499,64 +517,9 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             database_id,
             data_source_id,
             prop_map,
-            visible=[
-                "Name", "Status", "Project", "Purpose", "Task Group",
-                "Work Period", "Parent Task", "Depends On",
-            ],
+            visible=["Name", "Status", "Priority", "Next Action", "Project"],
             filter_body=_relative_today_filter(),
-            sorts=[_date_desc_sort()],
-            relative_today=True,
-            today=today,
-        ),
-        _view_spec(
-            "상태별",
-            database_id,
-            data_source_id,
-            prop_map,
-            visible=["Name", "Project", "Purpose", "Task Group", "Parent Task", "Work Period", "Date"],
-            group_by=_group_by(prop_map, "Status"),
-        ),
-        _view_spec(
-            "목적별",
-            database_id,
-            data_source_id,
-            prop_map,
-            visible=["Name", "Status", "Project", "Task Group", "Work Period", "Date"],
-            group_by=_group_by(prop_map, "Purpose"),
-        ),
-        _view_spec(
-            "프로젝트별",
-            database_id,
-            data_source_id,
-            prop_map,
-            visible=["Name", "Status", "Purpose", "Task Group", "Parent Task", "Work Period", "Date"],
-            group_by=_group_by(prop_map, "Project"),
-        ),
-        _view_spec(
-            "오늘 우선순위",
-            database_id,
-            data_source_id,
-            prop_map,
-            visible=[
-                "Name", "Priority", "Status", "Project", "Task Group",
-                "Next Action", "Blocked", "Work Period", "Date",
-            ],
-            filter_body=_today_unblocked_filter(),
-            sorts=[_priority_asc_sort(), _date_desc_sort()],
-            relative_today=True,
-            today=today,
-        ),
-        _view_spec(
-            "전날 미완료",
-            database_id,
-            data_source_id,
-            prop_map,
-            visible=[
-                "Name", "Priority", "Status", "Project", "Task Group",
-                "Next Action", "Carryover", "Work Period", "Date",
-            ],
-            filter_body=_unfinished_before_today_filter(),
-            sorts=[_priority_asc_sort(), _date_desc_sort()],
+            sorts=[_priority_asc_sort(), _date_desc_sort(), _task_index_asc_sort()],
             relative_today=True,
             today=today,
         ),
@@ -565,36 +528,29 @@ def _build_core_view_specs(database_id, data_source_id, prop_map, today):
             database_id,
             data_source_id,
             prop_map,
-            visible=[
-                "Name", "Priority", "Status", "Project", "Task Group",
-                "Block Reason", "Next Action", "Work Period", "Date",
-            ],
+            visible=["Name", "Priority", "Block Reason", "Next Action", "Project"],
             filter_body=_blocked_filter(),
-            sorts=[_priority_asc_sort(), _date_desc_sort()],
+            sorts=[_priority_asc_sort(), _date_desc_sort(), _task_index_asc_sort()],
         ),
         _view_spec(
-            "리뷰 필요",
+            "전날 미완료",
             database_id,
             data_source_id,
             prop_map,
-            visible=[
-                "Name", "Review Status", "Last Reviewed", "Priority",
-                "Project", "Task Group", "Next Action", "Date",
-            ],
-            filter_body=_needs_review_filter(),
-            sorts=[_date_desc_sort()],
+            visible=["Name", "Status", "Priority", "Next Action", "Date"],
+            filter_body=_unfinished_before_today_filter(),
+            sorts=[_priority_asc_sort(), _date_desc_sort(), _task_index_asc_sort()],
+            relative_today=True,
+            today=today,
         ),
         _view_spec(
             "작업 그룹별",
             database_id,
             data_source_id,
             prop_map,
-            visible=[
-                "Name", "Status", "Priority", "Project", "Purpose",
-                "Parent Task", "Work Period", "Date",
-            ],
+            visible=["Name", "Status", "Project", "Date"],
             group_by=_group_by(prop_map, "Task Group"),
-            sorts=[_date_desc_sort()],
+            sorts=[_date_desc_sort(), _task_index_asc_sort()],
         ),
     ]
 
@@ -670,20 +626,25 @@ def _update_payload_for_spec(spec, include_subtasks=True):
 
 
 def _property_config(prop_map, visible, hidden=None):
+    """Order the view's columns: `visible` first, then everything else hidden.
+
+    Notion leaves any property omitted from this list at whatever visibility it
+    already had, so listing only a hand-picked subset let the table widen every
+    time the schema gained a column. Enumerating the entire property map pins
+    each view to exactly its `visible` columns, now and after future schema
+    additions.
+    """
     visible_set = set(visible)
-    hidden_set = set(hidden or [])
-    ordered = []
-    for name in visible:
-        ordered.append({"property_id": _prop_id(prop_map, name), "visible": True})
-    for name in hidden or []:
-        if name in prop_map and name not in visible_set:
-            ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
-    for name in HIDDEN_PROPERTIES:
-        if name in prop_map and name not in visible_set and name not in hidden_set:
-            ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
-    for name in ("Files", "Commits", "Lines", "Categories", "Branch"):
-        if name in prop_map and name not in visible_set and name not in hidden_set:
-            ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
+    ordered = [
+        {"property_id": _prop_id(prop_map, name), "visible": True}
+        for name in visible
+    ]
+    placed = set(visible_set)
+    for name in list(hidden or []) + list(HIDDEN_PROPERTIES) + list(prop_map):
+        if name in placed or name not in prop_map:
+            continue
+        placed.add(name)
+        ordered.append({"property_id": _prop_id(prop_map, name), "visible": False})
     return ordered
 
 
@@ -727,15 +688,6 @@ def _fixed_relative_today_filter(today, filter_body=None):
     return _replace_relative_today(filter_body, today)
 
 
-def _today_unblocked_filter():
-    return {
-        "and": [
-            {"property": "Date", "date": {"equals": "today"}},
-            {"property": "Blocked", "checkbox": {"equals": False}},
-        ]
-    }
-
-
 def _unfinished_before_today_filter():
     return {
         "and": [
@@ -749,12 +701,19 @@ def _blocked_filter():
     return {"property": "Blocked", "checkbox": {"equals": True}}
 
 
-def _needs_review_filter():
-    return {"property": "Review Status", "select": {"equals": "Needs Review"}}
-
-
 def _priority_asc_sort():
     return {"property": "Priority", "direction": "ascending"}
+
+
+def _task_index_asc_sort():
+    """Tie-break within a day by the order the tasks were worked.
+
+    Every row a push creates carries the same `Date`, so `Date` alone leaves
+    them tied and Notion orders them arbitrarily. `Task Index` already records
+    the position of each task within its push, and a sort may reference a
+    hidden property — so the work order shows up without widening the table.
+    """
+    return {"property": "Task Index", "direction": "ascending"}
 
 
 def _verify_view(view, spec, prop_map, today):
@@ -769,15 +728,17 @@ def _verify_view(view, spec, prop_map, today):
         if _prop_id(prop_map, name) not in visible_ids and name not in visible_names:
             reasons.append("missing visible property: %s" % name)
 
-    for name in HIDDEN_PROPERTIES:
+    # Every column outside the spec must be hidden. Checking the whole property
+    # map (not just a curated list) is what lets `ensure` narrow a table that
+    # was already wide before this spec existed.
+    spec_visible = set(spec["visible"])
+    for name in prop_map:
+        if name in spec_visible:
+            continue
         prop_id = _prop_id(prop_map, name)
         if prop_id in explicitly_visible_ids or name in visible_names:
-            reasons.append("hidden property is visible: %s" % name)
-
-    for name in spec.get("hidden", []):
-        prop_id = _prop_id(prop_map, name)
-        if prop_id in explicitly_visible_ids or name in visible_names:
-            reasons.append("property should be hidden: %s" % name)
+            label = "hidden property is visible" if name in HIDDEN_PROPERTIES else "property should be hidden"
+            reasons.append("%s: %s" % (label, name))
 
     if spec["name"] == "오늘 작업":
         if not _has_today_filter(view.get("filter"), prop_map, today):
@@ -785,25 +746,20 @@ def _verify_view(view, spec, prop_map, today):
         if not _has_date_desc_sort(view.get("sorts"), prop_map):
             reasons.append("missing Date descending sort")
 
-    if spec["name"] == "오늘 우선순위":
-        if not _has_today_filter(view.get("filter"), prop_map, today):
-            reasons.append("missing Date=today filter")
-        if not _has_checkbox_filter(view.get("filter"), "Blocked", False, prop_map):
-            reasons.append("missing Blocked=false filter")
+    if spec["name"] == "Blocked":
+        if not _has_checkbox_filter(view.get("filter"), "Blocked", True, prop_map):
+            reasons.append("missing Blocked=true filter")
+
+    # Every managed view tie-breaks on work order, so an existing view that
+    # predates this sort gets repaired rather than left ordering arbitrarily.
+    if not _has_task_index_sort(view.get("sorts"), prop_map):
+        reasons.append("missing Task Index ascending tie-break sort")
 
     if spec["name"] == "전날 미완료":
         if not _has_date_before_today_filter(view.get("filter"), prop_map, today):
             reasons.append("missing Date before today filter")
         if not _has_select_filter(view.get("filter"), "Status", "does_not_equal", "Deployed", prop_map):
             reasons.append("missing Status!=Deployed filter")
-
-    if spec["name"] == "Blocked":
-        if not _has_checkbox_filter(view.get("filter"), "Blocked", True, prop_map):
-            reasons.append("missing Blocked=true filter")
-
-    if spec["name"] == "리뷰 필요":
-        if not _has_select_filter(view.get("filter"), "Review Status", "equals", "Needs Review", prop_map):
-            reasons.append("missing Review Status=Needs Review filter")
 
     if spec.get("group_by"):
         if not _has_group_by(view, spec["group_by"]):
@@ -870,6 +826,15 @@ def _has_date_desc_sort(sorts, prop_map):
     return False
 
 
+def _has_task_index_sort(sorts, prop_map):
+    keys = {"Task Index", _prop_id(prop_map, "Task Index")}
+    for sort in sorts or []:
+        prop = sort.get("property") or sort.get("property_id")
+        if prop in keys and sort.get("direction") == "ascending":
+            return True
+    return False
+
+
 def _has_filter_property(filter_body, name, prop_map):
     keys = {name, _prop_id(prop_map, name)}
     for node in _walk(filter_body):
@@ -925,12 +890,8 @@ def _has_subtasks(view, required):
 
 
 def _group_name(view_name):
-    if view_name == "상태별":
-        return "Status"
-    if view_name == "목적별":
-        return "Purpose"
-    if view_name == "프로젝트별":
-        return "Project"
+    if view_name == "작업 그룹별":
+        return "Task Group"
     return "required"
 
 
@@ -1033,9 +994,3 @@ def _infer_property_type(prop):
     return "unknown"
 
 
-def _short_error(resp):
-    try:
-        data = resp.json()
-        return data.get("message") or data.get("code") or resp.text[:200]
-    except Exception:
-        return resp.text[:200]

@@ -4,11 +4,29 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from claude_diary import __version__
-from claude_diary.cli.setup import HOOK_COMMAND
+from claude_diary.cli.setup import CODEX_SKILLS, HOOK_COMMAND
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("skill_name", sorted(CODEX_SKILLS))
+def test_shipped_skill_matches_the_installed_copy(skill_name):
+    """`skills/` and the `setup.py` constants are two copies of one contract.
+
+    The Codex plugin marketplace ships `skills/<name>/SKILL.md`, while
+    `working-diary install --codex-only` writes the embedded constant to
+    `~/.codex/skills/`. A change applied to only one of them means two agents
+    following two different contracts, with nothing at runtime to notice.
+    """
+    shipped = (ROOT / "skills" / skill_name / "SKILL.md").read_text(encoding="utf-8")
+    installed = CODEX_SKILLS[skill_name][0]
+    assert shipped == installed, (
+        "skills/%s/SKILL.md is out of sync with setup.py — update both." % skill_name
+    )
 
 
 def _pyproject_version():
@@ -111,30 +129,37 @@ def test_codex_skills_exist_and_cover_diary_workflows():
     assert "working-diary write --input" in diary_text
     assert "claude-diary write --input" in diary_text
     assert "working-diary diary-notion push" in notion_text
+    assert '"schema_version": 2' in notion_text
     assert '"purpose": "Feature"' in notion_text
-    assert '"summary_hints": ["..."]' in notion_text
+    assert '"summary": {' in notion_text
+    assert '"outcomes": ["..."]' in notion_text
+    assert '"work": {' in notion_text
+    assert '"context": "..."' in notion_text
+    assert '"appendix": {' in notion_text
     assert '"key_changes": ["..."]' in notion_text
-    assert '"work_context": ["..."]' in notion_text
-    assert '"impact": ["..."]' in notion_text
-    assert '"code_change_highlights": ["..."]' in notion_text
     assert '"implementation_notes": ["..."]' in notion_text
     assert '"verification": ["..."]' in notion_text
+    assert '"artifacts": [' in notion_text
     assert '"risks": ["..."]' in notion_text
     assert '"support_needed": ["..."]' in notion_text
-    assert '"work_period": "2026-06-02"' in notion_text
+    # No concrete work_period in the example: agents copy example dates, and a
+    # single-day session is supposed to omit the field entirely.
+    assert '"work_period"' not in notion_text
     assert '"priority": "P1"' in notion_text
     assert '"next_action": "..."' in notion_text
     assert '"blocked": false' in notion_text
     assert '"block_reason": ""' in notion_text
     assert '"carryover": false' in notion_text
-    assert '"review_status": "Needs Review"' in notion_text
-    assert '"last_reviewed": "2026-06-02"' in notion_text
+    assert '"review_status"' not in notion_text
+    assert '"last_reviewed"' not in notion_text
     assert '"parent_index": null' in notion_text
     assert "Exclude full diffs" in notion_text
     assert "in Korean" in notion_text
     assert "Notion task database record" in notion_text
     assert "Current Implementation Contract" in notion_text
-    assert "schema v7" in notion_text
+    assert "schema v8" in notion_text
+    assert ".codefleet/runs" in notion_text
+    assert "--preview-file" in notion_text
     assert "native sub-items" in notion_text
     assert "Never write `\"unknown\"` as `project`" in notion_text
     assert "Use `Depends On` only for prerequisite links" in notion_text

@@ -2,7 +2,6 @@
 
 import json
 import os
-import tempfile
 from unittest.mock import patch, MagicMock
 
 from claude_diary.core import process_session, _extract_project_name, _supplement_from_git, _run_exporters

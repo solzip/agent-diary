@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, phase-b, phase-c]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
@@ -27,7 +27,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-cov ruff
-          pip install -e .
+          # [notion] pulls in requests, so the Notion code paths are exercised
+          # against the dependency they actually import at runtime.
+          pip install -e ".[notion]"
 
       - name: Lint
         run: |

@@ -5,7 +5,11 @@ from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
-from claude_diary.cli.notion_ensure import cmd_notion_ensure
+from claude_diary.cli.notion_ensure import (
+    cmd_notion_ensure,
+    build_conflict_plan,
+    classify_conflict_reason,
+)
 from claude_diary.exporters.notion_hierarchical import SCHEMA_VERSION
 from claude_diary.exporters.notion_views import EnsureViewsResult, ViewConflict
 
@@ -96,10 +100,10 @@ class TestCmdNotionEnsure:
         ensurer_cls.assert_not_called()
         captured = capsys.readouterr()
         assert "Database: missing" in captured.out
-        assert "+ create 5 core views" in captured.out
-        assert "+ create 5 operating views" in captured.out
+        assert "+ create 3 core views" in captured.out
+        assert "+ create 2 operating views" in captured.out
 
-    def test_conflict_exits_1(self):
+    def test_conflict_exits_1(self, capsys):
         exporter = MagicMock()
         exporter.ensure_database.return_value = "db1"
         result = EnsureViewsResult(conflicts=[
@@ -116,3 +120,56 @@ class TestCmdNotionEnsure:
             cmd_notion_ensure(_args(year=2026))
 
         assert exc.value.code == 1
+        captured = capsys.readouterr()
+        assert "conflict[missing_filter]" in captured.out
+        assert "rerun `working-diary diary-notion ensure` to repair the view filter" in captured.out
+        assert "apply: yes" in captured.out
+
+
+class TestClassifyConflictReason:
+    def test_missing_filter(self):
+        assert classify_conflict_reason("missing Date=today filter") == "missing_filter"
+
+    def test_missing_property(self):
+        assert classify_conflict_reason("missing property: Work Period") == "missing_property"
+
+    def test_subitem_missing(self):
+        assert classify_conflict_reason("native Sub-items not enabled") == "subitem_missing"
+
+    def test_permission_or_auth(self):
+        assert classify_conflict_reason("403 permission denied") == "permission_or_auth"
+
+    def test_api_failure(self):
+        assert classify_conflict_reason("Notion API 400 failed") == "api_failure"
+
+
+class TestBuildConflictPlan:
+    def test_missing_filter_is_apply_supported(self):
+        plan = build_conflict_plan("오늘 작업", "missing Date=today filter")
+        assert plan["category"] == "missing_filter"
+        assert plan["apply_supported"] is True
+        assert "repair the view filter" in plan["action"]
+
+    def test_subitem_missing_is_manual(self):
+        plan = build_conflict_plan("warning", "native Sub-items not enabled")
+        assert plan["category"] == "subitem_missing"
+        assert plan["apply_supported"] is False
+        assert "enable Notion Sub-items" in plan["action"]
+
+    def test_permission_is_manual(self):
+        plan = build_conflict_plan("작업 계층", "403 permission denied")
+        assert plan["category"] == "permission_or_auth"
+        assert plan["apply_supported"] is False
+        assert "refresh the token" in plan["action"]
+
+
+class TestRetiredViewPlan:
+    def test_retired_view_warning_is_not_classified_as_unknown(self):
+        from claude_diary.cli.notion_ensure import build_conflict_plan
+        reason = "no longer managed — delete by hand in Notion if unused: 상태별, 리뷰 필요"
+        plan = build_conflict_plan("warning", reason)
+
+        assert plan["category"] == "retired_view"
+        assert plan["apply_supported"] is False
+        # Rerunning ensure does nothing for this one, so it must not say to.
+        assert "rerun changes nothing" in plan["action"]
