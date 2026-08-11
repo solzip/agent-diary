@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 
 from claude_diary.types import Config, EntryData, GitInfo
 from claude_diary.config import load_config
@@ -21,13 +22,18 @@ from claude_diary.indexer import update_index
 logger = get_logger("claude_diary.core")
 
 
-def process_session(session_id: str, transcript_path: str, cwd: str) -> bool:
+def process_session(session_id: str, transcript_path: str, cwd: str,
+                    when: Optional[datetime] = None) -> bool:
     """Main pipeline: transcript → enrichment → write → export.
 
     Args:
         session_id: Claude Code session ID
         transcript_path: Path to transcript.jsonl
         cwd: Working directory path
+        when: The moment the session happened. Defaults to now, which is
+            correct for the Stop Hook — it runs as the session ends. `backfill`
+            passes the transcript's own start time so an imported session is
+            filed under the day it was worked, not the day it was imported.
 
     Returns:
         True if entry was written, False if skipped (no content).
@@ -46,7 +52,7 @@ def process_session(session_id: str, transcript_path: str, cwd: str) -> bool:
         return False
 
     local_tz = timezone(timedelta(hours=tz_offset))
-    now = datetime.now(local_tz)
+    now = datetime.now(local_tz) if when is None else when.astimezone(local_tz)
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
