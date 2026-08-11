@@ -458,7 +458,7 @@ class TestMain:
         with patch("sys.argv", ["claude-diary"]):
             main()
         captured = capsys.readouterr()
-        assert "usage:" in captured.out.lower() or "claude-diary" in captured.out.lower()
+        assert "usage:" in captured.out.lower() or "agent-diary" in captured.out.lower()
 
     def test_version_flag(self, capsys):
         from claude_diary import __version__
@@ -940,7 +940,7 @@ class TestCmdInit:
             args = Namespace(team_repo=None)
             cmd_init(args)
         captured = capsys.readouterr()
-        assert "Initializing claude-diary" in captured.out
+        assert "Initializing agent-diary" in captured.out
         assert "[ok] Diary directory" in captured.out
         assert "[ok] Config" in captured.out
         assert "Done!" in captured.out
@@ -1004,7 +1004,7 @@ class TestCmdInit:
             cmd_init(args)
 
         captured = capsys.readouterr()
-        assert "Initializing claude-diary" in captured.out
+        assert "Initializing agent-diary" in captured.out
         assert "Stop Hook registered" in captured.out
 
     @patch("claude_diary.cli.get_config_path", return_value="/fake/config.json")

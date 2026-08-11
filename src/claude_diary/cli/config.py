@@ -106,12 +106,12 @@ def cmd_init(args):
     # Team mode init
     if hasattr(args, 'team_repo') and args.team_repo:
         from claude_diary.team import init_team
-        print("Initializing claude-diary (team mode)...")
+        print("Initializing agent-diary (team mode)...")
         print()
         init_team(args.team_repo)
         return
 
-    print("Initializing claude-diary...")
+    print("Initializing agent-diary...")
     print()
 
     # Create diary directory
