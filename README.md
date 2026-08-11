@@ -566,6 +566,13 @@ python -m ruff check .
 
 ## 10. 문서
 
+코드를 읽을지 판단하려는 분이라면 이 둘을 먼저 보세요.
+
+- **[Architecture](docs/ARCHITECTURE.md)** — 멱등성 모델, 재시도·에러 분류 정책, 캐시 무효화, 스키마 버전 관리, 부분 실패의 의미, 의존성 0개를 택한 이유
+- **[Postmortem: `ensure`가 497 row의 6개 속성을 지운 사고](docs/postmortem/2026-08-07-ensure-wipe.md)** — 증상, 프로덕션 대조 측정, 근본 원인, 수정, 회귀 테스트, 그리고 두 달간 못 본 이유
+
+세부 설계 문서:
+
 - [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
 - [Notion views design](docs/02-design/features/diary-notion-views.design.md)
 - [Distribution plan](docs/plans/phase-d-distribution.md)
