@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **커밋 줄 Gitmoji** (`formatting.gitmoji`, 기본 꺼짐): 켜면 각 커밋 줄에 Conventional Commit 타입에 해당하는 [gitmoji](https://gitmoji.dev)가 붙는다. 타입을 알아볼 수 없는 커밋은 그대로 두고, 이미 이모지로 시작하는 메시지에는 덧붙이지 않는다 (`ai-commit` 같은 도구가 먼저 붙였을 수 있으므로)
+  - **카테고리 태그에는 적용하지 않는다.** 📝·⚡·🔒 세 개가 일지에서 이미 작업 요약·주요 명령어·시크릿 마스킹을 뜻해서, 카테고리까지 장식하면 한 항목 안에서 같은 글자가 두 의미를 갖는다. 글자가 없는 것보다 나쁘다
+  - 기본을 꺼둔 이유: 일지는 영구 기록이고, 이모지는 취향이 갈린다
+
 ## [4.5.0] - 2026-08-11
 
 ### Added

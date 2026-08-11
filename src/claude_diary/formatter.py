@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -13,9 +14,58 @@ DEFAULT_VERIFICATION_LIMIT = 3
 PROMPT_OUTPUT_LIMIT = 15
 APPENDIX_ITEM_LIMIT = 10
 
+# https://gitmoji.dev conventions, keyed by Conventional Commit type.
+GITMOJI = {
+    "feat": "✨",
+    "fix": "🐛",
+    "refactor": "♻️",
+    "docs": "📝",
+    "style": "💄",
+    "test": "✅",
+    "chore": "🔧",
+    "perf": "⚡",
+    "ci": "👷",
+    "build": "📦",
+    "remove": "🔥",
+    "deploy": "🚀",
+    "security": "🔒",
+    "upgrade": "⬆️",
+    "format": "🎨",
+}
 
-def format_entry(entry_data: EntryData, lang: str = "ko") -> str:
-    """Format entry_data into a markdown diary entry."""
+# `type(scope)!: subject` — scope and the breaking-change bang are optional.
+_CONVENTIONAL = re.compile(r"^([a-z]+)(?:\([^)]*\))?!?:")
+
+
+def commit_gitmoji(message: str) -> str:
+    """Return the gitmoji for a Conventional Commit subject, or "".
+
+    Only the diary's rendering of a commit line uses this. The category
+    headings deliberately do not: three gitmoji (📝, ⚡, 🔒) already mean
+    something else there — Work Summary, Key Commands, and secrets masked —
+    and the same glyph carrying two meanings in one entry is worse than no
+    glyph at all.
+    """
+    text = (message or "").strip()
+    if not text:
+        return ""
+    # A message that already leads with an emoji is left alone; `ai-commit`
+    # and similar tools may have put one there.
+    if not text[0].isascii():
+        return ""
+    match = _CONVENTIONAL.match(text)
+    if not match:
+        return ""
+    return GITMOJI.get(match.group(1), "")
+
+
+def format_entry(entry_data: EntryData, lang: str = "ko", gitmoji: bool = False) -> str:
+    """Format entry_data into a markdown diary entry.
+
+    `gitmoji` prefixes each commit line with the emoji for its Conventional
+    Commit type. Off by default: this writes into the user's permanent
+    record, and emoji in it is a taste some people do not share.
+    """
     def L(key):
         return get_label(key, lang)
 
@@ -68,7 +118,12 @@ def format_entry(entry_data: EntryData, lang: str = "ko") -> str:
         if branch:
             lines.append("  - 🌿 %s: `%s`" % (L("branch"), branch))
         for commit in git_info.get("commits", [])[:5]:
-            lines.append("  - %s: `%s` %s" % (L("commit"), commit["hash"], commit["message"]))
+            message = commit["message"]
+            if gitmoji:
+                emoji = commit_gitmoji(message)
+                if emoji:
+                    message = "%s %s" % (emoji, message)
+            lines.append("  - %s: `%s` %s" % (L("commit"), commit["hash"], message))
         lines.append("")
 
     # Code stats

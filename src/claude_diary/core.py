@@ -143,7 +143,7 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
 
     # 6. Format and write (CRITICAL — exit 1 on failure)
     try:
-        entry_text = format_entry(entry_data, lang)
+        entry_text = format_entry(entry_data, lang, gitmoji=_gitmoji_enabled(config))
         ensure_diary_dir(diary_dir)
         append_entry(diary_dir, date_str, entry_text, lang)
         count = update_session_count(diary_dir, date_str)
@@ -191,6 +191,10 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
     )
 
     return True
+
+
+def _gitmoji_enabled(config: Config) -> bool:
+    return bool((config.get("formatting") or {}).get("gitmoji", False))
 
 
 def _extract_project_name(cwd: str) -> str:

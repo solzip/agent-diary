@@ -96,6 +96,12 @@ class EnrichmentConfig(TypedDict, total=False):
     session_time: bool
 
 
+class FormattingConfig(TypedDict, total=False):
+    """Rendering choices that are taste rather than correctness."""
+
+    gitmoji: bool
+
+
 class Config(TypedDict, total=False):
     """User configuration, merged from defaults, environment and config.json.
 
@@ -110,6 +116,7 @@ class Config(TypedDict, total=False):
     manual_diary_dir: str
     max_transcript_lines: Optional[int]
     enrichment: EnrichmentConfig
+    formatting: FormattingConfig
     exporters: Dict[str, Dict[str, Any]]
     custom_categories: Dict[str, List[str]]
 

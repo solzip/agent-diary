@@ -59,7 +59,10 @@ class GithubExporter(BaseExporter):
         from claude_diary.config import load_config
         config = load_config()
         lang = config.get("lang", "ko")
-        entry_text = format_entry(entry_data, lang)
+        entry_text = format_entry(
+            entry_data, lang,
+            gitmoji=bool((config.get("formatting") or {}).get("gitmoji", False)),
+        )
 
         # Append to daily file
         diary_file = os.path.join(member_dir, "%s.md" % date)
