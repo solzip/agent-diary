@@ -13,6 +13,8 @@
 
 ![Agent Diary demo](docs/demo.svg)
 
+> **Here to read the code?** [Architecture](docs/ARCHITECTURE.md) covers the idempotency key and its cache invalidation, a retry policy that branches on cause, schema versioning, and what partial failure means. The [postmortem](docs/postmortem/2026-08-07-ensure-wipe.md) is how one schema PATCH emptied six properties across 497 rows.
+
 ## 1. Why
 
 Work done with an AI lives in a chat window, and chat windows close. Two days later there is no way back to why a file was changed the way it was, and when a weekly review or a status report comes due you are working from memory. A commit log keeps the result; it does not keep what you asked for or what was tried on the way there.
@@ -321,6 +323,8 @@ Rows are still recorded if Sub-items are not enabled. Only visual nesting is mis
 
 ## 3. Logic
 
+This section covers **what flows where, in what order**. Why it is built that way — the idempotency key, the retry policy, schema versioning, partial-failure handling — is in [Architecture](docs/ARCHITECTURE.md).
+
 ### 3-1. Core Logic
 
 The core handles actual recording independently of the agent.
@@ -547,7 +551,12 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 pip install -e ".[dev,notion]"
 python -m pytest -q
 python -m ruff check .
+python -m mypy
 ```
+
+Run bare, `mypy` checks only the modules listed in `pyproject.toml`. That list is the annotated core, and CI keeps it green. Annotating a new module means adding it to the list — being on the list is a commitment to stay clean.
+
+CI runs it on the Python 3.12 job only, because current mypy will not run under this project's 3.8 floor. The annotations themselves are written for 3.8.
 
 ## 9. Roadmap
 

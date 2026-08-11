@@ -29,7 +29,7 @@ dependencies = []
 [project.optional-dependencies]
 notion = ["requests>=2.28"]
 all = ["requests>=2.28"]
-dev = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.4.0"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.4.0", "mypy>=1.0"]
 
 [project.scripts]
 # The import package stays `claude_diary`: `python -m claude_diary.hook` is
@@ -50,6 +50,21 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.mypy]
+# The annotated core, not the whole codebase. Everything listed here is clean
+# and CI keeps it that way; adding a module to this list is a commitment, so
+# the list grows as modules are annotated rather than all at once with
+# `ignore_errors` hiding the gap.
+files = [
+    "src/claude_diary/types.py",
+    "src/claude_diary/core.py",
+    "src/claude_diary/formatter.py",
+    "src/claude_diary/lib/git_info.py",
+    "src/claude_diary/lib/secret_scanner.py",
+    "src/claude_diary/cli/notion_push/properties.py",
+]
+ignore_missing_imports = true
 
 [tool.ruff]
 target-version = "py38"
