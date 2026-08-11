@@ -217,14 +217,56 @@ working-diary diary-notion ensure
 ```bash
 working-diary diary-notion push --input .diary-notion-<id>.json
 working-diary diary-notion push --input .diary-notion-<id>.json --force
+working-diary diary-notion push --input .diary-notion-<id>.json --dry-run
 ```
 
 - 기본 push는 `Session ID + Task Index`로 이미 기록된 row를 skip합니다.
 - `--force`는 같은 세션의 기존 row를 archive한 뒤 다시 push합니다.
+- `--dry-run`은 Notion에 쓰지 않고 만들어질 row와 page 본문을 출력합니다. `--preview-file <path>`를 함께 주면 같은 내용을 Markdown 파일로 저장합니다.
+- 같은 `Task Group`에 이미 기록된 세션이 있으면 제목에 `(N차)`가 붙습니다. 첫 세션에는 붙지 않습니다.
 - 실패한 task가 하나라도 있으면 exit code `1`로 종료하고 입력 JSON을 보존합니다.
 - 전체 성공 또는 이미 push된 task만 skip된 경우 exit code `0`으로 종료합니다.
 
-### 2-6. Notion sub-item
+### 2-6. push가 남기는 로컬 기록 (run artifacts)
+
+push는 **기본적으로** 실행할 때마다 현재 작업 디렉터리 아래에 실행 기록을 남깁니다. `--dry-run`에서도 남깁니다.
+
+```text
+<cwd>/.codefleet/runs/<YYYYMMDD-HHMMSS-session>/
+  input.json        원본 task JSON
+  git-diff.patch    push 시점의 작업 트리 diff
+  preview.md        Notion 본문 렌더링 결과
+  manifest.json     위 파일들의 목록과 sha256, push 결과 요약
+```
+
+Notion은 기록의 목적지이지 사본이 아닙니다. push가 중간에 실패하거나 row를 나중에 손으로 고치면, 실제로 무엇을 보냈는지 되짚을 방법은 이 로컬 기록뿐입니다.
+
+**`git-diff.patch`에는 커밋하지 않은 코드가 그대로 들어갑니다.** 저장소에 딸려 올라가지 않도록 `.gitignore`에 추가하세요.
+
+```gitignore
+.codefleet/runs/
+```
+
+저장 위치를 바꾸거나 아예 끄려면:
+
+```bash
+working-diary diary-notion push --input <json> --artifact-dir build/diary-runs
+working-diary diary-notion push --input <json> --no-artifacts
+```
+
+### 2-7. 검토 큐
+
+검토는 일이 끝난 뒤 사람이 내리는 판단이므로, 기록 파이프라인의 어느 단계도 스스로 "검토됨"을 선언하지 않습니다. push는 모든 새 row를 `Needs Review`로 기록하고, `Reviewed`로 올릴 수 있는 것은 이 명령의 `--apply`뿐입니다.
+
+```bash
+working-diary diary-notion review              # 검토 대기 row 나열 (읽기 전용)
+working-diary diary-notion review --apply      # Reviewed + Last Reviewed=오늘 기록
+working-diary diary-notion review --year 2026
+```
+
+`--apply` 없이 실행하면 아무것도 쓰지 않습니다. `ensure --dry-run` / `ensure`와 같은 방식입니다.
+
+### 2-8. Notion sub-item
 
 작업 계층 접기/펼치기는 Notion의 native Sub-items 기능을 사용합니다. 이 기능은 Notion UI에서 한 번 켜야 합니다.
 
@@ -262,8 +304,9 @@ core 처리
 | CLI entry | `src/claude_diary/cli/__init__.py` | `working-diary`, `claude-diary` 명령 라우팅 |
 | 자동 기록 core | `src/claude_diary/core.py` | Claude Code Stop Hook 자동 일지 pipeline |
 | 수동 기록 core | `src/claude_diary/cli/write.py` | `/diary`, `$diary`, `working-diary write` 처리 |
-| Notion push | `src/claude_diary/cli/notion_push.py` | task JSON을 Notion row로 push |
-| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | schema v7, core/operating views 보장 |
+| Notion push | `src/claude_diary/cli/notion_push/` | task JSON을 Notion row로 push (validate/properties/relations/artifacts로 분리) |
+| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | schema v8, core view 5개와 operating view 5개 보장 |
+| Notion 검토 큐 | `src/claude_diary/cli/notion_review.py` | `Needs Review` row 나열, `--apply` 시 `Reviewed` 기록 |
 | Formatter | `src/claude_diary/formatter.py` | Markdown entry와 Notion page body 생성 |
 
 ### 3-2. Claude Code 로직
@@ -336,11 +379,27 @@ working-diary uninstall --codex
 working-diary uninstall --codex-only
 
 working-diary write
+working-diary write --input .diary-<id>.json
+
 working-diary diary-notion init
 working-diary diary-notion ensure
 working-diary diary-notion ensure --dry-run
-working-diary diary-notion ops
+working-diary diary-notion ensure --year 2026
+
 working-diary diary-notion push --input .diary-notion-<id>.json
+working-diary diary-notion push --input .diary-notion-<id>.json --force
+working-diary diary-notion push --input .diary-notion-<id>.json --dry-run
+working-diary diary-notion push --input .diary-notion-<id>.json --preview-file preview.md
+working-diary diary-notion push --input .diary-notion-<id>.json --artifact-dir build/diary-runs
+working-diary diary-notion push --input .diary-notion-<id>.json --no-artifacts
+
+working-diary diary-notion ops
+working-diary diary-notion ops --stale-days 14
+working-diary diary-notion ops --json
+
+working-diary diary-notion review
+working-diary diary-notion review --apply
+
 working-diary notion push --input .diary-notion-<id>.json
 ```
 
@@ -413,6 +472,10 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 - 검색 인덱스
 - Notion 업무일지: `working-diary diary-notion init` -> `working-diary diary-notion ensure`
 - Notion 운영 진단: `working-diary diary-notion ops`로 blocked/review/next action/stale/work days/today-plan 후보/부모 상태 제안 확인
+- 검토 큐: `working-diary diary-notion review`. push는 항상 `Needs Review`로 기록하고 `--apply`만 `Reviewed`로 승격
+- push 실행 기록: 매 push마다 `input.json`, `git-diff.patch`, `preview.md`, `manifest.json`을 로컬에 sha256과 함께 보존
+- 같은 `Task Group`을 이어가는 세션에 `(N차)` 자동 부여 (컬럼 추가 없음)
+- 하루치 row는 작업한 순서대로 정렬 (`Date` 동률을 `Task Index`로 tie-break)
 - Slack, Discord, Obsidian, GitHub exporter: `working-diary config --add-exporter <name>`
 - HTML dashboard: `working-diary dashboard` 또는 `working-diary dashboard --serve --port 8787`
 - audit log와 source checksum 검증
@@ -427,6 +490,8 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 | Notion push가 인증 오류를 냄 | Integration token, root page ID, page 공유 상태 확인 |
 | Notion 하위항목 nesting이 안 보임 | `Entries` DB에서 Notion UI의 Sub-items를 한 번 활성화 |
 | push 재시도 시 중복이 걱정됨 | 기본 push는 같은 `Session ID + Task Index`를 skip. 다시 쓰려면 `--force` 사용 |
+| 프로젝트에 `.codefleet/` 디렉터리가 생김 | push가 남기는 실행 기록입니다. `.gitignore`에 `.codefleet/runs/`를 추가하거나 `--no-artifacts`로 끕니다 ([2-6](#2-6-push가-남기는-로컬-기록-run-artifacts)) |
+| 제목에 붙은 `(N차)`를 없애고 싶음 | 같은 `Task Group`의 이전 세션 수로 매겨집니다. `task_group`을 비우면 붙지 않습니다 |
 | PowerShell에서 글자가 깨짐 | 위 UTF-8 출력 설정 적용 |
 
 ## 8. 개발
@@ -443,9 +508,9 @@ python -m ruff check .
 
 | 구분 | 내용 |
 |------|------|
-| 현재 안정화 | Claude Code Stop Hook, Codex skill, Markdown 일지, Notion task row push, schema/view ensure |
-| Phase 3 진입 | `working-diary diary-notion ops` 읽기 전용 운영 진단, parent/task group 진행률, ensure conflict 분류와 repair plan |
-| 다음 개선 | Windows 설치/출력 경험 정리, Notion sub-item 안내 개선, CI/lint 범위 점진 확대 |
+| 사용 가능 | Claude Code Stop Hook, Codex skill, Markdown 일지, Notion task row push, schema v8 / view ensure, 운영 진단 `ops`, 검토 큐 `review`, push 실행 기록 |
+| 진행 중 | Notion 스키마 축소 ([#12](https://github.com/solzip/working-diary/issues/12)), dry-run 차수 반영 ([#10](https://github.com/solzip/working-diary/issues/10)), `Schema Version` 표기 정정 ([#11](https://github.com/solzip/working-diary/issues/11)) |
+| 다음 개선 | Windows 설치/출력 경험 정리, Notion sub-item 안내 개선 |
 | 검토 중 | SQLite 기반 검색 인덱스, Cursor/Windsurf/VS Code 같은 다른 AI IDE 연동 |
 
 ## 10. 문서
