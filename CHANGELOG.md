@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-08-11
+
+### Fixed
+
+- **CLI가 스스로를 옛 이름으로 소개하던 문제**: `argparse`의 `prog`와 `--version` 문자열이 `claude-diary`로 하드코딩돼 있어서, `pip install agent-diary` 후 `agent-diary --version`을 실행하면 `claude-diary 4.3.0`이라고 답했다. `--help`의 usage 줄도 마찬가지
+- 사용자 눈에 보이는 나머지 옛 이름 정리: `uninstall --codex` 도움말, `write`의 안내 출력, HTML 대시보드 footer
+- Obsidian exporter의 `subfolder` 기본값(`claude-diary`)은 **유지**. 이건 이름이 아니라 사용자 vault 안의 경로라, 바꾸면 기존 노트가 두 폴더로 갈라진다
+
 ## [4.3.0] - 2026-08-11
 
 ### Changed — 이름

@@ -277,7 +277,7 @@ def cmd_write(args):
         print("  searched: ~/.claude/projects/%s/" % encoded, file=sys.stderr)
         print("  hint: run /diary inside a Claude Code session that has at least", file=sys.stderr)
         print("        one user message — transcripts are written by Claude Code,", file=sys.stderr)
-        print("        not by claude-diary.", file=sys.stderr)
+        print("        not by agent-diary.", file=sys.stderr)
         sys.exit(1)
 
     parsed = parse_transcript(transcript_path, max_lines=config.get("max_transcript_lines"))
