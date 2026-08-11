@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-08-11
+
 ### Added
 
 - **`agent-diary backfill`**: 설치 이전 세션을 가져온다. `init` 직후에는 세션이 하나 끝날 때까지 보여줄 게 없었는데, Claude Code는 그동안 `~/.claude/projects/`에 transcript를 남겨왔다. 이걸 읽어서 **실제로 작업한 날짜**로 일지를 만든다 (가져온 날짜가 아니라)
