@@ -35,6 +35,15 @@ jobs:
         run: |
           ruff check .
 
+      # Only on the newest interpreter: current mypy refuses to run under the
+      # older ones this project still supports. The annotations themselves are
+      # written for the 3.8 floor.
+      - name: Type check
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: |
+          pip install mypy
+          mypy
+
       - name: Run tests
         run: |
           pytest tests/ -v --cov=claude_diary --cov-report=term-missing

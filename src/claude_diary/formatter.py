@@ -1,8 +1,12 @@
 """Markdown formatter — converts entry_data to diary markdown."""
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from claude_diary.i18n import get_label
+from claude_diary.types import EntryData, GitInfo
 
 
 DEFAULT_VERIFICATION_LIMIT = 3
@@ -10,7 +14,7 @@ PROMPT_OUTPUT_LIMIT = 15
 APPENDIX_ITEM_LIMIT = 10
 
 
-def format_entry(entry_data, lang="ko"):
+def format_entry(entry_data: EntryData, lang: str = "ko") -> str:
     """Format entry_data into a markdown diary entry."""
     def L(key):
         return get_label(key, lang)
@@ -121,7 +125,8 @@ def format_entry(entry_data, lang="ko"):
     return "\n".join(lines)
 
 
-def build_notion_blocks(task, git_info=None, lang="ko"):
+def build_notion_blocks(task: Dict[str, Any], git_info: Optional[GitInfo] = None,
+                        lang: str = "ko") -> List[Dict[str, Any]]:
     """Build Notion API block list for a task page body.
 
     Body layout:
@@ -684,7 +689,7 @@ def _truncate(text, n):
     return text[: n - 1] + "…"
 
 
-def format_daily_header(date_str, lang="ko"):
+def format_daily_header(date_str: str, lang: str = "ko") -> str:
     """Create daily diary file header."""
     def L(key):
         return get_label(key, lang)

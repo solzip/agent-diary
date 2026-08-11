@@ -1,9 +1,12 @@
 """Core pipeline orchestrator — processes a session into a diary entry."""
 
+from __future__ import annotations
+
 import os
 import sys
 from datetime import datetime, timezone, timedelta
 
+from claude_diary.types import Config, EntryData, GitInfo
 from claude_diary.config import load_config
 from claude_diary.log import get_logger, configure_from_config
 from claude_diary.lib.parser import parse_transcript
@@ -18,7 +21,7 @@ from claude_diary.indexer import update_index
 logger = get_logger("claude_diary.core")
 
 
-def process_session(session_id, transcript_path, cwd):
+def process_session(session_id: str, transcript_path: str, cwd: str) -> bool:
     """Main pipeline: transcript → enrichment → write → export.
 
     Args:
@@ -63,7 +66,7 @@ def process_session(session_id, transcript_path, cwd):
 
     # 2. Build entry_data
     project = _extract_project_name(cwd)
-    entry_data = {
+    entry_data: EntryData = {
         "session_id": session_id,
         "date": date_str,
         "time": time_str,
@@ -184,7 +187,7 @@ def process_session(session_id, transcript_path, cwd):
     return True
 
 
-def _extract_project_name(cwd):
+def _extract_project_name(cwd: str) -> str:
     """Extract project name from working directory (Windows/Unix)."""
     if not cwd:
         return "unknown"
@@ -192,7 +195,7 @@ def _extract_project_name(cwd):
     return os.path.basename(cwd)
 
 
-def _supplement_from_git(entry_data, git_info):
+def _supplement_from_git(entry_data: EntryData, git_info: GitInfo) -> None:
     """Supplement file lists from git when transcript may be incomplete."""
     diff_stat = git_info.get("diff_stat", {})
     if diff_stat.get("files", 0) > 0 and not entry_data["files_modified"] and not entry_data["files_created"]:
@@ -215,7 +218,7 @@ def _supplement_from_git(entry_data, git_info):
                 pass
 
 
-def _run_exporters(config, entry_data):
+def _run_exporters(config: Config, entry_data: EntryData) -> None:
     """Load and run enabled exporters via plugin loader."""
     from claude_diary.exporters.loader import load_exporters, run_exporters
     diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))

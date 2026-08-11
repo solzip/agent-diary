@@ -13,6 +13,8 @@
 
 ![Agent Diary 데모](docs/demo.svg)
 
+> **코드를 보러 오셨다면** — [Architecture](docs/ARCHITECTURE.md)에 멱등성 키와 캐시 무효화, 원인별로 갈리는 재시도 정책, 스키마 버전 관리, 부분 실패의 의미를 정리해뒀습니다. [Postmortem](docs/postmortem/2026-08-07-ensure-wipe.md)은 스키마 PATCH 하나가 497 row에서 6개 속성을 지운 사고의 전말입니다.
+
 ## 1. 왜 필요한가
 
 AI와 한 작업은 대화창에 남고, 대화창은 닫힙니다. 이틀 뒤 "이 파일 왜 이렇게 고쳤더라"를 되짚을 방법이 없고, 주간 회고나 업무일지를 쓸 때가 되면 기억에 의존하게 됩니다. 커밋 로그는 결과만 남기지 무엇을 요청했고 무엇을 시도했는지는 남기지 않습니다.
@@ -323,6 +325,8 @@ Sub-items가 아직 없어도 row 기록은 정상 동작합니다. 다만 계�
 
 ## 3. 로직
 
+이 절은 **무엇이 어떤 순서로 흐르는가**를 다룹니다. 왜 그렇게 설계했는지 — 멱등성 키, 재시도 정책, 스키마 버전 관리, 부분 실패 처리 — 는 [Architecture](docs/ARCHITECTURE.md)에 있습니다.
+
 ### 3-1. Core 로직
 
 Core는 에이전트와 무관하게 실제 기록 처리를 담당합니다.
@@ -551,7 +555,12 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 pip install -e ".[dev,notion]"
 python -m pytest -q
 python -m ruff check .
+python -m mypy
 ```
+
+`mypy`는 인자 없이 실행하면 `pyproject.toml`에 나열된 모듈만 검사합니다. 타입을 붙인 코어가 그 목록이고, CI가 초록으로 유지합니다. 모듈을 새로 주석 처리하면 목록에 추가하세요 — 목록에 올린다는 건 앞으로 계속 통과시키겠다는 약속입니다.
+
+CI에서는 Python 3.12 작업에서만 돕니다. 현재 mypy가 이 프로젝트의 하한인 3.8에서 실행되지 않기 때문이고, 어노테이션 자체는 3.8 기준으로 작성돼 있습니다.
 
 ## 9. 로드맵
 

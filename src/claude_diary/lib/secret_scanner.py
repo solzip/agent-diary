@@ -1,6 +1,11 @@
 """Secret scanner — detect and mask sensitive information before writing diary."""
 
+from __future__ import annotations
+
 import re
+from typing import List, Optional, Tuple
+
+from claude_diary.types import EntryData
 
 BASIC_PATTERNS = [
     (r'(?i)(password|passwd|pwd)\s*[=:]\s*\S+', r'\1=****'),
@@ -18,7 +23,8 @@ BASIC_PATTERNS = [
 ]
 
 
-def scan_and_mask(text, additional_patterns=None):
+def scan_and_mask(text: str,
+                  additional_patterns: Optional[List[str]] = None) -> Tuple[str, int]:
     """Scan text for secret patterns and mask them.
 
     Args:
@@ -49,7 +55,8 @@ def scan_and_mask(text, additional_patterns=None):
     return text, count
 
 
-def scan_entry_data(entry_data, additional_patterns=None):
+def scan_entry_data(entry_data: EntryData,
+                    additional_patterns: Optional[List[str]] = None) -> int:
     """Scan and mask secrets in all text fields of entry_data.
 
     Args:

@@ -165,7 +165,22 @@ Both are cases where the tidier-looking option costs a user something and the un
 
 ## 8. Verification
 
-- **741 tests**, 88.78% line coverage, with the CI gate at 85%
+- **741 tests**, 88.9% line coverage, with the CI gate at 85%
 - **15 combinations** per run: Python 3.8–3.12 across Linux, macOS and Windows
 - `ruff` with correctness rules, and per-file exemptions that each carry a written reason
+- `mypy` over the annotated core, enforced in CI
 - Every release publishes over OIDC from a tag, with no stored credentials
+
+### The types are checked, not decorative
+
+`types.py` used to document these shapes in comments, on the grounds that
+`TypedDict` needed Python 3.8. The floor had been 3.8 for a while, and the
+comments had already drifted — they omitted `short_hash` from a commit and
+three keys the parser produces. A comment cannot fail, which is the whole
+problem with using one as a schema.
+
+They are now real `TypedDict`s, and annotating the pipeline immediately found
+six places where the types did not actually flow: `entry_data` was built as a
+plain dict literal, so every function receiving it was taking `dict[str, Any]`
+rather than `EntryData`. The checker is scoped to the annotated modules and
+runs in CI, so the annotations cannot quietly become false.

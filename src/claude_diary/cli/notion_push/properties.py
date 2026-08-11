@@ -8,6 +8,12 @@ Relation properties are deliberately absent: `Depends On` and the sub-item
 parent link need all row IDs, so they are wired in pass 2 (see `relations`).
 """
 
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+from claude_diary.types import GitInfo
+
 from datetime import datetime
 
 from claude_diary.cli.notion_push.tasks import _task_files_count, _task_next_action
@@ -55,7 +61,9 @@ PURPOSE_ALIASES = {
 }
 
 
-def _build_properties(task, date_str, branch, git_info, session_id, task_index, cwd=None):
+def _build_properties(task: Dict[str, Any], date_str: str, branch: str,
+                      git_info: GitInfo, session_id: str, task_index: int,
+                      cwd: Optional[str] = None) -> Dict[str, Any]:
     """Build Notion DB row properties from task data.
 
     Note: relation properties are NOT set here — `Depends On` and

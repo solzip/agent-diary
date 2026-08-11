@@ -1,9 +1,14 @@
 """Git information collector — branch, commits, diff stats."""
 
+from __future__ import annotations
+
 import subprocess
+from typing import List, Optional
+
+from claude_diary.types import CommitInfo, DiffStat, GitInfo
 
 
-def collect_git_info(cwd, session_start=None):
+def collect_git_info(cwd: str, session_start: Optional[str] = None) -> Optional[GitInfo]:
     """Collect git info from the working directory.
 
     Args:
@@ -79,7 +84,7 @@ def _get_recent_commits(cwd, since=None):
         return []
 
 
-def get_branch_for_commit(cwd, commit_hash):
+def get_branch_for_commit(cwd: str, commit_hash: str) -> str:
     """Return the (first) branch containing the given commit.
 
     Used by /diary-notion to label each task with its branch. Falls back to
@@ -102,7 +107,7 @@ def get_branch_for_commit(cwd, commit_hash):
     return get_head_branch(cwd)
 
 
-def get_head_branch(cwd):
+def get_head_branch(cwd: str) -> str:
     """Return current HEAD branch, or empty string if detached/unknown."""
     if not cwd:
         return ""
@@ -119,7 +124,7 @@ def get_head_branch(cwd):
     return ""
 
 
-def get_commit_info(cwd, commit_hash):
+def get_commit_info(cwd: str, commit_hash: str) -> Optional[CommitInfo]:
     """Return {hash, short_hash, message} for a commit, or None if not found."""
     if not cwd or not commit_hash:
         return None
@@ -139,13 +144,13 @@ def get_commit_info(cwd, commit_hash):
         return None
 
 
-def get_diff_stat_for_commits(cwd, commit_hashes):
+def get_diff_stat_for_commits(cwd: str, commit_hashes: List[str]) -> DiffStat:
     """Sum diff stats across the given commits.
 
     Returns {"added": int, "deleted": int, "files": int}. Files count is
     a sum-of-touched (may double-count if a file changed in multiple commits).
     """
-    total = {"added": 0, "deleted": 0, "files": 0}
+    total: DiffStat = {"added": 0, "deleted": 0, "files": 0}
     if not cwd or not commit_hashes:
         return total
     import re
@@ -173,7 +178,7 @@ def get_diff_stat_for_commits(cwd, commit_hashes):
     return total
 
 
-def get_diff_stat(cwd, since=None):
+def get_diff_stat(cwd: str, since: Optional[str] = None) -> DiffStat:
     """Get diff stat (added/deleted lines, files changed).
 
     Args:
