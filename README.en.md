@@ -1,6 +1,6 @@
 # Working Diary
 
-Working Diary records Claude Code and Codex work sessions as Markdown diaries or task-based Notion work logs.
+**Remember what you did with an AI.** Automatically when a Claude Code session ends, or on one command in Codex, Working Diary records what you asked for and what changed.
 
 [![CI](https://github.com/solzip/working-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/working-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,23 +11,65 @@ Working Diary records Claude Code and Codex work sessions as Markdown diaries or
 >
 > This is a community project. It is not an official Anthropic or OpenAI project.
 
-## 1. Overview
+![Working Diary demo](docs/demo.svg)
 
-Working Diary preserves the context that usually disappears when an AI coding session ends.
+## 1. Why
 
-- User requests
-- Created and modified files
-- Important commands
-- Git branch, commit, and diff statistics
-- Work summaries and errors
-- Task rows for a Notion work database
+Work done with an AI lives in a chat window, and chat windows close. Two days later there is no way back to why a file was changed the way it was, and when a weekly review or a status report comes due you are working from memory. A commit log keeps the result; it does not keep what you asked for or what was tried on the way there.
 
-The package name remains `claude-diary` for compatibility. User-facing docs prefer the neutral `working-diary` CLI alias.
+Working Diary captures that context at the moment a session ends. There is no habit to build.
+
+One finished session appends an entry like this.
+
+```markdown
+### ⏰ 14:30:15 | 📁 `my-app`
+
+**🏷️ Categories:** `feature` `test`
+
+**📋 Task Requests:**
+  1. Add JWT authentication to login
+  2. Write the tests as well
+
+**📄 Files Created:**
+  - `src/auth/jwt_handler.py`
+  - `tests/test_auth.py`
+
+**✏️ Files Modified:**
+  - `src/api/routes.py`
+
+**🔀 Git:**
+  - 🌿 Branch: `feat/jwt-auth`
+  - Commit: `a1b2c3d` feat: verify tokens and cover login
+
+**📊 Code Stats:** +145 / -12 lines (5 files)
+
+**⚡ Key Commands:**
+  - `export API_KEY=****`
+  - `pytest -q`
+
+**📝 Work Summary:**
+  - Added JWT verification middleware and covered the login failure path
+
+**🔒 1 secrets masked**
+```
+
+Categories are inferred from the work. Branch, commits and diff stats are read from the repository. Anything that looks like a secret — the `API_KEY` above — is masked **before** the file is written.
+
+### What makes it different
+
+- **It is automatic.** In Claude Code a Stop Hook picks up the end of a session. You never have to decide to record something.
+- **Zero core dependencies.** Standard library only. `requests` is added only if you use the Notion integration.
+- **Local files.** Plain Markdown, so it greps, it opens in Obsidian, and it outlives any service.
+- **It scales to a team.** Push to a Notion work-log database when you need to, or export to Slack, Discord and GitHub.
 
 ```bash
 pip install claude-diary
 working-diary init
 ```
+
+Nothing else is required. Every Claude Code session from then on lands in `~/working-diary/YYYY-MM-DD.md`.
+
+> The package name remains `claude-diary` for compatibility. Docs prefer the neutral `working-diary` alias; both commands work.
 
 ### Supported Agents
 

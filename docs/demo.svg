@@ -29,12 +29,12 @@
   <circle class="term-btn-r" cx="20" cy="18" r="6"/>
   <circle class="term-btn-y" cx="40" cy="18" r="6"/>
   <circle class="term-btn-g" cx="60" cy="18" r="6"/>
-  <text class="term-title" x="360" y="22" text-anchor="middle">Terminal — claude-diary</text>
+  <text class="term-title" x="360" y="22" text-anchor="middle">Terminal — working-diary</text>
 
   <!-- Phase 1: Install -->
   <g class="phase1">
     <text class="prompt" x="20" y="62">$</text>
-    <text class="cmd" x="36" y="62">pip install claude-diary &amp;&amp; claude-diary init</text>
+    <text class="cmd" x="36" y="62">pip install claude-diary &amp;&amp; working-diary init</text>
     <text class="success" x="20" y="82">  [ok] Diary directory: ~/working-diary</text>
     <text class="success" x="20" y="100">  [ok] Config: ~/.config/claude-diary/config.json</text>
     <text class="success" x="20" y="118">  [ok] Stop Hook registered: python -m claude_diary.hook</text>
@@ -67,7 +67,7 @@
   <!-- Phase 4: Dashboard hint -->
   <g class="phase4">
     <text class="prompt" x="20" y="442">$</text>
-    <text class="cmd" x="36" y="442">claude-diary dashboard</text>
+    <text class="cmd" x="36" y="442">working-diary dashboard</text>
     <text class="highlight" x="280" y="442">← HTML dashboard with heatmap &amp; charts</text>
   </g>
 </svg>
