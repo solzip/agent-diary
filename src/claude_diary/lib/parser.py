@@ -35,7 +35,13 @@ def parse_transcript(transcript_path, max_lines=None):
 
     try:
         line_count = 0
-        with open(transcript_path, "r", encoding="utf-8") as f:
+        # `errors="replace"`, because one bad byte used to cost the whole
+        # session. Text IO decodes in chunks, so the error surfaced before any
+        # line was yielded and the parse returned nothing at all — not even
+        # the lines that came before it. With nothing parsed, `has_content` is
+        # false, and the session left no diary entry and no audit line: the
+        # one failure mode indistinguishable from a quiet day.
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 line_count += 1
                 if line_count > max_lines:
@@ -103,7 +109,7 @@ def get_session_time_range(transcript_path):
         return (None, None)
 
     try:
-        with open(transcript_path, "r", encoding="utf-8") as f:
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 line = line.strip()
                 if not line:

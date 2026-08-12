@@ -82,7 +82,7 @@ def _fallback_search_from_files(diary_dir, keyword):
     results = []
     for f in sorted(Path(diary_dir).glob("*.md")):
         try:
-            content = f.read_text(encoding="utf-8")
+            content = f.read_text(encoding="utf-8", errors="replace")
         except Exception:
             continue
         for line in content.split("\n"):

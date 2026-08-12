@@ -1,5 +1,6 @@
 """Configuration management with XDG standard paths."""
 
+import copy
 import json
 import os
 import sys
@@ -48,7 +49,11 @@ def load_config():
     """Load config from config.json, falling back to environment variables.
     Priority: config.json > environment variables > defaults.
     """
-    config = dict(DEFAULT_CONFIG)
+    # Deep, not shallow: `_deep_merge` writes into the nested dicts it is
+    # given, and a shallow copy hands it the module-level defaults themselves.
+    # One config.json with `enrichment.git_info: false` in it permanently
+    # changed what "default" meant for the rest of the process.
+    config = copy.deepcopy(DEFAULT_CONFIG)
 
     # 1. Environment variables (lowest priority override)
     env_lang = os.environ.get("CLAUDE_DIARY_LANG")
@@ -76,11 +81,72 @@ def load_config():
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 file_config = json.load(f)
-            _deep_merge(config, file_config)
-        except (json.JSONDecodeError, IOError):
-            pass
+        except (json.JSONDecodeError, IOError, UnicodeDecodeError, ValueError) as e:
+            # Falling back to defaults silently meant a corrupt file turned
+            # exporters off and moved a custom diary_dir back to the default
+            # with nothing said about it. The diary kept being written, just
+            # somewhere else and without the exports.
+            _logger().warning(
+                "%s is unreadable (%s); using defaults. "
+                "Custom diary_dir and exporters are NOT in effect.",
+                config_path, e,
+            )
+            file_config = {}
+
+        if not isinstance(file_config, dict):
+            _logger().warning(
+                "%s does not contain a JSON object; using defaults.", config_path
+            )
+            file_config = {}
+
+        # Check before merging, and drop the bad keys rather than substituting
+        # defaults for them. A wrong type in the file is the file's layer
+        # failing; the layers underneath it — the environment variables, then
+        # the defaults — are still good and should be what shows through.
+        # Substituting afterwards overrode a perfectly valid CLAUDE_DIARY_DIR
+        # with the default path.
+        _drop_wrong_types(file_config, config_path)
+        _deep_merge(config, file_config)
 
     return config
+
+
+def _logger():
+    from claude_diary.log import get_logger
+    return get_logger("claude_diary.config")
+
+
+# Keys the pipeline uses without checking, and what they have to be. A wrong
+# type here used to reach `os.path.expanduser(12345)` and `"yes".get(...)`,
+# both outside the try that guards the write, so the Stop Hook exited 1 and
+# the session went unrecorded — a typo in a config file costing an entry.
+_EXPECTED_TYPES = {
+    "lang": str,
+    "timezone_offset": int,
+    "diary_dir": str,
+    "manual_diary_dir": str,
+    "enrichment": dict,
+    "formatting": dict,
+    "exporters": dict,
+    "custom_categories": dict,
+    "security": dict,
+}
+
+
+def _drop_wrong_types(file_config, source):
+    """Remove values whose type the pipeline cannot use, and say so."""
+    for key, expected in _EXPECTED_TYPES.items():
+        if key not in file_config:
+            continue
+        value = file_config[key]
+        # bool is an int subclass, and a boolean timezone is not a timezone.
+        if isinstance(value, expected) and not (expected is int and isinstance(value, bool)):
+            continue
+        _logger().warning(
+            "%s: %s should be %s but is %s; ignoring it.",
+            source, key, expected.__name__, type(value).__name__,
+        )
+        del file_config[key]
 
 
 def save_config(config):

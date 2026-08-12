@@ -80,7 +80,7 @@ def cmd_delete(args):
             print("Cancelled.")
             return
 
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         # Split by session markers and remove last
@@ -108,7 +108,7 @@ def cmd_delete(args):
         found = False
         for f in sorted(Path(diary_dir).glob("*.md")):
             try:
-                content = f.read_text(encoding="utf-8")
+                content = f.read_text(encoding="utf-8", errors="replace")
             except Exception:
                 continue
             if args.session in content:
