@@ -34,6 +34,13 @@ STALE_AFTER_SECONDS = 30.0
 ACQUIRE_TIMEOUT_SECONDS = 10.0
 _POLL_SECONDS = 0.01
 
+# Outcomes of one acquisition attempt. `_HELD` is worth waiting on;
+# `_UNAVAILABLE` is not, and telling them apart is the difference between a
+# hook that pauses briefly and one that pauses for the whole timeout.
+_ACQUIRED = "acquired"
+_HELD = "held"
+_UNAVAILABLE = "unavailable"
+
 
 class FileLock:
     """Exclusive lock keyed on a path. Use as a context manager.
@@ -51,8 +58,20 @@ class FileLock:
     def __enter__(self) -> "FileLock":
         deadline = time.monotonic() + self.timeout
         while True:
-            if self._try_acquire():
+            state = self._try_acquire()
+            if state is _ACQUIRED:
                 self.acquired = True
+                return self
+            if state is _UNAVAILABLE:
+                # The directory will not accept a lock file at all, so no
+                # amount of waiting changes the answer. Waiting anyway cost
+                # the full timeout per lock — measured at 20s of a Stop Hook
+                # holding up the end of a session, on a diary directory that
+                # had simply lost its write permission.
+                logger.warning(
+                    "Cannot create %s (directory not writable); "
+                    "continuing without the lock", self.lock_path,
+                )
                 return self
             if self._break_if_stale():
                 continue
@@ -73,18 +92,23 @@ class FileLock:
             pass
         self.acquired = False
 
-    def _try_acquire(self) -> bool:
+    def _try_acquire(self) -> str:
+        """Returns one of the three module-level states."""
         try:
             fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except OSError as e:
-            if e.errno in (errno.EEXIST, errno.EACCES):
-                return False
+            if e.errno == errno.EEXIST:
+                # Somebody holds it. That clears on its own, so wait.
+                return _HELD
+            if e.errno in (errno.EACCES, errno.EPERM):
+                # We cannot create the file at all. Waiting cannot fix this.
+                return _UNAVAILABLE
             raise
         try:
             os.write(fd, ("%d %f" % (os.getpid(), time.time())).encode("utf-8"))
         finally:
             os.close(fd)
-        return True
+        return _ACQUIRED
 
     def _break_if_stale(self) -> bool:
         """Remove a lock left behind by a process that died holding it."""

@@ -24,7 +24,13 @@ def parse_daily_file(filepath):
         return stats
 
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        # `errors="replace"`, because a diary file can end mid-character —
+        # a hook killed partway through an append, a disk that filled — and
+        # strict decoding turned that into an empty result for the whole day.
+        # Measured: a file with four visible entries reported zero sessions,
+        # and `reindex` skipped the day on the strength of that zero. The
+        # replacement character costs one glyph; the alternative cost a day.
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
     except Exception:
         return stats

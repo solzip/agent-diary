@@ -3,15 +3,33 @@
 import json
 import os
 
+from claude_diary.lib.filelock import FileLock
+from claude_diary.log import get_logger
+
+logger = get_logger("claude_diary.indexer")
+
 
 def update_index(diary_dir, entry_data):
     """Add entry metadata to the search index (incremental).
+
+    Locked for the same reason the diary file is: the Stop Hook runs once per
+    session ending, as its own process. This one is worse than an append,
+    though — it reads the whole index, adds one entry, and writes the whole
+    thing back, so the last writer does not lose its own entry, it discards
+    everybody else's. Measured unlocked: forty concurrent sessions left two
+    entries in the index while the diary itself kept all forty.
 
     Args:
         diary_dir: Path to diary directory
         entry_data: Processed entry data dict
     """
     index_path = os.path.join(diary_dir, ".diary_index.json")
+
+    with FileLock(index_path):
+        _append_locked(index_path, entry_data)
+
+
+def _append_locked(index_path, entry_data):
     index = _load_index(index_path)
 
     # Extract keywords from prompts (simple word tokenization)
@@ -73,7 +91,7 @@ def reindex_all(diary_dir):
             continue
 
         try:
-            content = f.read_text(encoding="utf-8")
+            content = f.read_text(encoding="utf-8", errors="replace")
         except Exception:
             continue
 
@@ -136,26 +154,63 @@ def reindex_all(diary_dir):
     index["last_indexed"] = datetime.now().isoformat()
 
     index_path = os.path.join(diary_dir, ".diary_index.json")
-    _save_index(index_path, index)
+    with FileLock(index_path):
+        _save_index(index_path, index)
 
     return count
 
 
 def _load_index(index_path):
-    """Load index from file or return empty."""
-    if os.path.exists(index_path):
-        try:
-            with open(index_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+    """Load index from file or return empty.
+
+    An unreadable index used to fall through to the empty one and then get
+    written back over the top, which turned a truncated file into a real
+    deletion — measured, a half-written index of five entries came back as
+    one. The index is derived from the diary, so `reindex` can rebuild it,
+    but only if somebody notices. Hence the warning and the kept copy.
+    """
+    if not os.path.exists(index_path):
+        return _empty_index()
+
+    try:
+        with open(index_path, "r", encoding="utf-8") as f:
+            index = json.load(f)
+    except Exception as e:
+        from claude_diary.writer import preserve_corrupt
+        logger.warning(
+            "Search index unreadable (%s); starting a new one. "
+            "Run `agent-diary reindex` to rebuild it from the diary.", e,
+        )
+        preserve_corrupt(index_path)
+        return _empty_index()
+
+    if not isinstance(index, dict) or not isinstance(index.get("entries"), list):
+        from claude_diary.writer import preserve_corrupt
+        logger.warning(
+            "Search index has an unexpected shape; starting a new one. "
+            "Run `agent-diary reindex` to rebuild it from the diary."
+        )
+        preserve_corrupt(index_path)
+        return _empty_index()
+
+    return index
+
+
+def _empty_index():
     return {"entries": [], "last_indexed": ""}
 
 
 def _save_index(index_path, index):
-    """Save index to file."""
+    """Save index to file, atomically."""
+    tmp = "%s.tmp%d" % (index_path, os.getpid())
     try:
-        with open(index_path, "w", encoding="utf-8") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(index, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, index_path)
     except Exception:
-        pass  # Index failure should never block diary writing
+        # Index failure should never block diary writing, but a half-written
+        # index must not be left where the real one was.
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass

@@ -116,18 +116,40 @@ distinct session ids  : 10   <-- LOST
 session_counts says   : 4    <-- WRONG
 ```
 
-Both now take a lock — a lock file created with `O_CREAT | O_EXCL`, which is one syscall and behaves the same everywhere, rather than `fcntl` on one platform and `msvcrt` on the other. Nothing outside the standard library, which the zero-dependency rule below requires.
+All three writers now take a lock — a lock file created with `O_CREAT | O_EXCL`, which is one syscall and behaves the same everywhere, rather than `fcntl` on one platform and `msvcrt` on the other. Nothing outside the standard library, which the zero-dependency rule below requires.
 
-Two properties it needs beyond exclusion:
+Three, because the first version of this covered the two writers named above and left `update_index` as it was. The index is the worst of the three to leave unlocked: it reads the whole file, adds one entry, and writes the whole file back, so the loser of a race does not lose its own entry, it discards everyone else's. Measured at forty concurrent sessions, the diary kept all forty and the index kept two.
+
+Three properties it needs beyond exclusion:
 
 - **A stale lock is broken, not waited on.** A hook that dies holding the lock would otherwise block every session after it. Losing one entry is the bug being fixed; hanging the hook forever is worse.
 - **Failing to acquire degrades rather than raises.** The diary is best-effort. A lock that cannot be taken within the timeout logs and proceeds, because an exception here would lose the entry outright — the exact outcome the lock exists to prevent.
+- **A lock that cannot be created is not waited for.** `EEXIST` means somebody holds it, which clears on its own. `EACCES` means the directory will not accept a lock file at all, and no amount of waiting changes that. Treating them alike cost the full timeout on each of two locks — twenty seconds of a Stop Hook holding up the end of a session, on a diary directory that had simply lost its write permission.
 
-`update_session_count` also writes to a sibling and `os.replace`s it, so a crash mid-write cannot leave a truncated file where the counts used to be.
+`update_session_count` and `update_index` both write to a sibling and `os.replace` it, so a crash mid-write cannot leave a truncated file where the real one used to be.
 
 The regression tests use separate processes rather than threads. Threads share a file object and an interpreter, and would pass while the real thing failed.
 
-## 6. Zero dependencies in the core
+---
+
+## 6. A write can stop halfway, and a read must survive it
+
+The diary is UTF-8 text, appended to. A disk that fills stops on a byte boundary, not a character one, so a failed append can leave half a Korean character at the end of the file. That single broken byte sequence made the whole file undecodable, and every reader that opened it strictly reported the day as **empty** — `parse_daily_file` returned zero sessions for a file whose entries were still plainly visible, and `reindex` skipped the day on the strength of that zero.
+
+The defect was not really the truncation. It was that the readers disagreed: `backfill` and `report` read the diary with `errors="replace"` and were fine, while `stats`, `indexer`, `search` and `maintenance` read it strictly and were not. Same file, different verdict.
+
+Two defences, because neither covers the other:
+
+- **The writer rolls back.** A failed append truncates the file to its previous length. Losing the entry being written is acceptable; losing the day is not.
+- **The readers tolerate.** A process killed mid-append has nothing left to roll anything back, so every reader now uses `errors="replace"`. A replacement character costs one glyph. Strict decoding cost a day.
+
+The same rule applies to what the tool reads from outside itself. One bad byte in a transcript used to cost the entire session: text IO decodes in chunks, so the error surfaced before the first line was yielded, and with nothing parsed `has_content` was false — no diary entry, no audit line, and the parse error discarded along with them. That is the failure shape the 2026-08-07 postmortem named: *a diary that is not being written looks exactly like a quiet day.*
+
+### Derived files are repaired, not silently replaced
+
+`.diary_index.json` and `.session_counts.json` are read with a fallback to empty and then written back whole, which quietly promotes corruption into deletion — a truncated index of five entries came back as one, and a truncated counter took three months down to a single day. An unreadable one is now moved aside as `.corrupt` and logged. The index is derived from the diary, so `reindex` rebuilds it; the counter cannot be rebuilt, but at least the loss is visible.
+
+## 7. Zero dependencies in the core
 
 `dependencies = []`. The core runs on the standard library; `requests` arrives only with the `[notion]` extra.
 
@@ -137,7 +159,7 @@ The same reasoning applies to release: publishing uses PyPI trusted publishing o
 
 ---
 
-## 7. Layout
+## 8. Layout
 
 ```
 src/claude_diary/
@@ -178,7 +200,7 @@ The command and `_gather_git_info` / `_push_task` stay in `__init__` on purpose.
 
 ---
 
-## 8. Two things that look wrong and are not
+## 9. Two things that look wrong and are not
 
 **`Schema Version` reads `vlegacy`.** It began as a bug: a function returned `"legacy"` and a normalizer prefixed a `v`. It stays because it is a live select option carrying 350 of 509 rows in a real database. Changing it creates a third option and splits the column, so renaming it is a migration rather than an edit. It is now a named constant with a test pinning it.
 
@@ -188,7 +210,7 @@ Both are cases where the tidier-looking option costs a user something and the un
 
 ---
 
-## 9. Verification
+## 10. Verification
 
 - **741 tests**, 88.9% line coverage, with the CI gate at 85%
 - **15 combinations** per run: Python 3.8–3.12 across Linux, macOS and Windows
