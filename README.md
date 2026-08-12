@@ -140,8 +140,8 @@ Claude Code plugin installation is a separate distribution path for Claude Code 
 
 ```bash
 # Run inside Claude Code
-/plugin marketplace add https://github.com/solzip/agent-diary
-/plugin install agent-diary
+/plugin marketplace add solzip/agent-diary
+/plugin install agent-diary@solzip
 ```
 
 The plugin distributes Claude Code hook settings. The `agent-diary` CLI comes from the Python package, so Python package installation and `agent-diary init` are still required.

@@ -54,7 +54,11 @@ def test_claude_plugin_manifest_uses_current_repository():
 
     assert data["name"] == "agent-diary"
     assert data["repository"] == "https://github.com/solzip/agent-diary"
-    assert data["hooks"] == "hooks.json"
+    # The path, not the literal. This used to assert `== "hooks.json"`, which
+    # pinned a value the runtime could not resolve: the path is taken from the
+    # plugin root and the file is a directory down, so the loader reported it
+    # as missing and the plugin failed to load with the assertion still green.
+    assert (ROOT / data["hooks"]).is_file()
     assert "claude-code-hooks-diary" not in manifest_path.read_text(encoding="utf-8")
 
 

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **README가 안내하는 Claude Code 플러그인 설치가 처음부터 동작하지 않던 문제**: 이 프로젝트가 광고하는 배포 경로는 둘(PyPI, Claude Code 플러그인)인데 후자가 끝에서 끝까지 막혀 있었다. 4.8.1에서 고친 "Windows에서 안 되는 안내문"과 같은 유형 — 독자의 기계에서 실행되지 않는 지시문이다
+  - `/plugin marketplace add`는 저장소 루트의 `.claude-plugin/marketplace.json`을 읽는데 **그 파일이 없었다.** 첫 줄에서 실패한다
+  - `plugin.json`의 `dependencies`가 `{"python": ">=3.8"}` 였다. 스키마는 배열을 받는다. 인식되는 필드의 타입이 틀리면 경고가 아니라 **로드 실패**다 — 설치에 성공해도 훅이 안 붙는다
+  - `hooks`가 `"hooks.json"` 이었다. 이 경로는 플러그인 루트 기준인데 파일은 `.claude-plugin/` 안에 있어서 로더가 못 찾는다. `./.claude-plugin/hooks.json` 으로 고쳤다
+  - `claude plugin validate . --strict` 기준 **에러 3건·경고 1건 → 통과**
+  - 마켓플레이스 이름은 `solzip`이라 설치 명령이 `/plugin install agent-diary@solzip` 이다. README(EN/KO) 둘 다 갱신
+- **기존 테스트가 깨진 값을 고정하고 있던 문제**: `test_codex_plugin.py`가 `assert data["hooks"] == "hooks.json"` 으로 리터럴을 박아둬서, 런타임이 해석하지 못하는 경로를 **초록불로 지키고 있었다.** 경로가 실제 파일로 해석되는지 검사하도록 바꿨다
+
+### Added
+
+- 매니페스트 회귀 테스트 17개 (`test_plugin_manifests.py`). `claude plugin validate --strict`가 진짜 검사지만 CI에는 Claude Code가 없으므로, 실제로 깨졌던 불변식을 파이썬으로 못 박는다 — 마켓플레이스 필수 필드, 상대 경로가 실재하는지, 로드를 막는 타입, **README의 설치 명령이 매니페스트가 정의한 마켓플레이스·플러그인 이름과 일치하는지**, 세 곳의 버전 일치
+  - 되돌리기 검증 5/5 (마켓플레이스 삭제·타입 되돌림·경로 되돌림·README 드리프트·버전 불일치 전부 빨간불)
+
 ## [4.8.3] - 2026-08-12
 
 4.8.2가 "아직 검증 안 한 것"으로 남겨둔 네 가지 — 디스크 가득 참·쓰기 권한 거부, 손상된 `config.json`과 잘린 파일, 아주 큰 transcript, 인코딩이 깨진 transcript — 를 실제로 재현했다. 성능은 문제가 없었고(단일 파일 300MB까지 이상 없음, 피크 메모리는 파일 크기가 아니라 **가장 긴 줄의 약 2배**), 대신 데이터가 사라지는 경로가 여섯 개 나왔다.
