@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.8.3] - 2026-08-12
+
 4.8.2가 "아직 검증 안 한 것"으로 남겨둔 네 가지 — 디스크 가득 참·쓰기 권한 거부, 손상된 `config.json`과 잘린 파일, 아주 큰 transcript, 인코딩이 깨진 transcript — 를 실제로 재현했다. 성능은 문제가 없었고(단일 파일 300MB까지 이상 없음, 피크 메모리는 파일 크기가 아니라 **가장 긴 줄의 약 2배**), 대신 데이터가 사라지는 경로가 여섯 개 나왔다.
 
 ### Fixed
