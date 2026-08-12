@@ -17,8 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - 마켓플레이스 이름은 `solzip`이라 설치 명령이 `/plugin install agent-diary@solzip` 이다. README(EN/KO) 둘 다 갱신
 - **기존 테스트가 깨진 값을 고정하고 있던 문제**: `test_codex_plugin.py`가 `assert data["hooks"] == "hooks.json"` 으로 리터럴을 박아둬서, 런타임이 해석하지 못하는 경로를 **초록불로 지키고 있었다.** 경로가 실제 파일로 해석되는지 검사하도록 바꿨다
 
+### Changed
+
+- **PyPI 페이지 사이드바에 Changelog·Documentation·Issues 추가**: `[project.urls]`가 Homepage·Repository 둘뿐이라, 대부분의 방문자가 보는 유일한 페이지에서 **무엇이 바뀌었는지·어디에 신고하는지·왜 이렇게 만들었는지로 가는 경로가 없었다**
+- **`Operating System :: OS Independent`, `Topic :: Utilities` classifier 추가**: CI가 3개 OS를 전부 도는데 그 사실이 패키지 메타데이터에는 없었다
+
 ### Added
 
+- 패키지 메타데이터 테스트 12개 (`test_package_metadata.py`). PyPI 페이지의 주장이 저장소의 실제와 맞는지 검사한다 — 사이드바 링크가 가리키는 파일이 실재하는지, **classifier가 주장하는 파이썬 버전 집합이 CI 매트릭스와 정확히 같은지**(주장은 지원 선언이고 매트릭스는 검증된 것이다), `requires-python`이 최저 테스트 버전과 맞는지
+  - 되돌리기 검증 4/4 (링크 제거·없는 파일 지목·테스트 안 하는 3.13 주장·OS Independent 제거 전부 빨간불)
 - 매니페스트 회귀 테스트 17개 (`test_plugin_manifests.py`). `claude plugin validate --strict`가 진짜 검사지만 CI에는 Claude Code가 없으므로, 실제로 깨졌던 불변식을 파이썬으로 못 박는다 — 마켓플레이스 필수 필드, 상대 경로가 실재하는지, 로드를 막는 타입, **README의 설치 명령이 매니페스트가 정의한 마켓플레이스·플러그인 이름과 일치하는지**, 세 곳의 버전 일치
   - 되돌리기 검증 5/5 (마켓플레이스 삭제·타입 되돌림·경로 되돌림·README 드리프트·버전 불일치 전부 빨간불)
 
