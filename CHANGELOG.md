@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.8.1] - 2026-08-12
+
 ### Fixed
 
 - **`init`이 Windows에서 동작하지 않는 명령을 안내하던 문제**: 마지막 줄이 `cat <dir>/$(date +%Y-%m-%d).md` 였다. bash 문법이라 이 프로젝트가 지원하고 CI로 검증까지 하는 Windows에서는 아무 일도 하지 않는다. 온보딩의 **마지막 문장이자 성과를 확인하는 방법**이 실행한 플랫폼에서 틀린 상태였다. 이제 오늘 파일의 실제 경로를 그대로 출력한다
