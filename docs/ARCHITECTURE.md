@@ -91,7 +91,7 @@ A push is a sequence of independent API calls, so "it half worked" is a normal s
 Notion is the destination, not the archive. If a push half-fails, or a row is later edited by hand, the only way back to what was actually submitted is a local copy. Each run writes:
 
 ```
-<cwd>/.codefleet/runs/<YYYYMMDD-HHMMSS-session>/
+<cwd>/.agent-diary/runs/<YYYYMMDD-HHMMSS-session>/
   input.json        the original task JSON
   git-diff.patch    the working tree at push time
   preview.md        the rendered page body
@@ -102,7 +102,32 @@ The checksums mean a reference can be verified against the file it names rather 
 
 ---
 
-## 5. Zero dependencies in the core
+## 5. Two hooks can end at the same moment
+
+The Stop Hook runs once per session ending, as its own process. Somebody working across several projects — which is the case this tool is for — will have two sessions finish in the same second, and both then write the same day file.
+
+Unlocked, that file had two races. The header was written under an exists-then-create, so both processes could write one. And an append of a real entry is a few kilobytes, which is not atomic on either platform. `update_session_count` was worse: a read-modify-write with nothing around it, so both processes read the same number and both wrote it back plus one.
+
+Measured, twelve concurrent writers:
+
+```
+entries in the file   : 9    <-- LOST
+distinct session ids  : 10   <-- LOST
+session_counts says   : 4    <-- WRONG
+```
+
+Both now take a lock — a lock file created with `O_CREAT | O_EXCL`, which is one syscall and behaves the same everywhere, rather than `fcntl` on one platform and `msvcrt` on the other. Nothing outside the standard library, which the zero-dependency rule below requires.
+
+Two properties it needs beyond exclusion:
+
+- **A stale lock is broken, not waited on.** A hook that dies holding the lock would otherwise block every session after it. Losing one entry is the bug being fixed; hanging the hook forever is worse.
+- **Failing to acquire degrades rather than raises.** The diary is best-effort. A lock that cannot be taken within the timeout logs and proceeds, because an exception here would lose the entry outright — the exact outcome the lock exists to prevent.
+
+`update_session_count` also writes to a sibling and `os.replace`s it, so a crash mid-write cannot leave a truncated file where the counts used to be.
+
+The regression tests use separate processes rather than threads. Threads share a file object and an interpreter, and would pass while the real thing failed.
+
+## 6. Zero dependencies in the core
 
 `dependencies = []`. The core runs on the standard library; `requests` arrives only with the `[notion]` extra.
 
@@ -112,7 +137,7 @@ The same reasoning applies to release: publishing uses PyPI trusted publishing o
 
 ---
 
-## 6. Layout
+## 7. Layout
 
 ```
 src/claude_diary/
@@ -153,7 +178,7 @@ The command and `_gather_git_info` / `_push_task` stay in `__init__` on purpose.
 
 ---
 
-## 7. Two things that look wrong and are not
+## 8. Two things that look wrong and are not
 
 **`Schema Version` reads `vlegacy`.** It began as a bug: a function returned `"legacy"` and a normalizer prefixed a `v`. It stays because it is a live select option carrying 350 of 509 rows in a real database. Changing it creates a third option and splits the column, so renaming it is a migration rather than an edit. It is now a named constant with a test pinning it.
 
@@ -163,7 +188,7 @@ Both are cases where the tidier-looking option costs a user something and the un
 
 ---
 
-## 8. Verification
+## 9. Verification
 
 - **741 tests**, 88.9% line coverage, with the CI gate at 85%
 - **15 combinations** per run: Python 3.8–3.12 across Linux, macOS and Windows
