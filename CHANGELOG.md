@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **동시에 끝난 세션의 일지 항목이 사라지던 문제**: Stop Hook은 세션이 끝날 때마다 **별도 프로세스**로 실행되는데, 일지 쓰기에 잠금이 없었다. `append_entry`는 헤더를 exists-then-create로 쓰고(둘 다 쓸 수 있음) 수 KB짜리 append도 원자적이지 않았으며, `update_session_count`는 잠금 없는 read-modify-write였다
+  - 실측(12개 동시 프로세스): **항목 12개 중 9개만 기록**, session id 10개, 카운터는 4
+  - 표준 라이브러리만으로 된 잠금 파일(`O_CREAT | O_EXCL`)을 도입. `fcntl`/`msvcrt`는 플랫폼마다 동작이 달라 쓰지 않았고, 코어 의존성 0 규칙도 지킨다
+  - **죽은 잠금은 기다리지 않고 깬다** — hook이 잠금을 쥔 채 죽으면 이후 모든 세션이 막힌다. 항목 하나 잃는 것보다 영원히 멈추는 게 나쁘다
+  - **잠금 획득 실패는 예외가 아니라 경고 후 진행** — 일지는 best-effort고, 여기서 예외를 던지면 막으려던 유실이 그대로 일어난다
+  - `update_session_count`는 임시 파일에 쓰고 `os.replace` 하므로 쓰기 도중 죽어도 잘린 파일이 남지 않는다
+  - 회귀 테스트는 스레드가 아니라 **별도 프로세스**로 돈다. 스레드는 파일 객체와 인터프리터를 공유해서, 실제로는 깨지는데 테스트만 통과한다
+  - 수정 후 12개·40개 동시 프로세스 모두 유실 0
+
 ## [4.8.1] - 2026-08-12
 
 ### Fixed
