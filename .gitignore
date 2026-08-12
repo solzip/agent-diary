@@ -9,6 +9,13 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+# Throwaway environments. One of these was created inside packaging/ while
+# checking that the redirect release resolves, and 799 files of it reached a
+# commit before anyone looked.
+.venv/
+venv/
+*-test/pyvenv.cfg
+redirect-test/
 .pytest_cache/
 .coverage
 htmlcov/
