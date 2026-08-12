@@ -140,8 +140,8 @@ Claude Code 플러그인 설치는 별도 배포 경로입니다. Claude Code의
 
 ```bash
 # Claude Code 안에서 실행
-/plugin marketplace add https://github.com/solzip/agent-diary
-/plugin install agent-diary
+/plugin marketplace add solzip/agent-diary
+/plugin install agent-diary@solzip
 ```
 
 이 플러그인은 Claude Code 쪽 hook 설정을 배포합니다. `agent-diary` CLI는 Python 패키지에서 제공되므로, 플러그인 경로를 쓰더라도 Python 패키지 설치와 `agent-diary init`이 준비되어 있어야 합니다.

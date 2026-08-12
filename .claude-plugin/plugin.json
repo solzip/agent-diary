@@ -6,6 +6,7 @@
     "name": "solzip",
     "url": "https://github.com/solzip"
   },
+  "homepage": "https://github.com/solzip/agent-diary",
   "repository": "https://github.com/solzip/agent-diary",
   "license": "MIT",
   "keywords": [
@@ -16,11 +17,5 @@
     "automation",
     "claude-code"
   ],
-  "engines": {
-    "claude-code": ">=2.1.0"
-  },
-  "dependencies": {
-    "python": ">=3.8"
-  },
-  "hooks": "hooks.json"
+  "hooks": "./.claude-plugin/hooks.json"
 }
