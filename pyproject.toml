@@ -16,6 +16,9 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    # CI runs all three, so claiming it is a statement about what is tested
+    # rather than a hope. The core is standard library only.
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -23,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Documentation",
+    "Topic :: Utilities",
 ]
 dependencies = []
 
@@ -41,8 +45,15 @@ working-diary = "claude_diary.cli:main"
 claude-diary = "claude_diary.cli:main"
 
 [project.urls]
+# These become the sidebar on the PyPI page, which for most visitors is the
+# only page they see. Homepage and Repository alone sent them to the code with
+# no route to what changed, where to report something, or why any of it is
+# built the way it is.
 Homepage = "https://github.com/solzip/agent-diary"
 Repository = "https://github.com/solzip/agent-diary"
+Changelog = "https://github.com/solzip/agent-diary/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md"
+Issues = "https://github.com/solzip/agent-diary/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
