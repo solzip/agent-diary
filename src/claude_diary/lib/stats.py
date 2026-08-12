@@ -4,6 +4,8 @@ import os
 import re
 from collections import Counter
 
+from claude_diary.lib.conventional import commit_type
+
 
 def parse_daily_file(filepath):
     """Parse a daily diary .md file and extract statistics.
@@ -18,6 +20,9 @@ def parse_daily_file(filepath):
         "issues": [],
         "categories": [],
         "raw_entries": [],
+        "commit_types": [],
+        "commits": 0,
+        "sessions_with_commits": 0,
     }
 
     if not os.path.exists(filepath):
@@ -83,4 +88,37 @@ def parse_daily_file(filepath):
     for block in request_matches:
         stats["raw_entries"].extend(re.findall(r'\d+\. (.+)', block))
 
+    _collect_commit_types(content, stats)
+
     return stats
+
+
+# `  - 커밋: `hash` subject` / `  - Commit: `hash` subject`
+_COMMIT_LINE = re.compile(r"(?:커밋|Commit):\s*`[^`]+`\s*(.+)")
+
+
+def _collect_commit_types(content, stats):
+    """Count commits by their Conventional Commit type.
+
+    A separate axis from `categories`, and a better-founded one: a category is
+    guessed from words that appeared in the conversation, while a commit type
+    is what the author declared they were doing. Measured over 6,906 entries
+    the two disagree on a third of the entries that have both, and the
+    disagreement is lopsided — the keyword rules count `test` about four times
+    as often as `test:` commits exist, because saying "tests pass" during a
+    bug fix is enough to classify the session as testing.
+
+    They are not merged for the same reason they are worth comparing. Fewer
+    than half the entries have a commit at all, so replacing one with the
+    other would trade a wrong number for a missing one.
+    """
+    sessions = content.split("### ⏰")[1:]
+    for session in sessions:
+        subjects = _COMMIT_LINE.findall(session)
+        if subjects:
+            stats["sessions_with_commits"] += 1
+        for subject in subjects:
+            stats["commits"] += 1
+            kind = commit_type(subject)
+            if kind:
+                stats["commit_types"].append(kind)

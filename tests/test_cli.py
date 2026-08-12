@@ -741,7 +741,10 @@ class TestCmdStatsExtra:
         cmd_stats(args)
         captured = capsys.readouterr()
         assert "Projects:" in captured.out
-        assert "Categories:" in captured.out
+        # The heading says where the numbers came from, because a second block
+        # below it counts commit types and the two are not the same unit.
+        assert "Categories" in captured.out
+        assert "guessed" in captured.out
         assert "my-app" in captured.out
 
 

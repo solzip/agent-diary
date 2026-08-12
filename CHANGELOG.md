@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - 마켓플레이스 이름은 `solzip`이라 설치 명령이 `/plugin install agent-diary@solzip` 이다. README(EN/KO) 둘 다 갱신
 - **기존 테스트가 깨진 값을 고정하고 있던 문제**: `test_codex_plugin.py`가 `assert data["hooks"] == "hooks.json"` 으로 리터럴을 박아둬서, 런타임이 해석하지 못하는 경로를 **초록불로 지키고 있었다.** 경로가 실제 파일로 해석되는지 검사하도록 바꿨다
 
+### Added
+
+- **`stats`에 커밋 타입 축 추가**: 지금까지 통계의 유일한 축은 `categories`였는데, 그건 대화에 등장한 단어로 **추측한** 값이다. 커밋 prefix는 추측이 아니라 작성자가 **선언한** 작업 종류다
+  - 실측(일지 6,906건): 커밋이 붙은 항목 46%, 그중 92%가 Conventional prefix를 가진다. 둘 다 있는 항목에서 **키워드 분류와 커밋 타입의 일치율은 65%**
+  - 어긋나는 방향이 한쪽으로 쏠린다. `test`를 키워드는 1,231건 잡는데 `test:` 커밋은 325건뿐 — **약 4배 과다 계상**이다. 버그를 고치면서 "테스트 통과"라고 말하기만 해도 그 세션이 테스트 작업으로 분류된다
+  - **대체하지 않고 나란히 보여준다.** 커버리지가 46%라 대체하면 틀린 숫자를 없는 숫자로 바꾸는 셈이다. 대신 두 블록에 각각 출처를 적는다 — 위는 `guessed from the conversation`, 아래는 `declared, N commits from M of K sessions`
+  - **단위가 다르다는 것을 표기에 넣었다.** 위는 세션을 세고 아래는 커밋을 센다. 이걸 안 적으면 아래 숫자가 크다는 이유로 잘못된 결론이 나온다
+  - 명세에 없는 prefix도 센다. 실제 일지에 `copy:`·`memory:`·`temp:`·`content:`·`blog:`가 쓰이고 있고, 도구가 남의 prefix를 가짜라고 판정할 근거가 없다
+- `lib/conventional.py`: 커밋 타입 판정을 한 곳으로 모았다. gitmoji(4.6.0)와 이번 통계가 각자 정규식을 갖게 되면, **일지 줄에는 이모지가 붙는데 통계에는 안 잡히는** 커밋이 생긴다
+
 ### Changed
 
 - **PyPI 페이지 사이드바에 Changelog·Documentation·Issues 추가**: `[project.urls]`가 Homepage·Repository 둘뿐이라, 대부분의 방문자가 보는 유일한 페이지에서 **무엇이 바뀌었는지·어디에 신고하는지·왜 이렇게 만들었는지로 가는 경로가 없었다**

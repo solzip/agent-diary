@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from claude_diary.i18n import get_label
+from claude_diary.lib.conventional import commit_type
 from claude_diary.types import EntryData, GitInfo
 
 
@@ -33,10 +33,6 @@ GITMOJI = {
     "format": "🎨",
 }
 
-# `type(scope)!: subject` — scope and the breaking-change bang are optional.
-_CONVENTIONAL = re.compile(r"^([a-z]+)(?:\([^)]*\))?!?:")
-
-
 def commit_gitmoji(message: str) -> str:
     """Return the gitmoji for a Conventional Commit subject, or "".
 
@@ -45,18 +41,12 @@ def commit_gitmoji(message: str) -> str:
     something else there — Work Summary, Key Commands, and secrets masked —
     and the same glyph carrying two meanings in one entry is worse than no
     glyph at all.
+
+    The type itself comes from `lib.conventional`, shared with the stats
+    command so a message cannot be one type on the diary line and another in
+    the count.
     """
-    text = (message or "").strip()
-    if not text:
-        return ""
-    # A message that already leads with an emoji is left alone; `ai-commit`
-    # and similar tools may have put one there.
-    if not text[0].isascii():
-        return ""
-    match = _CONVENTIONAL.match(text)
-    if not match:
-        return ""
-    return GITMOJI.get(match.group(1), "")
+    return GITMOJI.get(commit_type(message), "")
 
 
 def format_entry(entry_data: EntryData, lang: str = "ko", gitmoji: bool = False) -> str:
