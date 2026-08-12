@@ -36,9 +36,12 @@ def cmd_stats(args):
     total_sessions = 0
     all_projects = Counter()
     all_categories = Counter()
+    all_commit_types = Counter()
     daily_sessions = {}
     total_files_created = 0
     total_files_modified = 0
+    total_commits = 0
+    sessions_with_commits = 0
 
     for day in range(1, days_in_month + 1):
         date_str = "%04d-%02d-%02d" % (year, month, day)
@@ -58,6 +61,10 @@ def cmd_stats(args):
             all_categories[c] += 1
         total_files_created += len(stats["files_created"])
         total_files_modified += len(stats["files_modified"])
+        for t in stats.get("commit_types", []):
+            all_commit_types[t] += 1
+        total_commits += stats.get("commits", 0)
+        sessions_with_commits += stats.get("sessions_with_commits", 0)
 
     # Render terminal dashboard
     month_str = "%04d-%02d" % (year, month)
@@ -80,9 +87,26 @@ def cmd_stats(args):
         print()
 
     if all_categories:
-        print("  Categories:")
+        print("  Categories (guessed from the conversation, %d sessions):" % total_sessions)
         for cat, count in all_categories.most_common(10):
             print("  %-12s %d" % (cat, count))
+        print()
+
+    if all_commit_types:
+        # The coverage line is not decoration. These count commits while the
+        # block above counts sessions, and fewer than half the sessions have a
+        # commit at all, so the two lists are not comparable and a reader who
+        # assumed they were would draw the wrong conclusion from the larger
+        # numbers here.
+        coverage = 100.0 * sessions_with_commits / total_sessions if total_sessions else 0.0
+        print("  Commit types (declared, %d commits from %d of %d sessions, %.0f%%):" % (
+            total_commits, sessions_with_commits, total_sessions, coverage,
+        ))
+        max_count = max(all_commit_types.values())
+        for kind, count in all_commit_types.most_common(10):
+            bar_len = int(count / max_count * 16)
+            bar = "█" * bar_len + "░" * (16 - bar_len)
+            print("  %-12s %s %d" % (kind, bar, count))
         print()
 
     # Daily activity
