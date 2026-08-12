@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.8.2] - 2026-08-12
+
 ### Fixed
 
 - **동시에 끝난 세션의 일지 항목이 사라지던 문제**: Stop Hook은 세션이 끝날 때마다 **별도 프로세스**로 실행되는데, 일지 쓰기에 잠금이 없었다. `append_entry`는 헤더를 exists-then-create로 쓰고(둘 다 쓸 수 있음) 수 KB짜리 append도 원자적이지 않았으며, `update_session_count`는 잠금 없는 read-modify-write였다
