@@ -9,10 +9,20 @@ like a quiet day.
 import json
 import os
 import time
+from pathlib import Path
 
 import pytest
 
 from claude_diary.lib.parser import parse_transcript
+
+
+def _isolate_config_home(tmp_path, monkeypatch):
+    """Point config lookup at a temporary directory on every platform."""
+    base = tmp_path / "config-home"
+    base.mkdir(exist_ok=True)
+    monkeypatch.setenv("APPDATA", str(base))            # Windows
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(base))    # Linux, macOS
+    return base
 
 
 def _line(text, ts="2026-07-01T10:00:00Z"):
@@ -65,7 +75,7 @@ class TestABrokenTranscript:
         from claude_diary.core import process_session
 
         diary = tmp_path / "diary"
-        monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+        _isolate_config_home(tmp_path, monkeypatch)
         monkeypatch.setenv("CLAUDE_DIARY_DIR", str(diary))
 
         path = self._write(
@@ -80,9 +90,15 @@ class TestABrokenTranscript:
 class TestABrokenConfig:
     @pytest.fixture(autouse=True)
     def _isolate(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
-        self.config_dir = tmp_path / "appdata" / "claude-diary"
-        self.config_dir.mkdir(parents=True)
+        # Both variables: `get_config_dir` reads APPDATA on Windows and
+        # XDG_CONFIG_HOME everywhere else, so setting one of them isolates
+        # the test on one platform and silently reads the developer's real
+        # config on the other.
+        _isolate_config_home(tmp_path, monkeypatch)
+        from claude_diary.config import get_config_dir
+
+        self.config_dir = Path(get_config_dir())
+        self.config_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.config_dir / "config.json"
 
     def _load(self, body):
