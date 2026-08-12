@@ -17,15 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - 마켓플레이스 이름은 `solzip`이라 설치 명령이 `/plugin install agent-diary@solzip` 이다. README(EN/KO) 둘 다 갱신
 - **기존 테스트가 깨진 값을 고정하고 있던 문제**: `test_codex_plugin.py`가 `assert data["hooks"] == "hooks.json"` 으로 리터럴을 박아둬서, 런타임이 해석하지 못하는 경로를 **초록불로 지키고 있었다.** 경로가 실제 파일로 해석되는지 검사하도록 바꿨다
 
-### Added
-
-- **은퇴한 이름 `claude-diary`를 위한 리다이렉트 릴리스** (`packaging/claude-diary/`): 이 프로젝트는 4.2.0까지 `claude-diary`로 배포됐는데, 이름을 바꾼 뒤에도 **그 이름으로 계속 설치되고 있었다** — 미러 제외 59일간 324회, 마지막이 2026-08-09. 그리고 그 설치는 전부 4.2.0을 받는다. 동시 세션 일지 유실 수정(4.8.2)도, 부분 실패가 하루를 지우는 문제 수정(4.8.3)도 없는 4개월 전 코드다
-  - 코드가 없는 배포판이고 `agent-diary`에 의존만 한다. import 패키지가 양쪽 다 `claude_diary`라서 **`import claude_diary`가 그대로 동작하면서 유지되는 코드로 해석된다**
-  - **모듈을 싣지 않는 것이 핵심**이다. 실으면 두 배포판이 같은 `claude_diary/`를 두고 다투고, 나중에 푼 쪽이 이긴다. 회귀 테스트가 `packages = []`를 지킨다
-  - 깨끗한 venv에서 확인: `pip install claude_diary-5.0.0.whl` → `agent-diary 4.8.3` 함께 설치, `import claude_diary` → 4.8.3
-  - 한 번만 배포한다. 의존은 고정이 아니라 하한이라 `agent-diary` 릴리스를 따라다닐 필요가 없다
-  - **아직 배포하지 않았다.** PyPI에 `claude-diary` 업로드 권한이 필요하고, 4.2.0 yank도 함께 해야 한다
-
 ### Changed
 
 - **PyPI 페이지 사이드바에 Changelog·Documentation·Issues 추가**: `[project.urls]`가 Homepage·Repository 둘뿐이라, 대부분의 방문자가 보는 유일한 페이지에서 **무엇이 바뀌었는지·어디에 신고하는지·왜 이렇게 만들었는지로 가는 경로가 없었다**
