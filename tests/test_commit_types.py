@@ -139,6 +139,65 @@ class TestCountingThemInADay:
         assert stats["commit_types"] == []
 
 
+class TestWhatASessionLeftBehind:
+    """Three observed states, not three guesses. The point of the third one is
+    that a session which changed nothing has an outcome rather than a gap:
+    reading and working something out is a result."""
+
+    def test_a_commit_makes_it_committed(self, tmp_path):
+        path = _diary(tmp_path, ENTRY % (1, COMMITS % "feat: one"))
+        assert parse_daily_file(path)["outcomes"]["committed"] == 1
+
+    def test_touched_files_without_a_commit_are_their_own_outcome(self, tmp_path):
+        """The largest group in the real diary, and the one the commit-type
+        axis cannot see: 51% of 6,921 entries changed something and committed
+        nothing."""
+        body = "**✏️ 수정된 파일:**\n  - `a.py`\n"
+        path = _diary(tmp_path, ENTRY % (1, body))
+        assert parse_daily_file(path)["outcomes"]["changed"] == 1
+
+    def test_created_files_count_as_changed_too(self, tmp_path):
+        body = "**📄 생성된 파일:**\n  - `a.py`\n"
+        path = _diary(tmp_path, ENTRY % (1, body))
+        assert parse_daily_file(path)["outcomes"]["changed"] == 1
+
+    def test_a_nonzero_diff_counts_as_changed_without_a_file_list(self, tmp_path):
+        """Some entries carry only the diff stat."""
+        body = "**📊 변경 통계:** +596 / -23 lines (2 files)\n"
+        path = _diary(tmp_path, ENTRY % (1, body))
+        assert parse_daily_file(path)["outcomes"]["changed"] == 1
+
+    def test_an_empty_diff_is_not_a_change(self, tmp_path):
+        body = "**📊 변경 통계:** +0 / -0 lines (0 files)\n"
+        path = _diary(tmp_path, ENTRY % (1, body))
+        assert parse_daily_file(path)["outcomes"]["investigation"] == 1
+
+    def test_changing_nothing_is_recorded_as_investigation(self, tmp_path):
+        path = _diary(tmp_path, ENTRY % (1, ""))
+        outcomes = parse_daily_file(path)["outcomes"]
+        assert outcomes["investigation"] == 1
+        assert outcomes["committed"] == 0
+        assert outcomes["changed"] == 0
+
+    def test_english_labels_are_recognised(self, tmp_path):
+        path = tmp_path / "2026-07-03.md"
+        path.write_text(
+            "### ⏰ 10:00:01 | 📁 `proj`\n\n**Files Modified:**\n  - `a.py`\n\n---\n",
+            encoding="utf-8",
+        )
+        assert parse_daily_file(str(path))["outcomes"]["changed"] == 1
+
+    def test_every_session_lands_in_exactly_one_outcome(self, tmp_path):
+        path = _diary(
+            tmp_path,
+            ENTRY % (1, COMMITS % "feat: one"),
+            ENTRY % (2, "**✏️ 수정된 파일:**\n  - `a.py`\n"),
+            ENTRY % (3, ""),
+        )
+        stats = parse_daily_file(path)
+        assert sum(stats["outcomes"].values()) == stats["sessions"] == 3
+
+
 class TestTheNumbersAreLabelledAsWhatTheyAre:
     """The two blocks count different things — sessions above, commits below —
     and the larger numbers are the less complete ones."""
@@ -159,6 +218,15 @@ class TestTheNumbersAreLabelledAsWhatTheyAre:
         out = self._render(tmp_path, capsys, monkeypatch)
         assert "Commit types" in out
         assert "1 of 2 sessions" in out, out
+
+    def test_the_sessions_the_commit_block_cannot_see_are_accounted_for(
+        self, tmp_path, capsys, monkeypatch
+    ):
+        """A coverage fraction alone leaves the reader to wonder what the rest
+        were. The outcomes block is what answers that."""
+        out = self._render(tmp_path, capsys, monkeypatch)
+        assert "Session outcomes" in out
+        assert "investigation only" in out, out
 
     def test_the_category_block_says_it_is_guessed(self, tmp_path, capsys, monkeypatch):
         out = self._render(tmp_path, capsys, monkeypatch)

@@ -37,6 +37,7 @@ def cmd_stats(args):
     all_projects = Counter()
     all_categories = Counter()
     all_commit_types = Counter()
+    all_outcomes = Counter()
     daily_sessions = {}
     total_files_created = 0
     total_files_modified = 0
@@ -63,6 +64,8 @@ def cmd_stats(args):
         total_files_modified += len(stats["files_modified"])
         for t in stats.get("commit_types", []):
             all_commit_types[t] += 1
+        for outcome, n in stats.get("outcomes", {}).items():
+            all_outcomes[outcome] += n
         total_commits += stats.get("commits", 0)
         sessions_with_commits += stats.get("sessions_with_commits", 0)
 
@@ -92,15 +95,29 @@ def cmd_stats(args):
             print("  %-12s %d" % (cat, count))
         print()
 
+    if total_sessions and sum(all_outcomes.values()):
+        # What each session left behind, and the reason the commit-type block
+        # below covers less than all of them. All three are observed rather
+        # than inferred: a commit exists or it does not, a file was touched or
+        # it was not. A session that changed nothing is reported as its own
+        # outcome rather than left out — reading and working something out is
+        # a result, and counting it as a gap in the data misrepresents the day.
+        print("  Session outcomes (%d sessions):" % total_sessions)
+        for key, label in (("committed", "committed"),
+                           ("changed", "changed, uncommitted"),
+                           ("investigation", "investigation only")):
+            count = all_outcomes.get(key, 0)
+            if count:
+                share = 100.0 * count / total_sessions
+                print("  %-22s %5d  %4.1f%%" % (label, count, share))
+        print()
+
     if all_commit_types:
-        # The coverage line is not decoration. These count commits while the
-        # block above counts sessions, and fewer than half the sessions have a
-        # commit at all, so the two lists are not comparable and a reader who
-        # assumed they were would draw the wrong conclusion from the larger
-        # numbers here.
-        coverage = 100.0 * sessions_with_commits / total_sessions if total_sessions else 0.0
-        print("  Commit types (declared, %d commits from %d of %d sessions, %.0f%%):" % (
-            total_commits, sessions_with_commits, total_sessions, coverage,
+        # These count commits while the categories block counts sessions, so
+        # the two lists are not comparable and a reader who assumed they were
+        # would draw the wrong conclusion from the larger numbers here.
+        print("  Commit types (declared, %d commits from %d of %d sessions):" % (
+            total_commits, sessions_with_commits, total_sessions,
         ))
         max_count = max(all_commit_types.values())
         for kind, count in all_commit_types.most_common(10):
