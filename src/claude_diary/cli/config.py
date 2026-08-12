@@ -2,6 +2,7 @@
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 import claude_diary.cli as _cli
@@ -175,8 +176,17 @@ def cmd_init(args):
         print("  [ok] Created %s with Stop Hook" % claude_settings)
 
     print()
-    print("Done! Claude Code sessions will be auto-logged.")
-    print("  View diary: cat %s/$(date +%%Y-%%m-%%d).md" % diary_dir)
+    print("Done! Claude Code sessions will be auto-logged from now on.")
+    print()
+    # Onboarding used to end here, which meant the payoff was "come back after
+    # you have worked for a while". Claude Code has transcripts on disk
+    # already, so the first thing to offer is the history you have.
+    print("Next:")
+    print("  agent-diary backfill    import the sessions you already have")
+    print("  agent-diary doctor      check it is set up and still recording")
+    print()
+    today = datetime.now().strftime("%Y-%m-%d")
+    print("Your diary: %s" % os.path.join(diary_dir, "%s.md" % today))
 
 
 def cmd_migrate(args):

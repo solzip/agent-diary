@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`init`이 Windows에서 동작하지 않는 명령을 안내하던 문제**: 마지막 줄이 `cat <dir>/$(date +%Y-%m-%d).md` 였다. bash 문법이라 이 프로젝트가 지원하고 CI로 검증까지 하는 Windows에서는 아무 일도 하지 않는다. 온보딩의 **마지막 문장이자 성과를 확인하는 방법**이 실행한 플랫폼에서 틀린 상태였다. 이제 오늘 파일의 실제 경로를 그대로 출력한다
+
+### Changed
+
+- **온보딩이 `backfill`로 이어진다**: `init`이 "이제부터 자동 기록됩니다"로 끝났는데, 이건 "가서 일하다 나중에 오라"는 말이다. transcript는 이미 디스크에 있으므로 다음 단계로 `backfill`과 `doctor`를 제시한다
+- **인자 없이 실행하면 시작 지점을 보여준다**: 서브커맨드가 21개인데 알파벳 나열뿐이라 `init`이 7번째, `backfill`이 17번째에 묻혀 있었다. argparse는 서브커맨드를 그룹핑하지 못하므로 epilog로 진입 경로를 명시한다
+
 ## [4.8.0] - 2026-08-11
 
 ### Added

@@ -75,10 +75,31 @@ def _add_diary_notion_parser(sub, name):
                           help="Output operations report as JSON (ops only)")
 
 
+# Twenty-one subcommands in one alphabetical wall tells a newcomer nothing
+# about where to begin — `init` sits seventh and `backfill`, which is the
+# thing that makes the tool worth having on day one, seventeenth. argparse
+# will not group subcommands, so the route in is spelled out instead.
+GETTING_STARTED = """
+start here:
+  agent-diary init                 set up, and register the Claude Code hook
+  agent-diary backfill             import the sessions you already have
+  agent-diary doctor               check it is set up and still recording
+
+then, day to day:
+  agent-diary report --days 7      one document for a period, to send someone
+  agent-diary search "keyword"     find an entry
+  agent-diary diary-notion push    push a session to a Notion work log
+
+everything else is listed above. docs: https://github.com/solzip/agent-diary
+"""
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="agent-diary",
         description="Auto-generated work diary from Claude Code and Codex sessions",
+        epilog=GETTING_STARTED,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     from claude_diary import __version__
     parser.add_argument("--version", action="version", version="agent-diary %s" % __version__)
