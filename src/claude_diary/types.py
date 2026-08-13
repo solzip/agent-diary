@@ -85,6 +85,9 @@ class EntryData(TypedDict, total=False):
     git_info: Optional[GitInfo]
     code_stats: Optional[DiffStat]
     secrets_masked: int
+    # 1-based position of this session among the ones recorded for the same
+    # project and branch. Absent when there is no branch to place it in.
+    branch_session_ordinal: int
 
 
 class EnrichmentConfig(TypedDict, total=False):

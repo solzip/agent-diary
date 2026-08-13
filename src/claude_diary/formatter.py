@@ -106,7 +106,14 @@ def format_entry(entry_data: EntryData, lang: str = "ko", gitmoji: bool = False)
         lines.append("**🔀 %s:**" % L("git"))
         branch = git_info.get("branch", "")
         if branch:
-            lines.append("  - 🌿 %s: `%s`" % (L("branch"), branch))
+            # The sequence number turns a branch name into a thread: reading
+            # an entry tells you this is the twelfth session on this piece of
+            # work rather than leaving you to count. Absent when the caller did
+            # not resolve it, and never shown as "1st" — the first session on a
+            # branch has no thread behind it to point at.
+            ordinal = entry_data.get("branch_session_ordinal") or 0
+            suffix = " (#%d)" % ordinal if ordinal > 1 else ""
+            lines.append("  - 🌿 %s: `%s`%s" % (L("branch"), branch, suffix))
         for commit in git_info.get("commits", [])[:5]:
             message = commit["message"]
             if gitmoji:

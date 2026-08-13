@@ -106,6 +106,19 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
         except Exception as e:
             logger.warning("Git enrichment failed: %s", e)
 
+    # 3.5 Where this session sits in the branch's thread. Read before the entry
+    # is formatted, so the record itself carries the position rather than
+    # requiring a separate command to go and work it out.
+    try:
+        branch = (entry_data.get("git_info") or {}).get("branch", "")
+        if branch:
+            from claude_diary.indexer import count_branch_sessions
+            entry_data["branch_session_ordinal"] = (
+                count_branch_sessions(diary_dir, project, branch) + 1
+            )
+    except Exception as e:
+        logger.warning("Branch thread lookup failed: %s", e)
+
     # 4. Enrichment: Auto-categorization
     if enrichment.get("auto_category", True):
         try:
