@@ -77,7 +77,11 @@ def format_entry(entry_data: EntryData, lang: str = "ko", gitmoji: bool = False)
     prompts = entry_data.get("user_prompts", [])
     if prompts:
         lines.append("**📋 %s:**" % L("task_requests"))
-        for i, prompt in enumerate(prompts[:5], 1):
+        # Every prompt in this turn, not the first five of the session. The cut
+        # used to be here rather than in the parser, so moving the parser to a
+        # turn boundary without removing it would keep the same defect at a
+        # smaller scale — a turn with six prompts cut at five.
+        for i, prompt in enumerate(prompts, 1):
             short = prompt.replace("\n", " ").strip()
             if len(short) > 150:
                 short = short[:150] + "..."
