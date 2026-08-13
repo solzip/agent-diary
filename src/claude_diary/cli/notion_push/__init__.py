@@ -104,6 +104,8 @@ from claude_diary.cli.notion_push.tasks import (
 )
 from claude_diary.cli.notion_push.validate import (
     _print_validation_errors,
+    collect_push_warnings,
+    print_push_warnings,
     _report_schema_version,
     _stamp_report_schema_version,
     _validate_push_data,
@@ -129,6 +131,9 @@ def cmd_notion_push(args):
     if validation_errors:
         _print_validation_errors(validation_errors, input_path)
         sys.exit(1)
+    # Warnings, not errors: these are worth saying and none of them is worth
+    # refusing to record the work over.
+    print_push_warnings(collect_push_warnings(tasks))
     if not tasks:
         print("[agent-diary diary-notion push] No tasks to push.")
         if not dry_run:
