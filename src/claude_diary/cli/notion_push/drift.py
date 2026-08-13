@@ -16,9 +16,7 @@ runs; a report that raises would turn a completed push into a failed command.
 
 from claude_diary.cli.notion_ops import build_ops_report
 from claude_diary.cli.notion_push.properties import _resolve_project_name
-from claude_diary.log import get_logger
-
-logger = get_logger("claude_diary.cli.notion_push.drift")
+from claude_diary.lib.nonfatal import non_fatal
 
 PREFIX = "[agent-diary diary-notion push]"
 
@@ -43,29 +41,28 @@ def print_pushed_projects_drift(exporter, db_id, tasks, pushed, cwd, today):
 
 
 def print_project_drift(exporter, db_id, project, today, parent_property_name="Parent Task"):
-    """Print open-work signals for one project. Never raises."""
-    try:
+    """Print open-work signals for one project. Never raises.
+
+    One guard around the whole thing rather than one per call: `_render` was
+    outside the old pair and only stayed non-fatal because the caller had a
+    handler too, which is the arrangement that let a bug in this file go a day
+    without a word.
+    """
+    with non_fatal("drift summary", PREFIX):
         rows = exporter.query_database_rows(
             db_id,
             row_filter={"property": "Project", "select": {"equals": project}},
         )
-    except Exception as e:
-        logger.debug("Drift summary skipped: %s", e)
-        return None
-
-    try:
         report = build_ops_report(rows, today, 7, parent_property_name)
-    except Exception as e:
-        logger.debug("Drift summary skipped: %s", e)
-        return None
 
-    stats = (report.get("projects") or {}).get(project)
-    counts = report.get("counts") or {}
-    if not stats:
-        return None
+        stats = (report.get("projects") or {}).get(project)
+        if not stats:
+            return None
 
-    _render(project, stats, counts, report.get("task_groups") or {})
-    return report
+        _render(project, stats, report.get("counts") or {},
+                report.get("task_groups") or {})
+        return report
+    return None
 
 
 UNGROUPED = "(no task group)"

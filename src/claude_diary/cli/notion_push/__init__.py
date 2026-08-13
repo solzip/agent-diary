@@ -34,6 +34,7 @@ from claude_diary.config import load_config
 from claude_diary.log import get_logger, configure_from_config
 from claude_diary.formatter import build_notion_blocks
 from claude_diary.lib import notion_cache
+from claude_diary.lib.nonfatal import non_fatal
 from claude_diary.lib.git_info import (
     get_branch_for_commit,
     get_head_branch,
@@ -253,7 +254,7 @@ def cmd_notion_push(args):
     # because the rows are already written by this point — a summary that
     # raised would turn a completed push into a failed command.
     if results["pushed"]:
-        try:
+        with non_fatal("drift summary", "[agent-diary diary-notion push]"):
             from claude_diary.cli.notion_push.drift import print_pushed_projects_drift
             # Resolved here rather than reused from above: the only other
             # binding is inside the --force branch, so reading it here made the
@@ -263,8 +264,6 @@ def cmd_notion_push(args):
                 exporter, exporter.ensure_database(year), tasks,
                 results["pushed"], cwd, date_str,
             )
-        except Exception as e:
-            logger.debug("Drift summary skipped: %s", e)
 
     if run_artifacts:
         _finalize_artifact_manifest(run_artifacts, tasks, results)
