@@ -142,10 +142,16 @@ def _resolve_project_name(value, cwd=None):
 
 
 def _project_name_from_cwd(cwd):
-    """Extract a stable project name from the command working directory."""
+    """Extract a stable project name from the command working directory.
+
+    The repository root, not the folder the command happened to run in — the
+    same rule the diary uses, so a session filed under `erp_chatbot_solzip`
+    locally does not arrive in Notion as `dev`.
+    """
     if not cwd:
         return "unknown"
-    normalized = str(cwd).replace("\\", "/").rstrip("/")
+    from claude_diary.lib.git_info import get_repo_root
+    normalized = str(get_repo_root(cwd) or cwd).replace("\\", "/").rstrip("/")
     name = normalized.rsplit("/", 1)[-1].strip()
     if not name or name in {".", ".."}:
         return "unknown"
