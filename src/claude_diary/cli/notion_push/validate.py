@@ -104,6 +104,38 @@ def _validate_push_data(data):
     return errors
 
 
+def collect_push_warnings(tasks):
+    """Problems worth saying out loud that must not stop the push.
+
+    A missing `task_group` is the case this exists for. It is a real defect —
+    a row filed without one cannot be joined to its own continuation later,
+    and 62% of rows on one real database have none — but rejecting the push
+    over it would discard the record entirely, which is a worse outcome than
+    an unlinked row and the failure mode this project keeps having to fix.
+    """
+    warnings = []
+    ungrouped = [
+        idx for idx, task in enumerate(tasks)
+        if isinstance(task, dict) and not str(task.get("task_group") or "").strip()
+    ]
+    if ungrouped:
+        warnings.append(
+            "%d of %d task(s) have no task_group: %s. "
+            "Work filed without one cannot be linked to its continuation later."
+            % (
+                len(ungrouped), len(tasks),
+                ", ".join("tasks[%d]" % i for i in ungrouped[:5])
+                + (" ..." if len(ungrouped) > 5 else ""),
+            )
+        )
+    return warnings
+
+
+def print_push_warnings(warnings):
+    for warning in warnings:
+        print("[agent-diary diary-notion push] warning: %s" % warning)
+
+
 def _print_validation_errors(errors, input_path):
     print("[agent-diary diary-notion push] Invalid input: %s" % input_path, file=sys.stderr)
     for error in errors[:20]:

@@ -18,7 +18,8 @@ from claude_diary.cli.notion_push.drift import (
 
 
 def _row(project, status="Implementation", review=None, done=False,
-         next_action="do the thing", blocked=False, date="2026-08-01"):
+         next_action="do the thing", blocked=False, date="2026-08-01",
+         task_group="a-group"):
     """A row shaped the way `_row_to_item` reads it.
 
     Two details that are easy to get wrong and were: finished work is
@@ -33,6 +34,8 @@ def _row(project, status="Implementation", review=None, done=False,
         "Next Action": {"type": "rich_text",
                         "rich_text": [{"plain_text": next_action}] if next_action else []},
         "Blocked": {"type": "checkbox", "checkbox": bool(blocked)},
+        "Task Group": {"type": "select",
+                       "select": {"name": task_group} if task_group else None},
     }
     if review:
         props["Review Status"] = {"type": "select", "select": {"name": review}}
@@ -117,6 +120,45 @@ class TestItSaysOnlyWhatIsTrue:
         exporter = FakeExporter(rows)
         print_project_drift(exporter, "db", "proj", "2026-08-13")
         assert "blocked" in capsys.readouterr().out
+
+
+class TestItShowsWhetherWorkIsLinkable:
+    """`Task Group` is what joins work done on different days. Measured on one
+    real database only 38% of rows carried one, which makes most of the
+    project history unlinkable — and nothing in the push path said so."""
+
+    def test_ungrouped_rows_are_counted(self, capsys):
+        rows = [_row("proj", task_group="") for _ in range(3)] + [_row("proj")]
+        exporter = FakeExporter(rows)
+        print_project_drift(exporter, "db", "proj", "2026-08-13")
+        assert "no task group          3 of 4 rows" in capsys.readouterr().out
+
+    def test_a_fully_grouped_project_says_nothing_about_it(self, capsys):
+        exporter = FakeExporter([_row("proj"), _row("proj")])
+        print_project_drift(exporter, "db", "proj", "2026-08-13")
+        assert "no task group" not in capsys.readouterr().out
+
+    def test_the_names_already_in_use_are_offered(self, capsys):
+        """A continuation filed under a new name is not a continuation, so the
+        next push needs to see the vocabulary before inventing one."""
+        rows = [_row("proj", task_group=""), _row("proj", task_group="alpha"),
+                _row("proj", task_group="beta")]
+        exporter = FakeExporter(rows)
+        print_project_drift(exporter, "db", "proj", "2026-08-13")
+        out = capsys.readouterr().out
+        assert "groups in use" in out
+        assert "alpha" in out and "beta" in out
+
+    def test_the_names_are_not_offered_when_nothing_is_ungrouped(self, capsys):
+        exporter = FakeExporter([_row("proj", task_group="alpha")])
+        print_project_drift(exporter, "db", "proj", "2026-08-13")
+        assert "groups in use" not in capsys.readouterr().out
+
+    def test_mostly_ungrouped_earns_the_hint(self, capsys):
+        rows = [_row("proj", task_group="") for _ in range(3)] + [_row("proj")]
+        exporter = FakeExporter(rows)
+        print_project_drift(exporter, "db", "proj", "2026-08-13")
+        assert "cannot be linked" in capsys.readouterr().out
 
 
 class TestTheHintIsRare:

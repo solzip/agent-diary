@@ -64,15 +64,40 @@ def print_project_drift(exporter, db_id, project, today, parent_property_name="P
     if not stats:
         return None
 
-    _render(project, stats, counts)
+    _render(project, stats, counts, report.get("task_groups") or {})
     return report
 
 
-def _render(project, stats, counts):
+UNGROUPED = "(no task group)"
+
+
+def _grouping(task_groups):
+    """How much of this project is filed under a task group, and which ones.
+
+    `Task Group` is what makes work from different days findable together, and
+    measured on one real database only 38% of rows carried one. A row filed
+    without a group cannot be linked to its own continuation later, so the
+    count belongs next to the other drift signals rather than in a report
+    nobody opens.
+    """
+    ungrouped = (task_groups.get(UNGROUPED) or {}).get("total", 0)
+    named = [
+        (name, stats)
+        for name, stats in task_groups.items()
+        if name != UNGROUPED
+    ]
+    # Most recently worked first: those are the ones a continuation is likely
+    # to belong to, which is the reason for printing them at all.
+    named.sort(key=lambda pair: pair[1].get("last_worked_on") or "", reverse=True)
+    return ungrouped, [name for name, _ in named]
+
+
+def _render(project, stats, counts, task_groups):
     active = stats.get("active", 0)
     total = stats.get("total", 0)
     done = stats.get("done", 0)
     ratio = stats.get("done_ratio") or 0.0
+    ungrouped, group_names = _grouping(task_groups)
 
     print()
     print("%s Open work in %s:" % (PREFIX, project))
@@ -91,19 +116,36 @@ def _render(project, stats, counts):
         if value:
             print("  %-22s %d" % (label, value))
 
+    if ungrouped:
+        print("  %-22s %d of %d rows" % ("no task group", ungrouped, total))
+
     print("  %-22s %d closed (%.0f%%)" % ("done", done, 100.0 * ratio))
 
-    hint = _hint(active, ratio, counts)
+    if ungrouped and group_names:
+        # The vocabulary already in use here, most recent first. A continuation
+        # filed under a new name is not a continuation, and this is the list
+        # the next push should be choosing from.
+        shown = ", ".join(group_names[:5])
+        more = len(group_names) - 5
+        print("  %-22s %s%s" % (
+            "groups in use", shown, " (+%d)" % more if more > 0 else "",
+        ))
+
+    hint = _hint(active, ratio, counts, ungrouped, total)
     if hint:
         print("  %s" % hint)
 
 
-def _hint(active, ratio, counts):
+def _hint(active, ratio, counts, ungrouped=0, total=0):
     """One line, and only when the numbers warrant it.
 
     The thresholds are deliberately low-traffic: this prints after every push,
     so a hint that shows most of the time is a hint nobody reads.
     """
+    if total and ungrouped * 2 > total:
+        return "-> %d of %d rows have no task group; work from separate days cannot be linked." % (
+            ungrouped, total,
+        )
     if active >= 20 and ratio < 0.1:
         return "-> %d open and %.0f%% closed. `agent-diary diary-notion ops` lists them." % (
             active, 100.0 * ratio,

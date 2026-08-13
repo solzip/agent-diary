@@ -32,6 +32,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - Use `parent_index` for containment hierarchy and Notion sub-items; do not model subtasks with dependencies
    - Use `depends_on_indices` only for prerequisite links between large top-level tasks
    - Mark continued work from an earlier day/session as a new row with the same `task_group` and `carryover=true` when it is still unfinished
+   - Give every row a `task_group`, not only the ones you expect to continue. A row filed without one cannot be joined to its own follow-up later, and on one real database 62% of rows had none — which is most of the project history unlinkable
 3. For each task, produce:
    - Prefer schema v2 normalized fields: `summary`, `work`, `decisions`, `risks`, `next_actions`, `support_needed`, and `appendix`.
    - Legacy flat fields are still accepted by the CLI, but new agent output should use v2 unless compatibility with an older installed version is required.
@@ -82,7 +83,7 @@ Split the current Codex session into task-sized entries and push them to Notion.
    - `block_reason`: Korean reason when `blocked` is `true`
    - `carryover`: `true` when this row continues unfinished work from a previous day/session
    - Do not author review state. Every row is filed as `Needs Review`; only a human running `agent-diary diary-notion review --apply` moves it to `Reviewed`
-   - `task_group`: stable kebab-case/snake-case group for multi-session work
+   - `task_group`: stable kebab-case/snake-case group. **Always set one.** Reuse the project's existing group name when this work continues a theme already filed; invent a new one only when it genuinely starts something. Assigning it only to work you already know spans sessions does not work — that is knowable after the second session, and by then the first row is filed without a group and its continuation can never be linked to it. The `push` summary prints the groups already in use for the project; choose from that list before adding a name
    - `parent_index`: zero-based index of the parent task in this push, or `null`; use it for "part of" hierarchy and Notion sub-items
    - `depends_on_indices`: zero-based indices in this push, or `[]`
      - Use this only when a top-level main task cannot proceed before another top-level main task is done
