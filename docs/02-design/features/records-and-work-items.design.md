@@ -77,17 +77,53 @@ work item     R27, IF-76, 라운드 2        few, long-lived, HAS STATE
 
 Reasons, in order of weight:
 
-1. `ops` already computes `parent_progress` — children done vs total per parent
-   — and finds 37 parents today. The reporting half exists.
-2. Notion's native sub-item relation already drives expand/collapse in the UI,
-   and `ensure` already detects and wires it.
-3. A second database doubles what `ensure` reconciles, and schema reconciliation
+1. A second database doubles what `ensure` reconciles, and schema reconciliation
    is the most dangerous code in this project — see the 2026-08-07 postmortem
    where one PATCH emptied six properties across 497 rows.
+2. Notion's native sub-item relation already drives expand/collapse in the UI,
+   and `ensure` already detects it.
+3. `ops` has a `parent_progress` calculation — children done vs total per
+   parent — and it finds 37 parents today.
 
 The cost of staying in one database: rows are heterogeneous, so every view and
 every count has to say which kind it means. That is a real cost and it is
 smaller than the alternative.
+
+### How much of this is actually proven
+
+Less than the list above suggests, and the difference matters.
+
+Every hierarchy link in the database today is **within one session**:
+
+```
+native   상위 항목 links     77    same session 77   across sessions 0
+custom   Parent Task links  13    same session 13   across sessions 0
+```
+
+Necessarily so: `_wire_parent_tasks` only pairs indices that are both in
+`row_ids`, which holds the rows this push created. Verified in the code rather
+than taken from the docstring.
+
+So `parent_progress` runs, but it has never once run on the case this design
+exists for. "The reporting half already exists" would be an overstatement — the
+code exists and its input never has.
+
+### Two hierarchy relations, not one
+
+The database carries two dual-property relation pairs:
+
+```
+Sub-items  <-> Parent Task     custom,  1% / 2% filled
+하위 항목   <-> 상위 항목        native,  7% / 14% filled
+```
+
+`detect_subitem_relation` picks the native pair, so that is where the tool
+writes and where 77 of the 90 existing links are. `Parent Task` is left over
+from the schema and holds the other 13.
+
+Which pair the work-item layer uses has to be decided rather than assumed, and
+the 13 links in the other pair have to go somewhere. The design does not settle
+this; it names it.
 
 ## The hard part: linking across sessions
 
@@ -208,15 +244,25 @@ same caveat 4.9.0 carries for entry counts.
 
 ## Order of work
 
-1. Merge the status vocabulary into one definition. No behaviour change.
-2. Work-item rows: look up or create by `Task Group`, wire records as
-   sub-items. Records keep their fields; nothing is removed yet.
-3. Move status to the work item; stop writing it on records.
-4. Repoint `ops` and the two views that filter on status.
-5. Retire `Review Status` and `Carryover` from records.
+1. **Merge the status vocabulary into one definition.** No behaviour change,
+   and a prerequisite: with six copies, adding a value and missing one makes it
+   neither done nor active, and it vanishes from every count in silence.
+2. **Decide which relation pair carries the hierarchy**, and deal with the 13
+   links in the other one. Nothing else can be built on an ambiguous answer.
+3. **Link one record to a work item across sessions, by hand, and read it
+   back.** One row, not a feature. This path has never executed: every existing
+   link is intra-session, so "Notion accepts it and `parent_progress` reports
+   it correctly" is an assumption until a single case says otherwise. Today's
+   work turned up three separate places where code existed and its path did
+   not.
+4. Work-item rows for real: look up or create by `Task Group`, wire records as
+   children. Records keep every field they have; nothing is removed yet.
+5. Move status to the work item; stop writing it on records.
+6. Repoint `ops` and the two views that filter on status.
+7. Retire `Review Status` and `Carryover` from records.
 
-Each step is separately shippable, and steps 1 and 2 are useful even if the
-rest never happens.
+Steps 1 to 3 are small, and 3 is the one that decides whether the rest is worth
+starting. Steps 1 and 4 are useful even if the rest never happens.
 
 ## Open questions
 
@@ -228,3 +274,6 @@ rest never happens.
   guesses; expecting is precise and has been 8% effective so far.
 - **Year boundaries.** The database is per-year. A work item spanning New Year
   has no defined home, and today nothing does either.
+- **Which relation pair**, and what happens to the 13 links in the loser.
+- **Whether cross-session linking works at all.** Unknown, not assumed — see
+  step 3. Every one of the 90 links that exists today is intra-session.
