@@ -1,125 +1,75 @@
-# Notion views to create by hand
+# Notion views
 
-The Notion API cannot create database views, so these are set up once in the
-Notion UI. Everything they need is already on the rows — this is configuration,
-not a schema change.
+`agent-diary diary-notion ensure` creates and verifies these. They are not
+set up by hand, and `ensure` is idempotent — running it again on a database
+that already has them reports `verified` and changes nothing.
 
-Why these five: measured on the live database (532 rows, 476 active), the
-numbers that matter are not visible in the default table.
-
-```
-untouched 7+ days     441   (93% of active)
-awaiting review       218
-no next action        125
-no task group         ~62% of rows
-blocked                 8
+```bash
+agent-diary diary-notion ensure --dry-run   # what it would do
+agent-diary diary-notion ensure             # do it
 ```
 
-The `push` summary now prints the same signals for the project just pushed.
-These views are where you go to act on them.
+## What it manages
 
----
+Five views, each answering one question the database exists to answer.
 
-## 1. This week, by project
+| View | Filter | Grouping / sort | Shows |
+|---|---|---|---|
+| **작업 계층** | none | sub-items, date desc | Name, Status, Project, Task Group, Date |
+| **오늘 작업** | today, relative | priority, then date desc | Name, Status, Priority, Next Action, Project |
+| **Blocked** | `Blocked` is checked | priority, then date desc | Name, Priority, Block Reason, Next Action, Project |
+| **전날 미완료** | unfinished, before today | priority, then date desc | Name, Status, Priority, Next Action, Date |
+| **작업 그룹별** | none | grouped by `Task Group` | Name, Status, Project, Date |
 
-The one to open daily. Answers "what did I touch this week, and where does it
-stand".
+`오늘 작업` and `전날 미완료` filter on a date relative to the day `ensure`
+ran, so re-running keeps them pointed at the current day.
 
-| | |
-|---|---|
-| Layout | Table |
-| Filter | `Work Period` — **This week** |
-| Group by | `Project` |
-| Sort | `Priority` ascending, then `Date` descending |
-| Shown | Name, Status, Priority, Task Group, Next Action |
+`Session ID` and `Task Index` are hidden in every view. They are the
+idempotency key, not something to read.
 
-`Work Period` is populated on every row, so this filter never silently drops
-anything. `Date` is the day the row was written; `Work Period` is the span the
-work covers, which is the one you want for a weekly view.
+## What it will not do
 
-> Notion's week starts on Sunday or Monday according to your account's
-> language/region setting. There is no per-view override, so if the boundary
-> matters, use **Past 7 days** instead — it is relative to today and needs no
-> setting.
+**Delete views.** Earlier versions created five more — 상태별, 목적별,
+프로젝트별, 오늘 우선순위, 리뷰 필요 — which were group-by duplicates of each
+other. `ensure` now lists them as no longer managed and leaves them alone,
+because deleting a Notion view can discard a layout somebody customised. Remove
+them by hand if they are not being used.
 
-## 2. Stale
+**Manage views you add yourself.** Anything outside the five names above is
+left untouched, so a hand-made view is safe from `ensure`.
 
-The 441. Open work nobody has touched in a week.
+## Views worth adding by hand
 
-| | |
-|---|---|
-| Layout | Table |
-| Filter | `Status` **is not** `Deployed` **AND** `Work Period` **is before** — *1 week ago* |
-| Group by | `Project` |
-| Sort | `Work Period` ascending (oldest first) |
-| Shown | Name, Status, Work Period, Next Action, Blocked |
+Two gaps the managed set does not cover, both visible in the numbers on a live
+database (532 rows, 476 active):
 
-Read the top of each group first: those are the oldest open items.
+**Stale** — 441 rows, 93% of active work, untouched for a week or more.
+`전날 미완료` covers yesterday; nothing covers the long tail.
 
-**Before concluding anything from this view**, note that `Deployed` is the only
-status counted as done. A row whose work is finished but still sitting in
-`Testing` shows up here. Some of the 441 is genuinely abandoned and some of it
-is just a status never moved — this view is where you tell the two apart.
+> Filter `Status` is not `Deployed` and `Work Period` is before *1 week ago*,
+> group by `Project`, sort `Work Period` ascending.
 
-## 3. Needs review
+Before drawing conclusions from it: **`Deployed` is the only status counted as
+done**. A row whose work is finished but still sitting in `Testing` appears
+here, so some of the 441 is abandoned and some is a status never moved. Telling
+those two apart is what the view is for.
 
-The 218. Rows filed by the agent and not yet checked by you.
+**No task group** — roughly 62% of rows. `Task Group` is the only thing joining
+work done on different days, so a row without one cannot be linked to its own
+follow-up. `작업 그룹별` groups by it but does not isolate the ones that are
+missing it.
 
-| | |
-|---|---|
-| Layout | Table |
-| Filter | `Review Status` **is** `Needs Review` |
-| Sort | `Date` descending |
-| Shown | Name, Project, Status, Date, Task Group |
+> Filter `Task Group` is empty and `Status` is not `Deployed`, group by
+> `Project`, sort `Date` descending.
 
-Every row is filed as `Needs Review` by design — the agent never writes review
-state. `agent-diary diary-notion review --apply` moves them to `Reviewed` in
-bulk; this view is for reading them before you do.
+This is a backfill queue. New rows should stop arriving in it: the skill now
+tells the agent to always set a group, and `push` warns when one is missing and
+prints the names already in use for that project.
 
-## 4. Blocked
+## Why there is no terminal browser
 
-Only 8 rows, and the highest value per row in the database: each one is work
-that has stopped and is waiting on something.
-
-| | |
-|---|---|
-| Layout | Table |
-| Filter | `Blocked` **is** checked **AND** `Status` **is not** `Deployed` |
-| Sort | `Work Period` ascending |
-| Shown | Name, Project, Block Reason, Next Action |
-
-`Blocked` is a checkbox; the text is in `Block Reason`.
-
-## 5. No task group
-
-The connectivity gap — roughly 62% of rows. `Task Group` is the only thing
-joining work done on different days into one thread, so a row without one
-cannot be linked to its own follow-up.
-
-| | |
-|---|---|
-| Layout | Table |
-| Filter | `Task Group` **is empty** **AND** `Status` **is not** `Deployed` |
-| Group by | `Project` |
-| Sort | `Date` descending |
-| Shown | Name, Project, Date, Status |
-
-This is a backfill queue. Assign groups from the top down; within a project,
-adjacent rows on the same theme usually belong to the same group. New rows
-should stop arriving here — the skill now instructs the agent to always set
-one, and `push` warns when it does not.
-
----
-
-## What is not worth a view
-
-**Per-week browsing beyond view 1.** `Work Period` supports any date filter, so
-a second "last week" view is a copy of the first with one dropdown changed.
-Change the filter instead of keeping two.
-
-**A terminal equivalent.** This was considered and dropped: arrow-key
-navigation needs a TTY, and commands here often run inside an agent session
-where stdout is not one. `curses` is not available on Windows, and the
+Arrow-key navigation needs a TTY, and these commands often run inside an agent
+session where stdout is not one. `curses` is absent on Windows, and the
 alternative — `termios` on Unix plus `msvcrt` on Windows — is the split this
-project already refused once when building the file lock. Notion is the
-browser; these views are the configuration it was missing.
+project already turned down when it built the file lock. Notion renders these
+views already; duplicating that in a terminal buys nothing.
