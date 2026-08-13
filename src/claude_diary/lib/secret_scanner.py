@@ -88,5 +88,16 @@ def scan_entry_data(entry_data: EntryData,
             entry_data["commands_run"][i] = masked
             total += count
 
+    # Scan errors. These are raw tool output — a failed request, a command
+    # that echoed its environment, a stack trace carrying a connection string —
+    # so they are the field most likely to hold something that should not be
+    # written down, and until the parser started collecting them the section
+    # was empty enough for the omission not to show.
+    for i, error in enumerate(entry_data.get("errors_encountered", [])):
+        masked, count = scan_and_mask(error, additional_patterns)
+        if count > 0:
+            entry_data["errors_encountered"][i] = masked
+            total += count
+
     entry_data["secrets_masked"] = total
     return total

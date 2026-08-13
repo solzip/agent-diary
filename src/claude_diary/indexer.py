@@ -54,6 +54,12 @@ def _append_locked(index_path, entry_data):
         "date": entry_data.get("date", ""),
         "time": entry_data.get("time", ""),
         "project": entry_data.get("project", ""),
+        # The branch is the one thread between sessions that the tool observes
+        # rather than being told: 39 distinct branches across this diary, and
+        # only 15% of entries on main or master. It was written into the
+        # Markdown and left out of the index, so nothing could follow a piece
+        # of work across days without re-reading every file.
+        "branch": (git_info or {}).get("branch", "") if git_info else "",
         "categories": entry_data.get("categories", []),
         "files": all_files[:20],
         "keywords": sorted(keywords)[:30],
@@ -73,6 +79,25 @@ def load_index(diary_dir):
     """Load the search index."""
     index_path = os.path.join(diary_dir, ".diary_index.json")
     return _load_index(index_path)
+
+
+def count_branch_sessions(diary_dir, project, branch):
+    """How many sessions this project has already recorded on this branch.
+
+    Used to stamp the sequence number into the entry being written, so the
+    record itself says where it sits in a thread. The alternative was another
+    command to go and ask, and the commands that have to be gone and asked are
+    the ones nobody runs — the diary is read, so the answer belongs in it.
+
+    Zero when either is missing, which reads as "no thread to place this in".
+    """
+    if not project or not branch:
+        return 0
+    index = load_index(diary_dir)
+    return sum(
+        1 for entry in index.get("entries", [])
+        if entry.get("project") == project and entry.get("branch") == branch
+    )
 
 
 def reindex_all(diary_dir):
@@ -136,10 +161,13 @@ def reindex_all(diary_dir):
                 r'(?:커밋|Commit):\s*`([^`]+)`', session
             )
 
+            branch_match = re.search(r'(?:브랜치|Branch):\s*`([^`]+)`', session)
+
             index["entries"].append({
                 "date": date_str,
                 "time": time_str,
                 "project": project,
+                "branch": branch_match.group(1) if branch_match else "",
                 "categories": cats,
                 "files": files[:20],
                 "keywords": sorted(keywords)[:30],
