@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **시크릿 스캐너에 추가했다.** 답변은 명령 출력·파일 내용·설정을 그대로 인용하고, 프롬프트와 달리 통째로 보관된다
   - `_extract_summary_hints` 제거. `summary_hints` 필드는 스키마에 남는다 — `write --input`이 에이전트가 쓴 JSON에서 받는다. 훅이 만들어내지 않을 뿐이다
 
+### Fixed
+
+- **`diary-notion push`의 미결 작업 요약이 `--force`일 때만 출력되던 문제**: 호출부가 `--force` 분기 안에서만 바인딩되는 `db_id`를 읽었다. 일반 push에서는 `NameError`가 나고 그것을 `except Exception`이 debug 로그로 삼켜서, 4.9.0에 실려나간 뒤로 **한 번도 출력된 적이 없다**
+  - 기존 테스트 17개가 전부 요약 함수를 직접 호출해서 배선이 덮이지 않았다. `push`를 끝까지 도는 테스트를 `--force` 유무 양쪽으로 추가했다
+  - 이 프로젝트에서 오늘만 네 번째인 모양이다 — **코드는 있는데 그 경로가 실행된 적 없음**
+
 
 ## [4.9.0] - 2026-08-13
 

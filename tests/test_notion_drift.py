@@ -195,3 +195,65 @@ class TestTheHintIsRare:
         exporter = FakeExporter(rows)
         print_project_drift(exporter, "db", "proj", "2026-08-13")
         assert "review" in capsys.readouterr().out
+
+
+class TestThePushActuallyCallsIt:
+    """Every test above calls the summary directly, and that is how it shipped
+    broken: the call site read a `db_id` that only exists on the --force path,
+    so an ordinary push raised NameError into a `except Exception` that logs at
+    debug. The summary never printed for anybody and no test noticed.
+    """
+
+    def _run_push(self, tmp_path, force):
+        import json
+        import os
+        from unittest.mock import MagicMock, patch
+
+        from claude_diary.cli.notion_push import cmd_notion_push
+
+        input_path = tmp_path / "in.json"
+        with open(str(input_path), "w", encoding="utf-8") as f:
+            json.dump({
+                "session_id": "s1",
+                "tasks": [{"title": "작업", "project": "proj"}],
+            }, f)
+
+        mock_exp = MagicMock()
+        mock_exp.ensure_database.return_value = "db_x"
+        mock_exp.find_existing_row.return_value = None
+        mock_exp.create_row.return_value = "row_a"
+        mock_exp.archive_rows_for_session.return_value = 0
+        mock_exp.get_task_group_session_ids.return_value = set()
+        mock_exp._cache = {"rows": {}, "years": {}, "databases": {}, "root_page_id": "p"}
+        mock_exp.query_database_rows.side_effect = (
+            lambda db_id, page_size=100, row_filter=None: [
+                _row("proj", blocked=True), _row("proj", done=True),
+            ]
+        )
+
+        args = MagicMock()
+        args.input = str(input_path)
+        args.force = force
+        args.dry_run = False
+        args.preview_file = ""
+        args.artifact_dir = ""
+        args.no_artifacts = True
+
+        config = {"exporters": {"notion_hierarchical": {"api_token": "t", "root_page_id": "p"}}}
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("claude_diary.cli.notion_push.load_config", return_value=config), \
+             patch("claude_diary.cli.notion_push.NotionHierarchicalExporter", return_value=mock_exp), \
+             patch("claude_diary.cli.notion_push.get_head_branch", return_value="main"), \
+             patch("claude_diary.cli.notion_push.os.getcwd", return_value=str(tmp_path)):
+            try:
+                cmd_notion_push(args)
+            except SystemExit:
+                pass
+
+    def test_an_ordinary_push_prints_the_summary(self, tmp_path, capsys):
+        self._run_push(tmp_path, force=False)
+        assert "Open work in proj:" in capsys.readouterr().out
+
+    def test_a_forced_push_prints_it_too(self, tmp_path, capsys):
+        self._run_push(tmp_path, force=True)
+        assert "Open work in proj:" in capsys.readouterr().out
