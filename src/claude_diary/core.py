@@ -13,6 +13,7 @@ from claude_diary.log import get_logger, configure_from_config
 from claude_diary.lib.parser import parse_transcript
 from claude_diary.lib.git_info import collect_git_info
 from claude_diary.lib.categorizer import categorize
+from claude_diary.lib.nonfatal import non_fatal
 from claude_diary.lib.secret_scanner import scan_entry_data
 from claude_diary.formatter import format_entry
 from claude_diary.lib.audit import log_entry as audit_log
@@ -323,7 +324,10 @@ def _supplement_from_git(entry_data: EntryData, git_info: GitInfo) -> None:
         # Transcript was empty/incomplete — get filenames from git
         cwd = entry_data.get("cwd", "")
         if cwd:
-            try:
+            # A fallback only runs when the thing it backs up came up empty,
+            # so it is exercised rarely and a defect in it would sit here
+            # unnoticed for as long as the normal path keeps working.
+            with non_fatal("git file-list fallback"):
                 import subprocess
                 result = subprocess.run(
                     ["git", "diff", "--name-only", "HEAD"],
@@ -335,8 +339,6 @@ def _supplement_from_git(entry_data: EntryData, git_info: GitInfo) -> None:
                         line = line.strip()
                         if line:
                             entry_data["files_modified"].append(_shorten_path(line))
-            except Exception:
-                pass
 
 
 def _run_exporters(config: Config, entry_data: EntryData) -> None:

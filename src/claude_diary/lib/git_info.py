@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 from typing import List, Optional
 
+from claude_diary.lib.nonfatal import non_fatal
 from claude_diary.types import CommitInfo, DiffStat, GitInfo
 
 
@@ -21,7 +22,7 @@ def collect_git_info(cwd: str, session_start: Optional[str] = None) -> Optional[
     if not cwd or not _is_git_repo(cwd):
         return None
 
-    try:
+    with non_fatal("git info collection"):
         branch = _get_branch(cwd)
         commits = _get_recent_commits(cwd, session_start)
         diff_stat = _session_diff_stat(cwd, commits, session_start)
@@ -31,8 +32,7 @@ def collect_git_info(cwd: str, session_start: Optional[str] = None) -> Optional[
             "commits": commits,
             "diff_stat": diff_stat,
         }
-    except Exception:
-        return None
+    return None
 
 
 def _session_diff_stat(cwd, commits, session_start=None):

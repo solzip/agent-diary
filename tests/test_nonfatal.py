@@ -244,6 +244,51 @@ class TestTheDriftSummaryUsesIt:
         assert capsys.readouterr().err == ""
 
 
+class TestTheGitFallbackUsesIt:
+    """This one only runs when the transcript came up empty, so it is
+    exercised rarely and a defect in it would sit unnoticed for as long as
+    the normal path kept working. That is what earns it a guard."""
+
+    def _entry(self):
+        return {"files_modified": [], "files_created": [], "cwd": "/somewhere"}
+
+    def test_a_bug_in_the_fallback_is_announced(self, capsys, monkeypatch):
+        import subprocess
+
+        from claude_diary.core import _supplement_from_git
+
+        def boom(*a, **kw):
+            raise NameError("name 'shorten' is not defined")
+
+        monkeypatch.setattr(subprocess, "run", boom)
+        _supplement_from_git(self._entry(), {"diff_stat": {"files": 3}})
+        assert "BUG" in capsys.readouterr().err
+
+    def test_git_being_unavailable_stays_quiet(self, capsys, monkeypatch):
+        import subprocess
+
+        from claude_diary.core import _supplement_from_git
+
+        def missing(*a, **kw):
+            raise FileNotFoundError("git")
+
+        monkeypatch.setattr(subprocess, "run", missing)
+        _supplement_from_git(self._entry(), {"diff_stat": {"files": 3}})
+        assert capsys.readouterr().err == ""
+
+    def test_the_caller_is_not_interrupted(self, monkeypatch):
+        import subprocess
+
+        from claude_diary.core import _supplement_from_git
+
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda *a, **kw: (_ for _ in ()).throw(NameError("boom")))
+        entry = self._entry()
+        _supplement_from_git(entry, {"diff_stat": {"files": 3}})
+        assert entry["files_modified"] == []
+
+
 def test_stderr_is_not_captured_by_accident():
     """Guards the tests above: if stderr were redirected, they would all pass
     vacuously."""

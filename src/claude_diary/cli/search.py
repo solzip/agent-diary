@@ -80,10 +80,14 @@ def cmd_search(args):
 def _fallback_search_from_files(diary_dir, keyword):
     """Search directly from .md files when no index exists."""
     results = []
+    unreadable = []
     for f in sorted(Path(diary_dir).glob("*.md")):
         try:
             content = f.read_text(encoding="utf-8", errors="replace")
         except Exception:
+            # "No results" and "no results in the files I could open" are
+            # different answers, and only one of them was being given.
+            unreadable.append(f.name)
             continue
         for line in content.split("\n"):
             if keyword in line.lower():
@@ -94,6 +98,11 @@ def _fallback_search_from_files(diary_dir, keyword):
                     project = pm.group(1)
                 results.append({"date": date, "project": project, "line": line.strip()[:100]})
                 break
+
+    if unreadable:
+        print("  (%d diary file(s) could not be read and were not searched: %s)"
+              % (len(unreadable), ", ".join(sorted(unreadable)[:5])))
+
     return results
 
 
