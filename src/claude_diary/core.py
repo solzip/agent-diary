@@ -211,11 +211,24 @@ def _gitmoji_enabled(config: Config) -> bool:
 
 
 def _extract_project_name(cwd: str) -> str:
-    """Extract project name from working directory (Windows/Unix)."""
+    """Name the project after its repository, not after the current folder.
+
+    The last path segment is what the hook used to record, and it is the
+    repository only when the session happened to be sitting at the root. See
+    `get_repo_root` for what that cost.
+
+    Falls back to the folder name outside a repository, which is the best
+    available answer there.
+    """
     if not cwd:
         return "unknown"
-    cwd = cwd.replace("\\", "/").rstrip("/")
-    return os.path.basename(cwd)
+    from claude_diary.lib.git_info import get_repo_root
+    root = get_repo_root(cwd)
+    return _basename(root or cwd)
+
+
+def _basename(path: str) -> str:
+    return os.path.basename(path.replace("\\", "/").rstrip("/"))
 
 
 def _supplement_from_git(entry_data: EntryData, git_info: GitInfo) -> None:

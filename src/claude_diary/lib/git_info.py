@@ -65,6 +65,38 @@ def _session_diff_stat(cwd, commits, session_start=None):
     return get_diff_stat_for_commits(cwd, hashes)
 
 
+def get_repo_root(cwd):
+    """The repository this directory belongs to, or "" if it is not in one.
+
+    A session does not stay where it started. Of the twenty largest transcripts
+    on one machine, seventeen record more than one working directory and one
+    records twenty-six — every `cd` into a subdirectory is another one. Naming
+    the project after the last path segment therefore files work under whatever
+    folder it happened to be in: `harness` instead of `_verification` 936
+    times, `dev` instead of `erp_chatbot_solzip` 827 times. Measured across the
+    89 recorded directories that still exist and are repositories, 75% have a
+    last segment that is not the repository.
+
+    Only 4% of existing entries are wrong, because most turns are recorded from
+    the project root and only the wandering one is misfiled. That ratio is a
+    property of how often the diary samples the path, and it stops holding the
+    moment every turn is recorded.
+    """
+    if not cwd:
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "-C", cwd, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=5,
+        )
+    except Exception:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return (result.stdout or "").strip()
+
+
 def _is_git_repo(cwd):
     """Check if directory is inside a git repository."""
     try:

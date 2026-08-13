@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **프로젝트 이름을 저장소 루트로 정규화**: 세션은 한 디렉터리에 머물지 않는다. 가장 큰 transcript 20개 중 **17개**가 여러 `cwd`를 기록하고 한 개는 26종류다 — 하위 폴더로 `cd` 할 때마다 늘어난다. 그런데 프로젝트 이름은 경로의 **마지막 조각**에서 나왔다
+  - 실측: transcript에 등장한 디렉터리 중 지금 존재하고 저장소인 89개에서, **75%가 마지막 조각 ≠ 저장소**
+  - `936회 harness → _verification`, `827회 dev → erp_chatbot_solzip`, `180회 docs → LottoMap_back`
+  - 지금 일지에서 틀린 이름은 **4%(6,977개 중 253개)** 뿐이다. 대부분의 턴이 프로젝트 루트에서 기록되고 하위 폴더로 들어간 턴만 어긋나기 때문이다. **이 비율은 일지가 경로를 드물게 표집하는 동안만 유지된다**
+  - `git rev-parse --show-toplevel`로 해결. 저장소가 아니면 지금처럼 폴더 이름을 쓴다
+  - 일지와 Notion 양쪽에 같은 규칙을 적용했다. 한쪽만 고치면 로컬은 `erp_chatbot_solzip`, Notion은 `dev`가 된다
+
 - **`agent-diary try`**: 무엇이 기록될지 보려면 기록하게 두는 수밖에 없었다. 뻔한 방법 — `CLAUDE_DIARY_DIR`을 바꿔서 훅을 돌리는 것 — 은 **동작하지 않는다.** `config.json`이 환경변수를 이기도록 설계돼 있어서 일지 경로는 `init`이 쓴 값 그대로고, 시험 실행이 실제 일지에 쌓인다
   - 가설이 아니다. 이 프로젝트의 테스트가 이 함정에 **두 번** 걸렸고, 한 번은 5개월치가 든 일지에 5건을 썼다
   - `try`는 **Claude Code가 부르는 바로 그 진입점**(`python -m claude_diary.hook`)을 임시 디렉터리를 가리키는 세 변수와 함께 띄운다: `APPDATA`·`XDG_CONFIG_HOME`(설정을 못 찾게), `CLAUDE_DIARY_DIR`(일지가 샌드박스로)
