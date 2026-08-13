@@ -88,6 +88,15 @@ def scan_entry_data(entry_data: EntryData,
             entry_data["commands_run"][i] = masked
             total += count
 
+    # Scan the assistant's replies. They quote command output, file contents
+    # and configuration back at the reader, so anything a prompt or a command
+    # could leak can arrive here too — and unlike those, a reply is kept whole.
+    for i, response in enumerate(entry_data.get("assistant_responses", [])):
+        masked, count = scan_and_mask(response, additional_patterns)
+        if count > 0:
+            entry_data["assistant_responses"][i] = masked
+            total += count
+
     # Scan errors. These are raw tool output — a failed request, a command
     # that echoed its environment, a stack trace carrying a connection string —
     # so they are the field most likely to hold something that should not be

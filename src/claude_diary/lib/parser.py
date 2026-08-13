@@ -33,7 +33,8 @@ def parse_transcript(transcript_path, max_lines=None, start_line=0):
     Returns dict with:
         user_prompts, files_created, files_modified, commands_run,
         tools_used, summary_hints, errors_encountered,
-        session_start, session_end (ISO timestamps), lines_read
+        session_start, session_end (ISO timestamps), lines_read,
+        assistant_responses
     """
     result = {
         "user_prompts": [],
@@ -43,6 +44,7 @@ def parse_transcript(transcript_path, max_lines=None, start_line=0):
         "tools_used": set(),
         "errors_encountered": [],
         "summary_hints": [],
+        "assistant_responses": [],
         "session_start": None,
         "session_end": None,
         # Absolute position in the file, including anything skipped. This is
@@ -120,10 +122,10 @@ def parse_transcript(transcript_path, max_lines=None, start_line=0):
                             elif block_type == "text":
                                 text = block.get("text", "")
                                 if text:
-                                    _extract_summary_hints(text, result["summary_hints"])
+                                    _collect_response(text, result)
 
                     elif isinstance(content, str) and content:
-                        _extract_summary_hints(content, result["summary_hints"])
+                        _collect_response(content, result)
 
         result["lines_read"] = line_count
     except Exception as e:
@@ -141,6 +143,35 @@ def parse_transcript(transcript_path, max_lines=None, start_line=0):
 
 ERROR_LIMIT = 10
 ERROR_TEXT_LIMIT = 200
+
+# Text short enough to be a note between tool calls rather than an answer:
+# "상황부터 파악하겠습니다.", "Let me check that." Measured across one session,
+# these are the median block at 61 characters, while the answers themselves are
+# the few long ones.
+RESPONSE_MIN_LENGTH = 120
+
+
+def _collect_response(text, result):
+    """Keep what the assistant actually said.
+
+    The diary recorded the request and then, for the reply, keyword-matched
+    sentence fragments — which is why `run-local.sh` appears in one real diary
+    as `run-local` and `sh` on separate lines, 17.6% of 32,887 summary lines
+    damaged that way.
+
+    Kept whole, and not capped. A turn's worth of assistant text is a median of
+    1,650 characters and a maximum of 4,735 across one real session; there is
+    nothing here worth truncating, and truncating quietly is the habit this
+    tool spent a release removing.
+
+    Only possible now that an entry covers one turn. Before, a session's worth
+    of replies would have been copied into every entry it produced.
+    """
+    text = (text or "").strip()
+    if len(text) < RESPONSE_MIN_LENGTH:
+        return
+    if text not in result["assistant_responses"]:
+        result["assistant_responses"].append(text)
 
 
 def _collect_tool_errors(content, result):
@@ -288,22 +319,6 @@ def _extract_text(content):
     return ""
 
 
-def _extract_summary_hints(text, hints_list):
-    """Extract work summary hints from text using keyword matching."""
-    keywords = [
-        "완료", "구현", "수정", "추가", "삭제", "생성",
-        "설정", "배포", "테스트", "리팩토링",
-        "fixed", "implemented", "created", "updated", "added",
-        "configured", "deployed", "tested", "refactored",
-        "completed", "resolved", "installed", "removed",
-    ]
-    for keyword in keywords:
-        if keyword in text.lower():
-            sentences = re.split(r'[.!?\n]', text)
-            for sent in sentences:
-                if keyword in sent.lower() and 10 < len(sent.strip()) < 200:
-                    hints_list.append(sent.strip())
-            break
 
 
 def _shorten_path(file_path):
