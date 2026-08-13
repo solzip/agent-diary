@@ -1,6 +1,6 @@
 {
   "name": "agent-diary",
-  "version": "4.8.3",
+  "version": "4.9.0",
   "description": "Record AI coding sessions as Markdown diaries or task-based Notion entries.",
   "author": {
     "name": "solzip",
