@@ -65,6 +65,41 @@ class TestReindex:
         assert not [r for r in caplog.records if "could not be read" in str(r.msg)]
 
 
+class TestTheIndexFailingToSave:
+    """Never blocks diary writing — that part was right. But a search served
+    from a stale index looks exactly like a search with no results."""
+
+    def test_it_says_the_index_is_now_out_of_date(self, diary, monkeypatch, caplog):
+        import os as os_mod
+
+        from claude_diary.indexer import _save_index
+
+        monkeypatch.setattr(
+            os_mod, "replace",
+            lambda s, d: (_ for _ in ()).throw(OSError(28, "No space left")))
+        _save_index(str(diary / ".diary_index.json"), {"entries": []})
+
+        messages = " ".join(r.getMessage() for r in caplog.records)
+        assert "out of date" in messages
+        assert "reindex" in messages
+
+    def test_it_still_does_not_raise(self, diary, monkeypatch):
+        import os as os_mod
+
+        from claude_diary.indexer import _save_index
+
+        monkeypatch.setattr(
+            os_mod, "replace",
+            lambda s, d: (_ for _ in ()).throw(OSError(28, "No space left")))
+        _save_index(str(diary / ".diary_index.json"), {"entries": []})
+
+    def test_a_successful_save_says_nothing(self, diary, caplog):
+        from claude_diary.indexer import _save_index
+
+        _save_index(str(diary / ".diary_index.json"), {"entries": []})
+        assert not [r for r in caplog.records if "out of date" in r.getMessage()]
+
+
 class TestSearchFallback:
     def test_the_note_names_the_file(self, diary, deny_one, capsys):
         from claude_diary.cli.search import _fallback_search_from_files
