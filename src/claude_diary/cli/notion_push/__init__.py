@@ -243,6 +243,19 @@ def cmd_notion_push(args):
     exporter.save_cache()
 
     _print_report(results, input_path)
+
+    # After the report, because it is context rather than outcome, and wrapped
+    # because the rows are already written by this point — a summary that
+    # raised would turn a completed push into a failed command.
+    if results["pushed"]:
+        try:
+            from claude_diary.cli.notion_push.drift import print_pushed_projects_drift
+            print_pushed_projects_drift(
+                exporter, db_id, tasks, results["pushed"], cwd, date_str
+            )
+        except Exception as e:
+            logger.debug("Drift summary skipped: %s", e)
+
     if run_artifacts:
         _finalize_artifact_manifest(run_artifacts, tasks, results)
         print("[agent-diary diary-notion push] Artifacts: %s" % run_artifacts["run_dir"])
