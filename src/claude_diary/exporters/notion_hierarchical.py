@@ -399,12 +399,20 @@ class NotionHierarchicalExporter:
         notion_cache.invalidate_rows_for_session(self._cache, session_id)
         return archived
 
-    def query_database_rows(self, db_id, page_size=100):
-        """Return all rows in an Entries database without mutating Notion."""
+    def query_database_rows(self, db_id, page_size=100, row_filter=None):
+        """Return rows in an Entries database without mutating Notion.
+
+        `row_filter` is a Notion filter object. The report commands want every
+        row and pass nothing; the summary printed after a push wants one
+        project and passes a filter, which is the difference between six
+        paginated requests and one on a database of this size.
+        """
         rows = []
         body = {
             "page_size": page_size,
         }
+        if row_filter:
+            body["filter"] = row_filter
         cursor = None
         while True:
             if cursor:
