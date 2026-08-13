@@ -25,6 +25,7 @@ from claude_diary.cli.setup import cmd_install, cmd_uninstall
 from claude_diary.cli.write import cmd_write
 from claude_diary.cli.backfill import cmd_backfill
 from claude_diary.cli.doctor import cmd_doctor
+from claude_diary.cli.try_run import cmd_try
 from claude_diary.cli.report import cmd_report
 from claude_diary.cli.notion_push import cmd_notion_push
 from claude_diary.cli.notion_init import cmd_notion_init
@@ -84,6 +85,7 @@ start here:
   agent-diary init                 set up, and register the Claude Code hook
   agent-diary backfill             import the sessions you already have
   agent-diary doctor               check it is set up and still recording
+  agent-diary try                  see what it would record, without recording it
 
 then, day to day:
   agent-diary report --days 7      one document for a period, to send someone
@@ -224,6 +226,17 @@ def main():
     p_doctor.add_argument("--notion", action="store_true",
                           help="Also make a read-only request to Notion")
 
+    # try (see what would be recorded, without recording it)
+    p_try = sub.add_parser(
+        "try",
+        help="Show what the hook would record for a transcript, writing nothing",
+    )
+    p_try.add_argument("transcript", nargs="?",
+                       help="Transcript .jsonl (default: this directory's most recent)")
+    p_try.add_argument("--cwd", help="Working directory to attribute the session to")
+    p_try.add_argument("--session-id", dest="session_id",
+                       help="Session id to record (default: try-run)")
+
     # report (one document for a period, for someone else to read)
     p_report = sub.add_parser(
         "report",
@@ -268,6 +281,7 @@ def main():
         "write": cmd_write,
         "backfill": cmd_backfill,
         "doctor": cmd_doctor,
+        "try": cmd_try,
         "report": cmd_report,
         "diary-notion": cmd_notion,
         "notion": cmd_notion,
