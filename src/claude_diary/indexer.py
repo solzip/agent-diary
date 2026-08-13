@@ -108,6 +108,7 @@ def reindex_all(diary_dir):
 
     index = {"entries": [], "last_indexed": ""}
     count = 0
+    unreadable = []
 
     for f in sorted(Path(diary_dir).glob("*.md")):
         date_str = f.stem
@@ -118,6 +119,10 @@ def reindex_all(diary_dir):
         try:
             content = f.read_text(encoding="utf-8", errors="replace")
         except Exception:
+            # A day that cannot be read is a day that disappears from search,
+            # from `stats`, and from every count taken off the index — and the
+            # rebuild used to report its total as though nothing were missing.
+            unreadable.append(f.name)
             continue
 
         sessions = content.split("### ⏰")
@@ -184,6 +189,13 @@ def reindex_all(diary_dir):
     index_path = os.path.join(diary_dir, ".diary_index.json")
     with FileLock(index_path):
         _save_index(index_path, index)
+
+    if unreadable:
+        logger.warning(
+            "%d diary file(s) could not be read and are missing from the "
+            "index: %s. Search and stats will be short by those days.",
+            len(unreadable), ", ".join(sorted(unreadable)[:5]),
+        )
 
     return count
 

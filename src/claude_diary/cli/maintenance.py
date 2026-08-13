@@ -106,10 +106,15 @@ def cmd_delete(args):
     if args.session:
         # Search all files for session ID and remove that entry
         found = False
+        unreadable = []
         for f in sorted(Path(diary_dir).glob("*.md")):
             try:
                 content = f.read_text(encoding="utf-8", errors="replace")
             except Exception:
+                # Skipping quietly and then printing "not found" tells the
+                # user the session is gone. It may be sitting in the file
+                # that could not be opened.
+                unreadable.append(f.name)
                 continue
             if args.session in content:
                 parts = content.split("### ⏰")
@@ -126,6 +131,10 @@ def cmd_delete(args):
 
         if not found:
             print("Session '%s' not found." % args.session)
+            if unreadable:
+                print("  %d diary file(s) could not be read and were not "
+                      "searched: %s" % (len(unreadable),
+                                        ", ".join(sorted(unreadable)[:5])))
         return
 
     print("Specify --last or --session <id>")
