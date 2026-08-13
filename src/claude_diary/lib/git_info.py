@@ -24,7 +24,7 @@ def collect_git_info(cwd: str, session_start: Optional[str] = None) -> Optional[
     try:
         branch = _get_branch(cwd)
         commits = _get_recent_commits(cwd, session_start)
-        diff_stat = get_diff_stat(cwd, session_start)
+        diff_stat = _session_diff_stat(cwd, commits, session_start)
 
         return {
             "branch": branch,
@@ -33,6 +33,36 @@ def collect_git_info(cwd: str, session_start: Optional[str] = None) -> Optional[
         }
     except Exception:
         return None
+
+
+def _session_diff_stat(cwd, commits, session_start=None):
+    """Lines this session landed, measured on its own commits.
+
+    It used to be `git diff --stat HEAD` — the *uncommitted* working tree at
+    the moment the session ended — which is a different quantity wearing the
+    same name, and wrong in three directions at once:
+
+    - a session that committed everything it did recorded nothing, because the
+      tree was clean;
+    - a repository holding a pile of uncommitted generated files recorded that
+      same pile again for every session in it, so summing across a project
+      counted one working tree hundreds of times. Measured across this diary,
+      one project came to -1,547,143 lines;
+    - the `session_start` argument was accepted and never used, so the window
+      the caller asked for had no effect.
+
+    The commits are the durable record of what the session produced, and
+    `get_diff_stat_for_commits` was already there — the Notion push path used
+    it while the diary did not.
+
+    With no commits the answer is zero, and that is the honest one: nothing
+    landed. Whether the session changed files without committing them is
+    already recorded as a session outcome, which is where that belongs.
+    """
+    hashes = [c.get("hash") for c in (commits or []) if c.get("hash")]
+    if not hashes:
+        return {"added": 0, "deleted": 0, "files": 0}
+    return get_diff_stat_for_commits(cwd, hashes)
 
 
 def _is_git_repo(cwd):

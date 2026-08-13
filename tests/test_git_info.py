@@ -181,6 +181,13 @@ class TestCollectGitInfo:
             assert collect_git_info("/some/dir") is None
 
     def test_successful_collection(self):
+        """The stat comes from the session's own commits.
+
+        It used to come from `git diff --stat HEAD`, the uncommitted tree at
+        session end, which is a different quantity under the same name: a
+        session that committed its work recorded nothing, and a repo with
+        uncommitted generated files recorded them again for every session.
+        """
         def fake_run(cmd, **kwargs):
             if "rev-parse" in cmd:
                 return MagicMock(returncode=0)
@@ -188,7 +195,7 @@ class TestCollectGitInfo:
                 return MagicMock(stdout="main\n")
             if "log" in cmd:
                 return MagicMock(stdout="abc123 Fix tests\n")
-            if "diff" in cmd:
+            if "show" in cmd:
                 return MagicMock(stdout=" 1 file changed, 3 insertions(+)\n")
             return MagicMock(returncode=0, stdout="")
 
@@ -199,6 +206,25 @@ class TestCollectGitInfo:
             assert len(result["commits"]) == 1
             assert result["commits"][0]["hash"] == "abc123"
             assert result["diff_stat"]["added"] == 3
+
+    def test_a_session_with_no_commits_lands_nothing(self):
+        """Zero, not the working tree. Whether files changed without being
+        committed is recorded as a session outcome, not as lines landed."""
+        def fake_run(cmd, **kwargs):
+            if "rev-parse" in cmd:
+                return MagicMock(returncode=0)
+            if "branch" in cmd:
+                return MagicMock(stdout="main\n")
+            if "log" in cmd:
+                return MagicMock(stdout="")
+            if "diff" in cmd:
+                return MagicMock(stdout=" 9 files changed, 4000 insertions(+)\n")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("claude_diary.lib.git_info.subprocess.run", side_effect=fake_run):
+            result = collect_git_info("/repo")
+            assert result["commits"] == []
+            assert result["diff_stat"] == {"added": 0, "deleted": 0, "files": 0}
 
     def test_returns_none_on_exception(self):
         with patch("claude_diary.lib.git_info._is_git_repo", return_value=True), \
