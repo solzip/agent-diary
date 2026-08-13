@@ -85,6 +85,8 @@ class EntryData(TypedDict, total=False):
     git_info: Optional[GitInfo]
     code_stats: Optional[DiffStat]
     secrets_masked: int
+    # What the assistant said this turn, kept whole.
+    assistant_responses: List[str]
     # 1-based position of this session among the ones recorded for the same
     # project and branch. Absent when there is no branch to place it in.
     branch_session_ordinal: int

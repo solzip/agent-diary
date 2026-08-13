@@ -147,7 +147,26 @@ def format_entry(entry_data: EntryData, lang: str = "ko", gitmoji: bool = False)
             lines.append("  - `%s`" % short)
         lines.append("")
 
-    # Summary hints
+    # What the assistant said, kept whole.
+    #
+    # This section used to hold keyword-matched sentence fragments cut out of
+    # the reply, which is how `run-local.sh` ended up as `run-local` and `sh`
+    # on two lines. Now that an entry covers one turn, the reply fits: a median
+    # of 1,650 characters, a maximum of 4,735 across one real session.
+    #
+    # Blockquoted rather than bulleted, because a paragraph is not a list and
+    # the answers contain their own lists.
+    responses = entry_data.get("assistant_responses", [])
+    if responses:
+        lines.append("**💬 %s:**" % L("response"))
+        for response in responses:
+            lines.append("")
+            for line in response.splitlines():
+                lines.append("> %s" % line if line.strip() else ">")
+        lines.append("")
+
+    # Summary hints, when an agent authored them. The `write --input` path
+    # takes them from the JSON it is given; the hook no longer produces any.
     hints = entry_data.get("summary_hints", [])
     if hints:
         lines.append("**📝 %s:**" % L("summary"))

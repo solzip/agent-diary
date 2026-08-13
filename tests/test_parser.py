@@ -73,15 +73,25 @@ class TestParseTranscript:
         finally:
             os.unlink(path)
 
-    def test_summary_hints_extraction(self):
+    def test_the_assistant_reply_is_kept_whole(self):
+        """It used to be keyword-matched into sentence fragments, split on
+        every `.` — which is how `run-local.sh` became `run-local` and `sh` on
+        two lines, in 17.6% of one diary's summary lines."""
+        answer = (
+            "Circuit breaker pattern implemented in `resilience.py`. "
+            "The threshold is five failures in ten seconds, chosen because the "
+            "upstream service recovers within eight on every measurement so far. "
+            "Anything tighter tripped on ordinary latency."
+        )
         path = _write_transcript([
             {"type": "assistant", "message": {"content": [
-                {"type": "text", "text": "Circuit breaker pattern implemented successfully."},
+                {"type": "text", "text": answer},
             ]}, "timestamp": "2026-03-17T10:01:00Z"},
         ])
         try:
             result = parse_transcript(path)
-            assert len(result["summary_hints"]) > 0
+            assert result["assistant_responses"] == [answer]
+            assert "resilience.py" in result["assistant_responses"][0]
         finally:
             os.unlink(path)
 
