@@ -56,9 +56,17 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
-    # 1. Parse transcript
+    # 1. Parse transcript, from where the previous turn stopped.
+    #
+    # The hook runs once per assistant turn. Reading from the beginning every
+    # time is what made 85% of the entries in one diary copies of an earlier
+    # entry in the same session.
     max_lines = config.get("max_transcript_lines")
-    parsed = parse_transcript(transcript_path, max_lines=max_lines)
+    start_line = _resume_point(diary_dir, session_id, transcript_path)
+    if start_line is None:
+        return False
+    parsed = parse_transcript(transcript_path, max_lines=max_lines,
+                              start_line=start_line)
 
     # Check if session has meaningful content
     has_content = (
@@ -164,6 +172,16 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
         logger.error("FATAL: Failed to write diary: %s", e)
         sys.exit(1)
 
+    # 6.5 Advance the read position, but only now that the entry is on disk.
+    # A failed write leaves the position where it was, so the next turn covers
+    # this turn's work as well rather than dropping it.
+    try:
+        from claude_diary.lib.progress import record_position
+        record_position(diary_dir, session_id, transcript_path,
+                        parsed.get("lines_read", 0))
+    except Exception as e:
+        logger.warning("Could not record read position: %s", e)
+
     # 7. Update search index (non-critical)
     try:
         update_index(diary_dir, entry_data)
@@ -204,6 +222,72 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
     )
 
     return True
+
+
+def _resume_point(diary_dir: str, session_id: str, transcript_path: str):
+    """Where this turn should start reading, or None to record nothing.
+
+    Three cases:
+
+    - A position is stored: resume there.
+    - Nothing stored and the diary has no entry for this session: it is new,
+      so read from the beginning.
+    - Nothing stored but the diary already holds entries for it: this is the
+      first turn after upgrading, mid-session. Reading from 0 would write one
+      final copy of everything already recorded — the exact defect being
+      fixed, one last time. Seed the position to the file's current length and
+      record nothing for this turn.
+    """
+    from claude_diary.lib.progress import read_position, record_position
+
+    try:
+        stored = read_position(diary_dir, session_id, transcript_path)
+    except Exception as e:
+        logger.warning("Could not read resume point: %s", e)
+        return 0
+
+    if stored is not None:
+        return stored
+
+    if not _session_already_recorded(diary_dir, session_id):
+        return 0
+
+    lines = _count_lines(transcript_path)
+    logger.info(
+        "First run for a session already in the diary; "
+        "recording from line %d onward.", lines,
+    )
+    record_position(diary_dir, session_id, transcript_path, lines)
+    return None
+
+
+def _session_already_recorded(diary_dir: str, session_id: str) -> bool:
+    """Whether the diary Markdown already mentions this session.
+
+    The Markdown, not the index or the audit log — `backfill` reads the same
+    source for the same reason: a derived artifact that has fallen behind would
+    answer this wrongly.
+    """
+    if not session_id or not os.path.isdir(diary_dir):
+        return False
+    from pathlib import Path
+    for path in Path(diary_dir).glob("*.md"):
+        try:
+            if session_id in path.read_text(encoding="utf-8", errors="replace"):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _count_lines(path: str) -> int:
+    if not path or not os.path.exists(path):
+        return 0
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return sum(1 for _ in f)
+    except OSError:
+        return 0
 
 
 def _gitmoji_enabled(config: Config) -> bool:

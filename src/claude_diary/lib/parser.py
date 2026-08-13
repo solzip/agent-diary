@@ -20,13 +20,20 @@ import re
 DEFAULT_MAX_TRANSCRIPT_LINES = None
 
 
-def parse_transcript(transcript_path, max_lines=None):
+def parse_transcript(transcript_path, max_lines=None, start_line=0):
     """Parse JSONL transcript and extract key work content.
+
+    `start_line` skips that many lines before collecting anything. The Stop
+    Hook fires once per assistant turn, and without this it re-read the whole
+    transcript every time — which is how 85% of the entries in one real diary
+    came to be copies of an earlier entry in the same session. Transcripts are
+    append-only (verified by hashing a live one's prefix across a turn), so a
+    line count is a durable place to resume from.
 
     Returns dict with:
         user_prompts, files_created, files_modified, commands_run,
         tools_used, summary_hints, errors_encountered,
-        session_start, session_end (ISO timestamps)
+        session_start, session_end (ISO timestamps), lines_read
     """
     result = {
         "user_prompts": [],
@@ -38,6 +45,10 @@ def parse_transcript(transcript_path, max_lines=None):
         "summary_hints": [],
         "session_start": None,
         "session_end": None,
+        # Absolute position in the file, including anything skipped. This is
+        # what the next turn resumes from, so it counts lines seen rather than
+        # lines used.
+        "lines_read": 0,
     }
 
     if max_lines is None:
@@ -59,7 +70,10 @@ def parse_transcript(transcript_path, max_lines=None):
         with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 line_count += 1
-                if max_lines and line_count > max_lines:
+                if line_count <= start_line:
+                    # Already recorded by an earlier turn. Counted, not read.
+                    continue
+                if max_lines and line_count - start_line > max_lines:
                     # Say so in the entry. A partial record that looks complete
                     # is the failure this whole tool exists to avoid.
                     truncated_at = max_lines
@@ -111,6 +125,7 @@ def parse_transcript(transcript_path, max_lines=None):
                     elif isinstance(content, str) and content:
                         _extract_summary_hints(content, result["summary_hints"])
 
+        result["lines_read"] = line_count
     except Exception as e:
         result["errors_encountered"].append("Transcript parse error: %s" % str(e))
 
