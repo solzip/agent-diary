@@ -247,9 +247,15 @@ def _save_index(index_path, index):
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(index, f, indent=2, ensure_ascii=False)
         os.replace(tmp, index_path)
-    except Exception:
+    except Exception as e:
         # Index failure should never block diary writing, but a half-written
-        # index must not be left where the real one was.
+        # index must not be left where the real one was — and silence here
+        # means search quietly answers from a stale index for as long as the
+        # condition lasts, which is indistinguishable from having no results.
+        logger.warning(
+            "Search index could not be written (%s); it is now out of date. "
+            "Run `agent-diary reindex` once the cause is cleared.", e,
+        )
         try:
             os.unlink(tmp)
         except OSError:
