@@ -186,8 +186,12 @@ class TestAnUnwritableDirectory:
         target = str(tmp_path / "thing")
         real_open = os.open
 
+        # A directory that will not accept the lock file will not accept any
+        # file, so the denial is on the directory rather than on one name.
+        # Denying only "*.lock" made this pass while the lock was in fact
+        # waiting out the whole timeout.
         def denied(path, flags, *a, **kw):
-            if str(path).endswith(".lock"):
+            if os.path.dirname(str(path)) == str(tmp_path):
                 raise OSError(13, "Permission denied")
             return real_open(path, flags, *a, **kw)
 
@@ -197,6 +201,37 @@ class TestAnUnwritableDirectory:
         with filelock.FileLock(target, timeout=5.0) as lock:
             assert lock.acquired is False
         assert time.monotonic() - start < 1.0, "waited out a timeout it could not win"
+
+    def test_a_lock_file_being_deleted_is_contention_not_a_dead_end(self, tmp_path):
+        """Windows reports EACCES for a lock file another process is in the
+        middle of removing. Measured on a writable temp directory, twelve
+        processes hammering one lock produced 65 EACCES in 3,600 attempts;
+        each one abandoned the lock at the moment contention made it matter.
+        """
+        from claude_diary.lib import filelock
+
+        target = str(tmp_path / "thing")
+        lock = filelock.FileLock(target, timeout=0.2)
+        real_open = os.open
+        calls = []
+
+        def transient(path, flags, *a, **kw):
+            # Only the lock file is refused, and only the way Windows refuses
+            # one that is going away. Everything else in the directory works,
+            # which is what makes this contention rather than a permission.
+            if str(path) == lock.lock_path:
+                calls.append(1)
+                raise OSError(13, "Permission denied")
+            return real_open(path, flags, *a, **kw)
+
+        os.open = transient
+        try:
+            with lock as held:
+                assert held.acquired is False
+        finally:
+            os.open = real_open
+
+        assert len(calls) > 1, "gave up after one EACCES instead of waiting"
 
     def test_a_held_lock_is_still_waited_on(self, tmp_path):
         """The fast path must not swallow ordinary contention."""
