@@ -111,8 +111,16 @@ def _resolve_transcript(args):
     latest = _latest_transcript_for_cwd()
     if latest:
         return latest
-    print("[agent-diary try] No transcript found for this directory.", file=sys.stderr)
-    print("  Pass one: agent-diary try <path to .jsonl>", file=sys.stderr)
+    print("[agent-diary try] No session transcript recorded for %s"
+          % os.getcwd(), file=sys.stderr)
+    # The common cause is a moved project: transcripts carry the path they ran
+    # in, so the ones from before a rename point at the old location and will
+    # not match until a session runs here. Subagent transcripts are skipped
+    # too — they are fragments of somebody else's errand, not sessions.
+    print("  Transcripts are matched on the working directory recorded inside "
+          "them, so a project that moved has none until it is worked in again.",
+          file=sys.stderr)
+    print("  Pass one directly: agent-diary try <path to .jsonl>", file=sys.stderr)
     return None
 
 
@@ -134,33 +142,53 @@ def _latest_transcript_for_cwd():
     candidates = []
     for directory, _dirs, files in os.walk(root):
         for name in files:
-            if name.endswith(".jsonl"):
-                candidates.append(os.path.join(directory, name))
+            if not name.endswith(".jsonl"):
+                continue
+            # Subagents keep their own transcripts, and they are fragments of a
+            # session rather than one. `backfill` has excluded them since it
+            # was written — 115 of 194 files in one real tree — and picking one
+            # here would show an entry made of somebody else's errand.
+            if name.startswith("agent-"):
+                continue
+            candidates.append(os.path.join(directory, name))
 
     # Newest first, so the usual case stops after one file.
     for path in sorted(candidates, key=os.path.getmtime, reverse=True):
-        if _transcript_cwd(path) == here:
+        cwd, is_subagent = _transcript_head(path)
+        if is_subagent:
+            continue
+        if cwd == here:
             return path
     return None
 
 
-def _transcript_cwd(path, scan_lines=40):
+def _transcript_head(path, scan_lines=40):
+    """Return (cwd, is_subagent) from the start of a transcript.
+
+    `agentId` is the semantic subagent signal and the `agent-` filename prefix
+    is the cheap one; both were checked against the same real tree and select
+    the same files. The prefix filters before opening anything, this catches
+    the rest.
+    """
+    cwd = None
     try:
         with io.open(path, encoding="utf-8", errors="replace") as f:
             for i, line in enumerate(f):
                 if i >= scan_lines:
-                    return None
-                if '"cwd"' not in line:
+                    break
+                if '"agentId"' not in line and '"cwd"' not in line:
                     continue
                 try:
-                    value = json.loads(line).get("cwd")
+                    record = json.loads(line)
                 except ValueError:
                     continue
-                if value:
-                    return os.path.normcase(os.path.abspath(value))
+                if record.get("agentId"):
+                    return (None, True)
+                if cwd is None and record.get("cwd"):
+                    cwd = os.path.normcase(os.path.abspath(record["cwd"]))
     except OSError:
-        return None
-    return None
+        return (None, False)
+    return (cwd, False)
 
 
 def _line_count(path):
