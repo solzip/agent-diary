@@ -178,3 +178,51 @@ class TestFindingThisDirectorysTranscript:
         monkeypatch.setattr(os.path, "expanduser", lambda p: p.replace("~", str(tmp_path)))
         monkeypatch.chdir(work)
         assert try_run._latest_transcript_for_cwd() is None
+
+    def test_a_subagent_transcript_is_never_offered(self, tmp_path, monkeypatch):
+        """Subagents keep their own transcripts and they are fragments of a
+        session, not one. `backfill` has excluded them since it was written —
+        115 of 194 files in one real tree. Picking one here shows an entry made
+        of somebody else's errand, which is what this did before the check.
+        """
+        projects = tmp_path / ".claude" / "projects" / "p" / "subagents"
+        projects.mkdir(parents=True)
+        work = tmp_path / "work"
+        work.mkdir()
+        (projects / "agent-abc.jsonl").write_text(
+            json.dumps({"type": "user", "cwd": str(work), "agentId": "abc"}) + "\n",
+            encoding="utf-8")
+
+        monkeypatch.setattr(os.path, "expanduser", lambda p: p.replace("~", str(tmp_path)))
+        monkeypatch.chdir(work)
+        assert try_run._latest_transcript_for_cwd() is None
+
+    def test_the_filename_prefix_alone_is_enough(self, tmp_path, monkeypatch):
+        """The prefix is the cheap signal: it decides without opening the file.
+        Tested on its own, with no `agentId`, or the field check masks it and
+        the prefix could be deleted with every test still green."""
+        projects = tmp_path / ".claude" / "projects" / "p"
+        projects.mkdir(parents=True)
+        work = tmp_path / "work"
+        work.mkdir()
+        (projects / "agent-no-field.jsonl").write_text(
+            json.dumps({"type": "user", "cwd": str(work)}) + "\n", encoding="utf-8")
+
+        monkeypatch.setattr(os.path, "expanduser", lambda p: p.replace("~", str(tmp_path)))
+        monkeypatch.chdir(work)
+        assert try_run._latest_transcript_for_cwd() is None
+
+    def test_an_agent_id_is_caught_even_without_the_filename_prefix(self, tmp_path, monkeypatch):
+        """Two signals, because the cheap one is the filename and the real one
+        is the field."""
+        projects = tmp_path / ".claude" / "projects" / "p"
+        projects.mkdir(parents=True)
+        work = tmp_path / "work"
+        work.mkdir()
+        (projects / "not-obviously-a-subagent.jsonl").write_text(
+            json.dumps({"type": "user", "cwd": str(work), "agentId": "abc"}) + "\n",
+            encoding="utf-8")
+
+        monkeypatch.setattr(os.path, "expanduser", lambda p: p.replace("~", str(tmp_path)))
+        monkeypatch.chdir(work)
+        assert try_run._latest_transcript_for_cwd() is None
