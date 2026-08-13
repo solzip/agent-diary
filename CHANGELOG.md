@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`agent-diary try`**: 무엇이 기록될지 보려면 기록하게 두는 수밖에 없었다. 뻔한 방법 — `CLAUDE_DIARY_DIR`을 바꿔서 훅을 돌리는 것 — 은 **동작하지 않는다.** `config.json`이 환경변수를 이기도록 설계돼 있어서 일지 경로는 `init`이 쓴 값 그대로고, 시험 실행이 실제 일지에 쌓인다
+  - 가설이 아니다. 이 프로젝트의 테스트가 이 함정에 **두 번** 걸렸고, 한 번은 5개월치가 든 일지에 5건을 썼다
+  - `try`는 **Claude Code가 부르는 바로 그 진입점**(`python -m claude_diary.hook`)을 임시 디렉터리를 가리키는 세 변수와 함께 띄운다: `APPDATA`·`XDG_CONFIG_HOME`(설정을 못 찾게), `CLAUDE_DIARY_DIR`(일지가 샌드박스로)
+  - **설정이 없으면 exporter도 없다.** 이게 가장 중요하다 — 시험 실행이 남의 Notion DB에 행을 밀어넣으면 안 된다
+  - 인자를 안 주면 **이 디렉터리의 최근 transcript**를 쓴다. 폴더 이름이 아니라 transcript 안의 `cwd`로 찾는다. Claude Code는 경로의 비ASCII 문자를 전부 `-`로 접어서 `C--Users----Desktop----sol-working-diary`로 만들기 때문에 이름으로는 되돌릴 수 없다
+  - 항목을 출력하고 디렉터리를 지운다. 훅이 죽어도 지운다
+
 - **`변경 통계`가 세션이 한 일이 아니라 커밋 안 한 작업 트리를 재던 문제**: `git diff --stat HEAD`, 즉 **세션 종료 시점의 미커밋 상태**를 재고 있었다. 같은 이름을 쓰는 다른 값이고, 세 방향으로 틀렸다
   - 일을 다 커밋한 세션은 트리가 깨끗해서 **0으로 기록**된다
   - 생성 파일이 미커밋으로 쌓인 저장소는 그 더미를 **세션마다 다시** 기록한다. 프로젝트 단위로 합치면 작업 트리 하나를 수백 번 센 값이 나온다 — 실측 `erp_chatbot_solzip` 누적 **-1,547,143줄**

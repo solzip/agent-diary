@@ -442,6 +442,10 @@ agent-diary backfill --transcripts /path/to/projects
 agent-diary doctor
 agent-diary doctor --notion
 
+agent-diary try
+agent-diary try path/to/transcript.jsonl
+agent-diary try --cwd /path/to/project
+
 agent-diary report
 agent-diary report --days 14
 agent-diary report --month 2026-07
