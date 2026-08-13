@@ -11,10 +11,16 @@ session. It has always done this. On each firing it parses the transcript
 **from line 1** and writes the **first five** user prompts it finds.
 
 ```python
-parsed = parse_transcript(transcript_path)   # always from the start
-...
-user_prompts[:5]                             # always the first five
+# lib/parser.py — no way to start anywhere but the beginning
+def parse_transcript(transcript_path, max_lines=None)
+
+# formatter.py:79 — the parser collects every prompt; the entry prints five
+for i, prompt in enumerate(prompts[:5], 1)
 ```
+
+The cut is in the formatter, not the parser. Everything is read and then
+discarded at the point of writing, which matters for the fix: moving the
+parser to a turn boundary is not enough on its own while `[:5]` stands.
 
 Turn 1 records requests 1–5. Turn 2 records requests 1–5. Turn 400 records
 requests 1–5. The sixth request of a session is never written down, and the
@@ -76,9 +82,27 @@ is written exactly once.
 
 ### Read from where the last turn stopped
 
-Transcripts are append-only JSONL. Claude Code appends records and never
-rewrites earlier lines; verified by watching one file grow across turns while
-its earlier content stayed byte-identical.
+Transcripts are append-only JSONL. Measured rather than assumed: the prefix of
+a live transcript was hashed, a turn was allowed to pass, and the same prefixes
+were hashed again.
+
+```
+lines   2,916 -> 2,938   (+22)
+bytes   6,455,803 -> 6,506,504
+
+first   100 lines   sha256 unchanged
+first   500 lines   sha256 unchanged
+first 1,000 lines   sha256 unchanged
+first 2,000 lines   sha256 unchanged
+```
+
+One thing that looked like counter-evidence was not. 69 of 2,055 timestamped
+lines carry a time earlier than the line above them, which would be odd for a
+file that is only ever appended to. Checking the types: 65 of the 69 sit
+directly after a `file-history-delta`, which is bookkeeping stamped with the
+moment it was written, while the `assistant` line after it carries the moment
+the message was produced. Mixed clock semantics in the records, not reordering
+of the lines.
 
 So the state needed is one number per session: how many lines have been
 recorded already.
@@ -147,6 +171,41 @@ already written, badly — and everything from the next turn on is correct.
 When there is no stored position and no existing entry, the session is new:
 read from 0, which is right.
 
+### Prerequisite: the project name has to survive the change
+
+A session does not stay in one directory. Of the twenty largest transcripts,
+**seventeen** record more than one `cwd`; one records twenty-six. The entry's
+project comes from whatever `cwd` the hook was handed, and
+`_extract_project_name` takes the last path segment of it.
+
+Across the 111 distinct working directories seen in transcripts, 89 still
+exist and are git repositories. Of those:
+
+```
+last segment == repository root      22  (25%)
+last segment is a subdirectory       67  (75%)
+
+  936x  'harness'          -> _verification
+  827x  'dev'              -> erp_chatbot_solzip
+  411x  'chatbot'          -> erp_chatbot_solzip
+  180x  'docs'             -> LottoMap_back
+  142x  '담당팀_답변'        -> _verification
+```
+
+Only 253 of 6,977 entries (4%) currently carry one of those wrong names,
+because most turns happen to be recorded from the project root and only the
+turn that wandered into a subdirectory gets it wrong. Recording every turn
+moves that 4% toward the 75%: `dev`, `docs`, `app`, `extracted_text` would
+start accumulating as project names.
+
+So the project must be resolved to the repository root — `git rev-parse
+--show-toplevel`, falling back to the directory name when it is not a
+repository. `collect_git_info` already shells out to git in the same
+directory, so this costs one more call on a path that already makes several.
+
+This is a prerequisite, not a companion improvement. Turn-scoped recording
+without it makes the diary worse than it is now.
+
 ### Assistant responses
 
 With turn-scoped parsing, the assistant text in the new lines is this turn's
@@ -190,6 +249,9 @@ here; the split-on-period bug is fixed either way.
 The existing bar: reverting each piece must turn a test red, and the numbers
 must be measured rather than asserted.
 
+0. The `[:5]` in the formatter goes with it. Turn-scoped parsing alone leaves
+   a turn with six prompts cut at five, which is the same defect at a smaller
+   scale.
 1. A synthetic transcript grown turn by turn, asserting each entry contains
    only that turn's prompts — the direct regression for the 85%.
 2. Position survives a process restart; a shortened transcript resets it.
@@ -199,3 +261,5 @@ must be measured rather than asserted.
    seeds its position.
 5. Re-run the duplication measurement above against a sandbox diary built from
    a real transcript replayed turn by turn: copies must be 0.
+6. A turn recorded from a subdirectory is attributed to the repository root,
+   not to the subdirectory.
