@@ -255,8 +255,13 @@ def cmd_notion_push(args):
     if results["pushed"]:
         try:
             from claude_diary.cli.notion_push.drift import print_pushed_projects_drift
+            # Resolved here rather than reused from above: the only other
+            # binding is inside the --force branch, so reading it here made the
+            # summary print for --force pushes and silently NameError for every
+            # other one. A cache hit, since rows were just written to it.
             print_pushed_projects_drift(
-                exporter, db_id, tasks, results["pushed"], cwd, date_str
+                exporter, exporter.ensure_database(year), tasks,
+                results["pushed"], cwd, date_str,
             )
         except Exception as e:
             logger.debug("Drift summary skipped: %s", e)
