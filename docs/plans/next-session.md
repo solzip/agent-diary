@@ -8,11 +8,15 @@
 
 ```
 main        clean, nothing unpushed
-released    v4.10.0 (PyPI 4.10.0 confirmed)
-CHANGELOG   [Unreleased] has 2026-08-14's work in it, not yet released
-tests       1,153 passing locally and from an unpacked sdist
+released    v4.11.0 (PyPI 4.11.0 confirmed, GitHub release created by the tag)
+CHANGELOG   [Unreleased] empty
+tests       1,160 passing locally and from an unpacked sdist
 CI          green on 30 combinations
 ```
+
+v4.11.0 was the first tag to publish its own release notes. The workflow ran
+all eight steps green, and the published release body is byte-identical to the
+CHANGELOG section it came from — checked, not assumed.
 
 Nothing is half-finished. Every branch is merged and deleted.
 
