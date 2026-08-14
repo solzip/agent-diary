@@ -153,8 +153,8 @@ class TestWhatItReports:
 class TestFindingThisDirectorysTranscript:
     def test_it_matches_on_the_recorded_cwd(self, tmp_path, monkeypatch):
         """Not on the folder name. Claude Code collapses every non-ASCII
-        character in the path to a dash, so `...\\윤솔\\...\\개인\\...` becomes
-        `C--Users----Desktop----sol-working-diary` and cannot be mapped back."""
+        character in the path to a dash, so `...\\홍길동\\...\\문서\\...` becomes
+        `C--Users-----Desktop----sol-working-diary` and cannot be mapped back."""
         projects = tmp_path / ".claude" / "projects" / "C--Users----Desktop----x"
         projects.mkdir(parents=True)
         work = tmp_path / "work"
