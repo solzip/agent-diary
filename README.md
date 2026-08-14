@@ -1,6 +1,6 @@
 # Agent Diary
 
-**Remember what you did with an AI.** Automatically when a Claude Code session ends, or on one command in Codex, Agent Diary records what you asked for and what changed.
+**Remember what you did with an AI.** Automatically every time Claude Code finishes replying, or on one command in Codex, Agent Diary records what you asked for and what changed.
 
 [![CI](https://github.com/solzip/agent-diary/actions/workflows/ci.yml/badge.svg)](https://github.com/solzip/agent-diary/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -19,9 +19,9 @@
 
 Work done with an AI lives in a chat window, and chat windows close. Two days later there is no way back to why a file was changed the way it was, and when a weekly review or a status report comes due you are working from memory. A commit log keeps the result; it does not keep what you asked for or what was tried on the way there.
 
-Agent Diary captures that context at the moment a session ends. There is no habit to build.
+Agent Diary captures that context as the work happens. There is no habit to build.
 
-One finished session appends an entry like this.
+Each turn appends an entry like this — one exchange, not a summary of the whole session.
 
 ```markdown
 ### ⏰ 14:30:15 | 📁 `my-app`
@@ -49,17 +49,23 @@ One finished session appends an entry like this.
   - `export API_KEY=****`
   - `pytest -q`
 
-**📝 Work Summary:**
-  - Added JWT verification middleware and covered the login failure path
+**💬 Response:**
+
+> Added `verify_token()` and wired it into the login route. The expired-token
+> path was not covered, so `test_auth.py` now asserts a 401 there as well.
 
 **🔒 1 secrets masked**
 ```
 
-Categories are inferred from the work. Branch, commits and diff stats are read from the repository. Anything that looks like a secret — the `API_KEY` above — is masked **before** the file is written.
+Categories are inferred from the work. Branch, commits and diff stats are read from the repository. The reply is kept whole rather than cut into keyword-matched fragments. Anything that looks like a secret — the `API_KEY` above — is masked **before** the file is written.
+
+**An entry covers one turn, not one session.** The Stop Hook fires each time Claude Code finishes replying, and an entry holds only what happened since the previous one, so a long session leaves a series of entries in the day's file. Diaries written before 4.9.0 look different: every entry there re-recorded the session's opening prompts, so the same requests repeat down the file.
+
+`📝 Work Summary` is not in the entry above because the hook does not write one. It appears when an agent authors the entry itself — `/diary`, `$diary`, or `agent-diary write --input` — and supplies `summary_hints`.
 
 ### What makes it different
 
-- **It is automatic.** In Claude Code a Stop Hook picks up the end of a session. You never have to decide to record something.
+- **It is automatic.** In Claude Code a Stop Hook fires each time Claude finishes replying. You never have to decide to record something.
 - **Zero core dependencies.** Standard library only. `requests` is added only if you use the Notion integration.
 - **Local files.** Plain Markdown, so it greps, it opens in Obsidian, and it outlives any service.
 - **It scales to a team.** Push to a Notion work-log database when you need to, or export to Slack, Discord and GitHub.
@@ -70,7 +76,7 @@ agent-diary init
 agent-diary backfill      # optional: import the sessions you already have
 ```
 
-Nothing else is required. Every Claude Code session from then on lands in `~/working-diary/YYYY-MM-DD.md`.
+Nothing else is required. Everything Claude Code does from then on lands in `~/working-diary/YYYY-MM-DD.md`.
 
 Claude Code has been keeping transcripts on disk all along, so `backfill` gives you a diary of work you already did rather than an empty directory. On the machine this was built on it turned 79 past sessions into 21 days of entries. Running it twice changes nothing — sessions already in the diary are skipped.
 
