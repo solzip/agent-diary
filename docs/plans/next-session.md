@@ -177,28 +177,62 @@ diary that has been reindexed at some point is thin. This one was.
 
 ## The one large piece of work left
 
-`docs/02-design/features/records-and-work-items.design.md` — **design, not
-implemented**. Every measurement is already in it; do not re-measure.
+`docs/02-design/features/records-and-work-items.design.md` holds the
+measurements; do not re-measure them. What has changed is that **the design's
+six open questions are no longer all open.** Three decisions were taken on
+2026-08-14 and are in `docs/decisions/`:
 
-- [x] Whether this needs a second database, or per-project databases
-  - 📄 [프로젝트별 표시는 DB를 나누지 않고 링크드 뷰로 한다](../decisions/0001-project-pages-via-linked-views.md) — 결정 2026-08-14
+- [x] Second database, or per-project databases
+  - 📄 [DB를 나누지 않고 링크드 뷰로](../decisions/0001-project-pages-via-linked-views.md) — 2026-08-14
+- [x] Whether cross-session linking works at all
+  - 📄 [2계층으로 간다 — 세션 넘는 연결 확인](../decisions/0002-two-layer-records-and-work-items.md) — 2026-08-14
+- [x] Whether this database tracks state at all
+  - 📄 [구조를 가진 일지다 — 상태를 관리하지 않는다](../decisions/0003-a-structured-journal-not-a-tracker.md) — 2026-08-14
+- [x] Which relation pair carries the hierarchy — native. The legacy
+      `Parent Task`/`Sub-items` pair is gone from the schema and from the live
+      2026 database
+- [x] Unlinked records — dissolved by ADR-0003. With no state, a record with no
+      parent is simply a record
 
-The finding it rests on: of 532 live Notion rows, **89% were never edited after
-creation**, median time from creation to last edit 0 seconds. Rows are records,
-records do not change state, and the database attaches `Status`, `Review
-Status`, `Blocked` and `Carryover` to them anyway. Completion 6%, `Testing` 53%
-at a median 44 days, 441 stale — all of it follows from that one fact.
+**What the database is now:** a journal with structure. It records what
+happened and links related records into a hierarchy. It does not track status.
+Deployment is the one exception — it is an event, not a state — and it attaches
+only to *the unit that shipped together*, which the hierarchy already expresses.
 
-Six decisions in the doc's "Open questions" block the work, and they are Sol's,
-not the tool's. The order of work is in the doc. **Step 1, consolidating the
-status definitions, is done** — they are in `src/claude_diary/lib/statuses.py`,
-with the current meanings unchanged and a test that fails if the enumeration is
-written out anywhere else.
+### Still open
 
-**Step 3 is the one that matters now**: link one record to a work item across
-sessions by hand and read it back. Not a feature — one row. Every one of the 90
-hierarchy links that exists today is intra-session, so cross-session linking is
-unverified, and that single row decides whether steps 4-7 are worth starting.
+- **The shape of the deployment marker** — checkbox, date, or release
+  identifier (`v4.11.3`). This repository deploys by tag so an identifier
+  answers all three questions, but how projects like `erp_chatbot_solzip`
+  deploy has not been checked.
+- **The lookup key for a parent in an earlier session.** Cross-session linking
+  works; what is missing is how a push finds the parent row. This is the same
+  question as the identifier scheme, so answering one answers both.
+- **Year boundaries.** The database is per year and a hierarchy spanning New
+  Year has no defined home.
+
+### The dangerous part: what order to remove things in
+
+ADR-0003 removes `Status`, `Priority`, `Blocked`, `Block Reason`,
+`Review Status` and `Carryover`. **The cost is not the six fields. It is
+everything that reads them**, and the order matters:
+
+```
+1. ops           완료율·stale·needs review 계산을 먼저 제거하거나 다시 정의
+2. 뷰            Blocked / 전날 미완료 / 리뷰 필요 3개
+3. 스킬 계약      태스크마다 status·priority를 정하라는 지시
+4. review 명령    존재 이유가 사라진다
+5. 그 다음에      스키마에서 필드 제거
+```
+
+**Fields first is the mistake.** Remove a property and the readers do not
+fail — they receive an empty value and report a plausible wrong answer. That
+is the failure mode this project hit repeatedly on 2026-08-14: an unreadable
+input looking exactly like an empty one. `Parent Task`/`Sub-items` were safe to
+remove in the other order only because nothing read them.
+
+Existing rows keep their values. Nothing is deleted from the 566 rows; they are
+simply no longer read.
 
 ## Things that are true and are not written in the code
 
