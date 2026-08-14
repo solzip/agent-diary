@@ -3,5 +3,16 @@ include CHANGELOG.md
 include SECURITY.md
 include README.md
 include README.ko.md
+# The one document the PyPI sidebar promises. The rest of docs/ is design notes
+# and plans — 344KB the package has no use for.
+include docs/ARCHITECTURE.md
+# The sdist ships `tests/`, so it has to ship what those tests read. Several of
+# them inspect the repository itself — the plugin manifests, the CI matrix, the
+# release workflow — and without these lines they do not skip, they error out
+# during collection. Measured before adding them: 2 collection errors, 4
+# failures and 14 errors from an unpacked sdist.
+recursive-include .claude-plugin *.json
 recursive-include .codex-plugin *.json
+recursive-include .github/workflows *.yml
+recursive-include scripts *.py
 recursive-include skills *.md *.yaml

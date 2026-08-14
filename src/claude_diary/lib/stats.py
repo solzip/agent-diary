@@ -5,6 +5,9 @@ import re
 from collections import Counter
 
 from claude_diary.lib.conventional import commit_type
+from claude_diary.log import get_logger
+
+logger = get_logger("claude_diary.lib.stats")
 
 
 def parse_daily_file(filepath):
@@ -38,7 +41,14 @@ def parse_daily_file(filepath):
         # replacement character costs one glyph; the alternative cost a day.
         with open(filepath, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
-    except Exception:
+    except Exception as e:
+        # `errors="replace"` took the decoding failures out of this handler, so
+        # what is left is the file refusing to open at all — locked, a
+        # permission change, a disk error. The return value cannot say that:
+        # an empty `stats` is what a genuinely quiet day looks like, and every
+        # caller reads it as one. Saying so here is the only place it can be
+        # said, and it costs nothing on a clean run.
+        logger.warning("could not read %s (%s): counted as zero sessions", filepath, e)
         return stats
 
     stats["sessions"] = content.count("### ⏰")
