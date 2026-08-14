@@ -119,10 +119,50 @@ class TestTheChartsStayCharts:
         for original in ("█▓░", "╔═╗║╚╝╠╣", "—✓✗"):
             assert len(self._cp949(original)) == len(original)
 
-    def test_an_unmapped_character_is_decoration_not_an_error(self):
+    def test_an_unmapped_symbol_is_decoration_not_an_error(self):
         """`*` rather than `?`: a question mark reads as something having gone
         wrong, and an emoji this table has never heard of has not."""
         assert self._cp949("\U0001f984") == "*"
+
+    def test_a_day_with_no_sessions_still_looks_like_one(self):
+        """cp949 has `·`, so the first pass never saw it. An ASCII locale does
+        not, and the month came out as 31 asterisks."""
+        assert "·".encode("ascii", errors=ERROR_HANDLER).decode("ascii") == "."
+
+
+class TestLosingWordsLooksDifferentFromLosingDecoration:
+    """A `stats` run on an ASCII locale turned `주간 작업 리포트` into
+    `** ** ***` — which reads as decoration, when it is the heading, gone."""
+
+    def _ascii(self, text):
+        return text.encode("ascii", errors=ERROR_HANDLER).decode("ascii")
+
+    def test_letters_that_cannot_be_shown_are_marked_as_lost(self):
+        assert self._ascii("주간") == "??"
+        assert self._ascii("日本語") == "???"
+
+    def test_digits_too(self):
+        assert self._ascii("１２３") == "???"
+
+    def test_symbols_stay_decoration(self):
+        assert self._ascii("\U0001f4ca") == "*"
+        assert self._ascii("→") == "*"
+
+    def test_the_table_still_wins_over_the_rule(self):
+        """`—` is punctuation, so the rule alone would make it `*`. It has a
+        real ASCII equivalent and the table says so."""
+        assert self._ascii("—") == "-"
+        assert self._ascii("█") == "#"
+
+    def test_an_ascii_locale_still_runs(self, tmp_path):
+        result = _run("weekly", _isolated(tmp_path, "ascii"))
+        assert "UnicodeEncodeError" not in result.stderr, result.stderr[-300:]
+        assert result.stdout.strip()
+
+
+class TestNothingIsSubstitutedThatDoesNotHaveToBe:
+    def _cp949(self, text):
+        return text.encode("cp949", errors=ERROR_HANDLER).decode("cp949")
 
     def test_what_the_console_can_encode_is_left_alone(self):
         assert self._cp949("한글과 → 화살표") == "한글과 → 화살표"

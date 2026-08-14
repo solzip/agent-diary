@@ -32,6 +32,7 @@ error handler below substitutes the nearest ASCII instead: `█` becomes `#`,
 
 import codecs
 import sys
+import unicodedata
 
 #: What to draw instead, when the console cannot draw the real thing.
 #:
@@ -41,8 +42,9 @@ import sys
 #: single-character emoji is doubly wide in most terminals, so a one-character
 #: ASCII stand-in is if anything better aligned than the original.
 #:
-#: Anything not listed falls back to `*` rather than `?`: these are decoration,
-#: and a question mark reads as something having gone wrong.
+#: Anything not listed is decided by what kind of character it is — see
+#: `_substitute`. Decoration becomes `*`; a letter or a digit becomes `?`,
+#: because losing one of those is losing content and should look like it.
 _ASCII_FOR = {
     # bars and shading — the reason this exists. `stats` drew its charts in
     # block elements, and on cp949 every bar came out as a row of `?`.
@@ -52,7 +54,11 @@ _ASCII_FOR = {
     "╔": "+", "╗": "+", "╚": "+", "╝": "+", "╠": "+", "╣": "+",
     # punctuation this project uses in prose. cp949 carries U+2015 but not the
     # em dash, which is what the original bug report tripped over.
-    "—": "-", "–": "-", "⋯": "~",
+    "—": "-", "–": "-", "⋯": ".", "…": ".",
+    # `stats` marks a day with no sessions with this. cp949 has it, so the
+    # first pass never saw it; an ASCII locale does not, and a month came out
+    # as 31 asterisks.
+    "·": ".",
     # status marks
     "✓": "v", "✅": "v", "✗": "x", "❌": "x",
 }
@@ -73,9 +79,21 @@ def _substitute(error):
     Only the terminal is affected. Files are opened with their own encoding —
     `weekly` writes its report in UTF-8 and then prints it, and only the
     printed copy passes through here.
+
+    What is not in the table splits by character class. A `stats` run on an
+    ASCII locale turned `주간 작업 리포트` into `** ** ***`, which reads as
+    decoration when it is in fact the heading, gone. Letters and digits get `?`
+    — the conventional mark for "this did not survive" — and everything else,
+    being symbols and punctuation, gets `*`.
     """
     chunk = error.object[error.start:error.end]
-    return ("".join(_ASCII_FOR.get(char, "*") for char in chunk), error.end)
+    return ("".join(_replacement(char) for char in chunk), error.end)
+
+
+def _replacement(char):
+    if char in _ASCII_FOR:
+        return _ASCII_FOR[char]
+    return "?" if unicodedata.category(char)[0] in ("L", "N") else "*"
 
 
 codecs.register_error(ERROR_HANDLER, _substitute)
