@@ -21,10 +21,16 @@ Nothing is half-finished. Every branch opened today is merged and deleted.
    April's code. Measured: 91% of its 324 downloads had no Python version or
    platform in the user agent, so there is no evidence of real users — but the
    yank is one click and leaves a warning either way. Needs PyPI credentials.
-2. **GitHub Releases: 18 tags, 0 release notes.** Copying CHANGELOG sections
-   across is the cheapest visibility this project has left. Deferred on
-   2026-08-12 with "I'll do it once I like the project"; worth re-checking
-   whether that still holds.
+2. ~~**GitHub Releases: 18 tags, 0 release notes.**~~ **Done 2026-08-14.** All
+   18 tags now have a release; each body is its CHANGELOG section verbatim,
+   verified by round-tripping every published body against the source (18/18
+   identical). Titles carry the CHANGELOG date (`v4.10.0 — 2026-08-13`) because
+   GitHub stamps all eighteen with today's creation date and the real release
+   dates would otherwise be lost. v4.10.0 is marked latest.
+   **Keep it current:** a new release does not appear on its own — the `v*` tag
+   publishes to PyPI via `release.yml`, it does not write release notes. Add
+   `gh release create vX.Y.Z --verify-tag --title "vX.Y.Z — <date>"
+   --notes-file <section>` to the release steps, or the count drifts back.
 
 ## The one large piece of work left
 
