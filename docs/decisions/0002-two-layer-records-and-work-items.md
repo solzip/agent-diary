@@ -8,6 +8,7 @@
 | **관련 작업 항목** | `docs/02-design/features/records-and-work-items.design.md` |
 | **선행 결정** | [ADR-0001](0001-project-pages-via-linked-views.md) — DB를 나누지 않는다 |
 | **결정자** | Sol |
+| **일부 대체됨** | [ADR-0003](0003-a-structured-journal-not-a-tracker.md) — "작업항목은 상태를 갖는다"는 전제가 대체되었다. 2계층 구조와 세션 넘는 연결 검증 결과는 그대로 유효하다 |
 
 ## 1. 배경
 

@@ -10,3 +10,4 @@
 |---|---|---|---|
 | [0001](0001-project-pages-via-linked-views.md) | 프로젝트별 표시는 DB를 나누지 않고 링크드 뷰로 한다 | 2026-08-14 | Accepted |
 | [0002](0002-two-layer-records-and-work-items.md) | 기록/작업항목 2계층으로 간다 | 2026-08-14 | Accepted |
+| [0003](0003-a-structured-journal-not-a-tracker.md) | 구조를 가진 일지다 — 상태를 관리하지 않는다 | 2026-08-14 | Accepted |
