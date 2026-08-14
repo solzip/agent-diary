@@ -495,6 +495,9 @@ agent-diary reindex
 agent-diary delete --last
 ```
 
+<a id="reindex-once-on-4-11-3"></a>
+**Run `agent-diary reindex` once after upgrading to 4.11.3.** Before that release `reindex` rebuilt the index from the text of the diary and kept only the *first* category on each entry, so a search by category answered with part of its matches — on a real 73-file diary, `refactor` returned 35 of 1,183. The diary files themselves were always correct; only the index built from them was thin, and only if it was ever rebuilt. The incremental path the hook writes through was never affected. A rebuild on 4.11.3 or later therefore recovers all of it.
+
 Extension commands:
 
 ```bash
@@ -627,12 +630,21 @@ It applies to commit lines only, not to the category tags. Three gitmoji — �
 
 The two Notion credentials are the exception and override the config, so a token need not be written to a file in CI or when moving between workspaces.
 
-If PowerShell output shows broken Korean or emoji characters, switch the current session output encoding to UTF-8.
+<a id="consoles-that-cannot-draw-every-character"></a>
+### Consoles that cannot draw every character
+
+Since 4.11.1 a console that cannot encode a character no longer stops the command. Legacy code pages have no room for the punctuation and emoji this project writes — cp949 carries Hangul and `→` but not `—`, `✓` or the `⏰`/`📁` every entry header is built from — and `stats`, `weekly`, `report` and `doctor` used to die on their own output.
+
+The stream keeps the console's encoding rather than being forced to UTF-8, because on a legacy console that encoding is what the terminal can actually render; switching it would turn correct Hangul into mojibake to save an em dash. What cannot be encoded is drawn as the nearest ASCII instead: `█` becomes `#`, `╔═╗` becomes `+=+`, an em dash becomes `-`. A letter or digit that does not survive becomes `?`, because losing content should look like losing content, and other symbols become `*`.
+
+So `#` in a chart or `?` mid-word is the fallback doing its job, not a broken install. To get every character exactly, use a UTF-8 console.
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 ```
+
+`PYTHONIOENCODING=utf-8` does the same thing for one command.
 
 ## 6. Features
 
@@ -664,7 +676,8 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 | Entries stopped appearing and I do not know why | Run `agent-diary doctor`. It checks that the hook is registered, that the module it names still resolves, and how long it has been since the last entry |
 | I used to get `.codefleet/runs/` | That was the old default, named after a separate project. New projects use `.agent-diary/runs/`; an existing `.codefleet/runs/` keeps being used so your history does not split |
 | I want to drop the `(N차)` suffix from titles | It counts prior sessions of the same `Task Group`. Leave `task_group` empty and no suffix is added |
-| PowerShell text is garbled | Apply the UTF-8 output setting above |
+| Output shows `#`, `+`, `?` or `*` where a character should be | The console cannot encode it and the nearest ASCII was drawn instead. See [Consoles that cannot draw every character](#consoles-that-cannot-draw-every-character) |
+| `search` by category returns fewer hits than the diary holds | An index rebuilt before 4.11.3 kept one category per entry. Run [`agent-diary reindex`](#reindex-once-on-4-11-3) once |
 
 ## 8. Development
 
