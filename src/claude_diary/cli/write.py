@@ -15,7 +15,11 @@ import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from claude_diary.config import load_config
+from claude_diary.config import (
+    load_config,
+    resolve_manual_diary_dir,
+    resolve_transcript_root,
+)
 from claude_diary.log import get_logger, configure_from_config
 from claude_diary.lib.parser import parse_transcript
 from claude_diary.lib.git_info import collect_git_info
@@ -47,7 +51,7 @@ def _candidate_project_dirs(cwd):
     recorded the path differently than os.getcwd() returns it (case,
     symlinks, abspath vs realpath).
     """
-    base = Path(os.path.expanduser("~/.claude/projects"))
+    base = Path(resolve_transcript_root())
     seen = set()
     candidates = []
     for variant in (
@@ -88,7 +92,7 @@ def _find_latest_transcript(cwd):
             return str(max(jsonls, key=lambda p: p.stat().st_mtime))
 
     # Final fallback: scan all projects, pick latest .jsonl if recent
-    base = Path(os.path.expanduser("~/.claude/projects"))
+    base = Path(resolve_transcript_root())
     if base.is_dir():
         all_jsonls = list(base.glob("*/*.jsonl"))
         if all_jsonls:
@@ -241,9 +245,7 @@ def cmd_write(args):
 
     lang = config.get("lang", "ko")
     tz_offset = config.get("timezone_offset", 9)
-    manual_dir = os.path.expanduser(
-        config.get("manual_diary_dir") or "~/working-diary/manual"
-    )
+    manual_dir = resolve_manual_diary_dir(config)
     enrichment = config.get("enrichment", {})
 
     cwd = os.getcwd()

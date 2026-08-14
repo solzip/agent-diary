@@ -28,6 +28,46 @@ DEFAULT_CONFIG = {
 }
 
 
+#: Where Claude Code keeps session transcripts, in the form a human reads and
+#: `--transcripts` defaults to. Spelled three ways before this — a named
+#: constant in `backfill`, a bare string twice in `write`, and an
+#: `os.path.join("~", ".claude", "projects")` in `try_run`.
+CLAUDE_TRANSCRIPT_ROOT = "~/.claude/projects"
+
+
+def resolve_transcript_root():
+    """The same directory, expanded, with this platform's separator throughout.
+
+    The three spellings were not equivalent on Windows, which is why this is a
+    function and not one string used everywhere: `expanduser("~/.claude")`
+    yields `C:\\Users\\me/.claude`, mixing separators, while the `os.path.join`
+    form yields `C:\\Users\\me\\.claude`. Both open the same directory, and
+    only one of them compares equal to a path built any other way — a test
+    caught the difference the moment the two were merged.
+    """
+    return os.path.join(os.path.expanduser("~"), ".claude", "projects")
+
+
+def resolve_diary_dir(config):
+    """Absolute path of the diary directory this config asks for.
+
+    Seven call sites wrote `config.get("diary_dir", "~/working-diary")`, each
+    carrying its own copy of the default. None of those copies could ever be
+    used — `load_config` deep-copies `DEFAULT_CONFIG`, so the key is always
+    there — which made them seven statements of a default that nothing would
+    have updated, in a different form (a POSIX literal) from the one that is
+    actually in force (built with `os.path.join`).
+    """
+    return os.path.expanduser(config.get("diary_dir") or DEFAULT_CONFIG["diary_dir"])
+
+
+def resolve_manual_diary_dir(config):
+    """Absolute path for `agent-diary write`, same reasoning as above."""
+    return os.path.expanduser(
+        config.get("manual_diary_dir") or DEFAULT_CONFIG["manual_diary_dir"]
+    )
+
+
 def get_config_dir():
     """Return XDG-standard config directory path.
     Linux/macOS: ~/.config/claude-diary/

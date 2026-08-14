@@ -27,6 +27,8 @@ import subprocess
 import sys
 import tempfile
 
+from claude_diary.config import resolve_transcript_root
+
 
 def cmd_try(args):
     """Show what the hook would record for a transcript, writing nothing."""
@@ -135,7 +137,7 @@ def _latest_transcript_for_cwd():
     were dropped, not which ones. The transcript records its `cwd` in the first
     few lines, so that is what gets compared.
     """
-    root = os.path.expanduser(os.path.join("~", ".claude", "projects"))
+    root = resolve_transcript_root()
     if not os.path.isdir(root):
         return None
 

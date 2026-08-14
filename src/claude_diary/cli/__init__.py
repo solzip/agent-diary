@@ -9,7 +9,13 @@ from claude_diary.cli.notion_push.artifacts import default_artifact_dir
 
 # Re-export dependencies so submodules can access them via claude_diary.cli.*
 # and so that tests can patch them at claude_diary.cli.<name>.
-from claude_diary.config import load_config, save_config, get_config_path, migrate_from_env
+from claude_diary.config import (
+    CLAUDE_TRANSCRIPT_ROOT,
+    load_config,
+    save_config,
+    get_config_path,
+    migrate_from_env,
+)
 from claude_diary.i18n import get_label
 from claude_diary.indexer import load_index
 from claude_diary.lib.stats import parse_daily_file
@@ -216,7 +222,7 @@ def main():
     p_backfill.add_argument("--dry-run", action="store_true",
                             help="List what would be imported without writing")
     p_backfill.add_argument("--transcripts",
-                            help="Transcript directory (default: ~/.claude/projects)")
+                            help="Transcript directory (default: %s)" % CLAUDE_TRANSCRIPT_ROOT)
 
     # doctor (is it still recording?)
     p_doctor = sub.add_parser(

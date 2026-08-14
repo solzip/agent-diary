@@ -5,6 +5,7 @@ import sys
 from datetime import datetime
 
 from claude_diary.config import load_config
+from claude_diary.lib import statuses
 from claude_diary.log import configure_from_config
 from claude_diary.cli.notion_common import (
     date_start_value as _date_start,
@@ -23,8 +24,7 @@ from claude_diary.exporters.notion_hierarchical import (
 )
 
 
-DONE_STATUSES = {"Deployed"}
-ACTIVE_STATUSES = {"Discussion", "Design", "Implementation", "Testing"}
+DONE_STATUSES = statuses.DONE
 PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3, "": 9}
 
 
@@ -90,7 +90,7 @@ def build_ops_report(rows, today, stale_days=7, parent_property_name="Parent Tas
     needs_review = [item for item in active if item["review_status"] == "Needs Review"]
     missing_next_action = [
         item for item in active
-        if item["status"] in ("Implementation", "Testing") and not item["next_action"]
+        if item["status"] in statuses.IN_PROGRESS and not item["next_action"]
     ]
     stale = [
         item for item in active
@@ -295,7 +295,8 @@ def _suggest_parent_status(parent, children):
                                   "at least one child task is blocked", children)
     if "Testing" in child_statuses and parent["status"] not in ("Testing", "Deployed"):
         return _parent_suggestion(parent, "Testing", "at least one child task is in Testing", children)
-    if "Implementation" in child_statuses and parent["status"] in ("", "Discussion", "Design"):
+    if "Implementation" in child_statuses and (
+            not parent["status"] or parent["status"] in statuses.EARLY):
         return _parent_suggestion(parent, "Implementation", "at least one child task is in Implementation", children)
     return None
 
@@ -343,7 +344,7 @@ def _today_plan_candidates(items, today):
 def _verification_candidates(items):
     candidates = []
     for item in items:
-        if item["blocked"] or item["status"] not in ("Implementation", "Testing"):
+        if item["blocked"] or item["status"] not in statuses.IN_PROGRESS:
             continue
         reasons = []
         if item["review_status"] != "Reviewed":

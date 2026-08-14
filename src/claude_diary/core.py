@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from claude_diary.types import Config, EntryData, GitInfo
-from claude_diary.config import load_config
+from claude_diary.config import load_config, resolve_diary_dir
 from claude_diary.log import get_logger, configure_from_config
 from claude_diary.lib.parser import parse_transcript
 from claude_diary.lib.git_info import collect_git_info
@@ -43,7 +43,7 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
     configure_from_config(config)
     lang = config.get("lang", "ko")
     tz_offset = config.get("timezone_offset", 9)
-    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
+    diary_dir = resolve_diary_dir(config)
     enrichment = config.get("enrichment", {})
 
     # 0. Session opt-out check
@@ -344,7 +344,7 @@ def _supplement_from_git(entry_data: EntryData, git_info: GitInfo) -> None:
 def _run_exporters(config: Config, entry_data: EntryData) -> None:
     """Load and run enabled exporters via plugin loader."""
     from claude_diary.exporters.loader import load_exporters, run_exporters
-    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
+    diary_dir = resolve_diary_dir(config)
 
     exporters = load_exporters(config)
     if exporters:

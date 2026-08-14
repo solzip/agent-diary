@@ -53,30 +53,29 @@ Three things were found and fixed — the home-directory leak, the sdist that
 could not run its own tests, and four handlers whose failure value was
 indistinguishable from an empty success. They are in the CHANGELOG.
 
-**What the audit found and did not fix**, all of it one shape — a constant
-that exists in one place and is written out by hand somewhere else:
+**What the audit found in the constants, and what was done about it.** Three
+were defined and read by nothing — `RICH_TEXT_LIMIT`, `ACTIVE_STATUSES`,
+`DEFAULT_VERIFICATION_LIMIT` — and in each case the value they named was typed
+out by hand nearby: eight `[:2000]` across three modules, the status strings
+compared inline six times in the file below them. They now live in
+`lib/notion_api.py` and `lib/statuses.py`, the diary defaults behind
+`resolve_diary_dir()`, the transcript root behind `resolve_transcript_root()`.
+A test fails if a constant goes unread again or a consolidated value reappears
+as a literal.
 
-- **`RICH_TEXT_LIMIT = 2000` is defined and never used.** Eight literal
-  `[:2000]` do the actual truncating across three modules, and
-  `formatter.py`'s docstring claims truncation happens "to RICH_TEXT_LIMIT"
-  while that module neither imports it nor could. The values agree today.
-- **`ACTIVE_STATUSES` in `notion_ops.py` is defined and never used**, sitting
-  directly above `DONE_STATUSES`, which is. This is one of the six scattered
-  status definitions the records/work-items design is blocked on — worth
-  fixing *there* rather than here.
-- **`DEFAULT_VERIFICATION_LIMIT = 3` in `formatter.py` is defined and never
-  used.**
-- **`"~/working-diary"` is written out at seven call sites** as a fallback to
-  `config.get("diary_dir", ...)`, while the real default lives in
-  `DEFAULT_CONFIG` — built with `os.path.join`, not as a POSIX literal. The
-  fallbacks cannot fire (`load_config` deep-copies the defaults), so they are
-  seven copies of a value nothing would update.
-- **The transcript root is spelled three ways**: `DEFAULT_TRANSCRIPT_ROOT` in
-  `backfill.py` (used), a bare `"~/.claude/projects"` twice in `write.py`, and
-  `os.path.join("~", ".claude", "projects")` in `try_run.py`.
+Two things came out of doing it that are worth keeping:
 
-None of it is a live defect; all of it is the "one place was fixed and the
-others were not" shape that has produced most of this project's real bugs.
+- **The three spellings of the transcript root were not equivalent.**
+  `expanduser("~/.claude/projects")` mixes separators on Windows;
+  `os.path.join("~", ".claude", "projects")` does not. Both open the directory
+  and only one compares equal to a path built any other way. An existing test
+  caught it the moment they were merged, which is why there is a
+  `CLAUDE_TRANSCRIPT_ROOT` *string* for display and a
+  `resolve_transcript_root()` *function* for code.
+- **Consolidating the statuses is step 1 of the records/work-items work**, and
+  it is done. It moved definitions only: whether `Deployed` means shipped or
+  merely finished is still the open question, and `lib/statuses.py` states the
+  current meaning without answering it.
 
 **Clean, and worth not re-checking:** no absolute machine paths, no `/tmp` or
 `/var`, no Notion IDs, no e-mail addresses, no credential-shaped values (the
@@ -96,11 +95,15 @@ Status`, `Blocked` and `Carryover` to them anyway. Completion 6%, `Testing` 53%
 at a median 44 days, 441 stale — all of it follows from that one fact.
 
 Six decisions in the doc's "Open questions" block the work, and they are Sol's,
-not the tool's. The order of work is in the doc and **step 3 is the one that
-matters**: link one record to a work item across sessions by hand and read it
-back. Not a feature — one row. Every one of the 90 hierarchy links that exists
-today is intra-session, so cross-session linking is unverified, and that single
-row decides whether steps 4-7 are worth starting.
+not the tool's. The order of work is in the doc. **Step 1, consolidating the
+status definitions, is done** — they are in `src/claude_diary/lib/statuses.py`,
+with the current meanings unchanged and a test that fails if the enumeration is
+written out anywhere else.
+
+**Step 3 is the one that matters now**: link one record to a work item across
+sessions by hand and read it back. Not a feature — one row. Every one of the 90
+hierarchy links that exists today is intra-session, so cross-session linking is
+unverified, and that single row decides whether steps 4-7 are worth starting.
 
 ## Things that are true and are not written in the code
 

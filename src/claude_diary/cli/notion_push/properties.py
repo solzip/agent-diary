@@ -12,13 +12,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from claude_diary.lib.notion_api import RICH_TEXT_LIMIT
+from claude_diary.lib.statuses import VALID as VALID_STATUSES
 from claude_diary.types import GitInfo
 
 from datetime import datetime
 
 from claude_diary.cli.notion_push.tasks import _task_files_count, _task_next_action
 
-VALID_STATUSES = {"Discussion", "Design", "Implementation", "Testing", "Deployed"}
 VALID_PRIORITIES = {"P0", "P1", "P2", "P3"}
 # Every pushed row starts unreviewed; `diary-notion review --apply` is the only
 # thing that advances it.
@@ -78,7 +79,7 @@ def _build_properties(task: Dict[str, Any], date_str: str, branch: str,
     lines = (stat.get("added", 0) or 0) + (stat.get("deleted", 0) or 0)
 
     props = {
-        "Name": {"title": [{"text": {"content": title[:2000]}}]},
+        "Name": {"title": [{"text": {"content": title[:RICH_TEXT_LIMIT]}}]},
         "Date": {"date": {"start": date_str}},
         "Work Period": {"date": _normalize_work_period(task.get("work_period"), date_str)},
         "Project": {"select": {"name": _safe_select(project)}},
@@ -89,7 +90,7 @@ def _build_properties(task: Dict[str, Any], date_str: str, branch: str,
         "Files": {"number": files_count},
         "Commits": {"number": len(commits)},
         "Lines": {"number": lines},
-        "Session ID": {"rich_text": [{"text": {"content": session_id[:2000]}}]},
+        "Session ID": {"rich_text": [{"text": {"content": session_id[:RICH_TEXT_LIMIT]}}]},
         "Task Index": {"number": task_index},
     }
     report_schema = _clean_schema_version(task.get("_report_schema_version"))
@@ -236,7 +237,7 @@ def _normalize_priority(value):
 
 def _clean_rich_text(value):
     raw = str(value or "").strip()
-    return raw[:2000] if raw else ""
+    return raw[:RICH_TEXT_LIMIT] if raw else ""
 
 
 def _clean_schema_version(value):

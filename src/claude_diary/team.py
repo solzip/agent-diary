@@ -8,7 +8,7 @@ from collections import Counter
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from claude_diary.config import load_config
+from claude_diary.config import load_config, resolve_diary_dir
 from claude_diary.lib.stats import parse_daily_file
 from claude_diary.log import get_logger
 
@@ -73,7 +73,7 @@ def init_team(repo_url, member_name=None):
     validate_member_name(member_name)
 
     # Clone team repo
-    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
+    diary_dir = resolve_diary_dir(config)
     team_repo_path = os.path.join(diary_dir, ".team-repo")
 
     if os.path.exists(team_repo_path):
