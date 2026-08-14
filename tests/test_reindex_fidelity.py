@@ -75,6 +75,28 @@ def test_rebuild_recovers_line_counts(tmp_path):
     assert entry["lines_deleted"] == 12
 
 
+def test_rebuild_recovers_every_category_not_just_the_first(tmp_path):
+    """The fixture above has carried two categories the whole time and nothing
+    asserted on them, so the index quietly kept one.
+
+    Measured on a real 73-file diary: 7,131 entries, 91.6% of them with three
+    categories, 20,424 categories in the files and 7,048 reaching the index.
+    `search refactor` was answering from 35 entries where 1,183 exist."""
+    _write(tmp_path, "2026-07-01.md", ENTRY)
+    assert reindex_all(str(tmp_path)) == 1
+    assert _entries(tmp_path)[0]["categories"] == ["feature", "test"]
+
+
+def test_the_word_in_prose_does_not_become_a_category(tmp_path):
+    """From a real entry: a commit line mentioning categories with a hash in
+    backticks beside it. The old pattern indexed the hash."""
+    _write(tmp_path, "2026-07-01.md", ENTRY.replace(
+        "  - `src/auth.py`",
+        "  - `src/auth.py`\n  - 커밋: `f98c96ec5` fix: 신규 카테고리 첫 부팅 레이스"))
+    assert reindex_all(str(tmp_path)) == 1
+    assert _entries(tmp_path)[0]["categories"] == ["feature", "test"]
+
+
 def test_rebuild_recovers_commits(tmp_path):
     _write(tmp_path, "2026-07-01.md", ENTRY)
     reindex_all(str(tmp_path))
