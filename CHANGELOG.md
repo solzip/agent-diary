@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- **`Parent Task` / `Sub-items` — 아무것도 채우지 않던 관계쌍**: Notion DB 스키마에서 뺐습니다. 이 둘은 네이티브 하위항목이 없는 DB를 위한 대체 경로처럼 보였지만, **대체 경로가 아니었습니다**
+  - `update_row_parent`와 `update_row_subitems`는 **호출자가 0**이었습니다. 네이티브가 없으면 `_wire_parent_tasks`는 실패로 보고하고 "Notion UI에서 하위항목을 켜라"고 안내할 뿐, 이 쌍에 쓰지 않습니다. 즉 컬럼이 있든 없든 계층은 똑같이 없었습니다
+  - `REQUIRED_PROPERTIES`에 남아 있는 한 **Notion에서 지워도 다음 `ensure`가 다시 만듭니다.** 그래서 두 목록과 DB 생성 스키마에서 함께 뺐습니다
+  - 죽은 writer 2개도 지웠습니다. 이제 만들지도 않는 속성에 PATCH를 거는 함정이 됩니다
+  - **이관 경로는 남깁니다.** 세상에 나가 있는 DB에는 아직 컬럼과 링크가 있고, `_compute_native_migration`이 그것을 네이티브로 접어 넣습니다. `ops`의 `Parent Task` 폴백도 같은 이유로 남깁니다
+  - 지우기 전 실측: 라이브 DB의 legacy 링크 **13개가 전부 네이티브에도 존재**해 잃을 링크가 0이었습니다. 삭제 후 대조에서 **나머지 26개 속성의 값 변화 0**, 행 수 566 유지. 2026-08-07에 `ensure`가 497행에서 속성 6개를 비운 실패 유형은 발생하지 않았습니다
+  - 목록에서 두 이름을 지웠을 때 **테스트가 하나도 깨지지 않았습니다.** 목록을 단정하는 테스트가 없었기 때문이고, 그래서 가드를 붙였습니다
+
 
 ## [4.11.3] - 2026-08-14
 

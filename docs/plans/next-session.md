@@ -180,6 +180,9 @@ diary that has been reindexed at some point is thin. This one was.
 `docs/02-design/features/records-and-work-items.design.md` — **design, not
 implemented**. Every measurement is already in it; do not re-measure.
 
+- [x] Whether this needs a second database, or per-project databases
+  - 📄 [프로젝트별 표시는 DB를 나누지 않고 링크드 뷰로 한다](../decisions/0001-project-pages-via-linked-views.md) — 결정 2026-08-14
+
 The finding it rests on: of 532 live Notion rows, **89% were never edited after
 creation**, median time from creation to last edit 0 seconds. Rows are records,
 records do not change state, and the database attaches `Status`, `Review
