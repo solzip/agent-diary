@@ -21,9 +21,14 @@ have gone out that way since. The workflow runs all eight steps green and the
 published body is byte-identical to the CHANGELOG section it came from —
 checked, not assumed.
 
-**Anyone upgrading past 4.11.2 should run `agent-diary reindex` once.** The
-category defect below wrote a thin index; the diary files were never wrong, so
-a rebuild recovers all of it.
+**Anyone whose index has ever been rebuilt should run `agent-diary reindex`
+once on 4.11.3.** The category defect made `reindex` write a thin index; the
+diary files were never wrong, so a rebuild on the fixed code recovers all of
+it. Measured below: `search feature` went from 2,287 hits to 4,949.
+
+The published 4.11.3 was installed from PyPI into a clean virtualenv and run:
+`stats`, `weekly`, `doctor` and `search` all complete on a cp949 console with
+zero `?` in the output.
 
 Nothing is half-finished. Every branch is merged and deleted.
 
@@ -133,16 +138,42 @@ Three things worth keeping from how those went:
   ASCII locale, and a `·` that cp949 happens to have became 31 asterisks. Five
   encodings now, not one.
 
+## What the category fix actually changed
+
+Measured on a copy of the real diary — the live one was not touched. The index
+on disk held 7,195 categories against 20,443 in the files, with 6,966 of 7,152
+entries carrying exactly one. After `reindex` on 4.11.3 it holds 20,443, and
+6,531 entries carry three.
+
+What `search` answers, before and after that rebuild:
+
+| keyword | before | after |
+|---|---|---|
+| `feature` | 2,287 | **4,949** |
+| `bugfix` | 912 | **3,150** |
+| `test` | 3,239 | **4,613** |
+| `refactor` | 243 | **1,301** |
+| `style` | 236 | **1,079** |
+| `docs` | 5,183 | **5,941** |
+| `config` | 1,131 | **1,640** |
+
+`feature` more than doubled. These counts are higher than the category totals
+because `search` also matches keywords in the prompts; the difference between
+the columns is the categories that were missing.
+
+**The incremental path was never broken** — the hook writes `categories`
+straight from the entry data. Only `reindex` rebuilt from the text, so only a
+diary that has been reindexed at some point is thin. This one was.
+
 ## Not verified
 
-- The category fix was measured at the parser (20,431 against 7,057 on the
-  real diary). **`search docs` was not re-run after a reindex**, so the change
-  in what the command answers is inferred, not observed.
-- 4.11.2 and 4.11.3 were confirmed published and green; **neither was
-  installed from PyPI into a clean environment and run**, the way 4.11.1 was.
 - `mypy` still covers 15% of the code (6 of 62 files, 1,932 of 12,882 lines),
   and `notion_views.py` is still the coverage floor at 75%. Both are
   deliberate, neither has changed.
+- The five console encodings are exercised through `PYTHONIOENCODING`, which
+  is not the same thing as a real Windows console with that code page active.
+  The original report came from a real one; the regression tests do not run on
+  one.
 
 ## The one large piece of work left
 
