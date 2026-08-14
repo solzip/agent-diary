@@ -9,6 +9,7 @@ from claude_diary.cli.notion_push.artifacts import default_artifact_dir
 
 # Re-export dependencies so submodules can access them via claude_diary.cli.*
 # and so that tests can patch them at claude_diary.cli.<name>.
+from claude_diary.lib.console import make_output_unbreakable
 from claude_diary.config import (
     CLAUDE_TRANSCRIPT_ROOT,
     load_config,
@@ -103,6 +104,10 @@ everything else is listed above. docs: https://github.com/solzip/agent-diary
 
 
 def main():
+    # Before anything can print. A Korean console cannot encode the em dashes
+    # and emoji this tool writes, and `print` raising takes the command with it.
+    make_output_unbreakable()
+
     parser = argparse.ArgumentParser(
         prog="agent-diary",
         description="Auto-generated work diary from Claude Code and Codex sessions",
