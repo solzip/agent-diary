@@ -90,15 +90,29 @@ def count_branch_sessions(diary_dir, project, branch):
     command to go and ask, and the commands that have to be gone and asked are
     the ones nobody runs — the diary is read, so the answer belongs in it.
 
+    **Distinct session ids, not rows.** This counted rows, which was the same
+    thing when it was written and stopped being so in 4.9.0, when an entry
+    became one assistant turn. Measured on a real index: a branch worked on
+    across 24 sessions held 1,292 entries, and one worked on in a single
+    session that day already held 15 — so the next entry there would have
+    called itself the sixteenth session on the branch.
+
+    Every row carries the id, and a rebuild recovers it from the entry text
+    (`reindex_all`), so the count survives `reindex`. Rows that have none —
+    4 of 7,269 in that index — share the empty string and so count once
+    between them rather than once each; an unattributable row should not be
+    able to inflate the number, which is the defect being fixed.
+
     Zero when either is missing, which reads as "no thread to place this in".
     """
     if not project or not branch:
         return 0
     index = load_index(diary_dir)
-    return sum(
-        1 for entry in index.get("entries", [])
+    return len({
+        entry.get("session_id") or ""
+        for entry in index.get("entries", [])
         if entry.get("project") == project and entry.get("branch") == branch
-    )
+    })
 
 
 def reindex_all(diary_dir):
