@@ -10,6 +10,9 @@ from pathlib import Path
 
 from claude_diary.config import load_config
 from claude_diary.lib.stats import parse_daily_file
+from claude_diary.log import get_logger
+
+logger = get_logger("claude_diary.team")
 
 
 _VALID_MEMBER_NAME = re.compile(r'^[a-zA-Z0-9_\-\.]+$')
@@ -37,7 +40,12 @@ def load_team_config(team_repo_path):
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        # The file is there — the check above passed — so this is unreadable or
+        # malformed JSON. `None` is also what "this repo has no team" returns,
+        # and the whole team feature then behaves as if it were never set up.
+        logger.warning("could not read the team config %s (%s): continuing as if "
+                       "there were no team", config_path, e)
         return None
 
 

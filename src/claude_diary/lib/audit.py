@@ -6,6 +6,10 @@ import os
 import sys
 from datetime import datetime, timezone, timedelta
 
+from claude_diary.log import get_logger
+
+logger = get_logger("claude_diary.lib.audit")
+
 
 def get_audit_path(diary_dir):
     """Return path to audit log file."""
@@ -75,7 +79,13 @@ def read_audit_log(diary_dir, days=None, limit=10):
                         entries.append(json.loads(line))
                     except json.JSONDecodeError:
                         continue
-    except Exception:
+    except Exception as e:
+        # The audit log exists — that was checked above — so this is a file
+        # that will not open. "No audit entries" is the answer for a tool that
+        # has never run, and it is the wrong answer here: the log is the thing
+        # someone opens to find out whether a session was recorded.
+        logger.warning("could not read the audit log %s (%s): reporting no entries",
+                       audit_path, e)
         return []
 
     # Filter by days (date string comparison, timezone-safe)
@@ -121,7 +131,12 @@ def _compute_source_checksum():
                 try:
                     with open(full_path, "rb") as f:
                         hasher.update(f.read())
-                except Exception:
-                    pass
+                except Exception as e:
+                    # A file that cannot be hashed is silently left out of the
+                    # sum, which produces a checksum that is stable, plausible
+                    # and covers less than it claims. Tamper detection that
+                    # quietly skips a file is worse than none.
+                    logger.warning("checksum skipped %s (%s): it covers fewer files "
+                                   "than it appears to", full_path, e)
 
     return "sha256:" + hasher.hexdigest()

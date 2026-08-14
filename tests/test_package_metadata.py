@@ -90,3 +90,55 @@ class TestTheClassifiersAreClaimsWeCanBack:
     def test_the_license_classifier_matches_the_declared_license(self):
         assert 'license = {text = "MIT"}' in PYPROJECT
         assert "License :: OSI Approved :: MIT License" in _classifiers()
+
+
+MANIFEST = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+
+
+class TestTheSdistCarriesWhatItsOwnTestsRead:
+    """The sdist ships `tests/`, which makes those tests a promise.
+
+    Several of them read the repository rather than the package — the plugin
+    manifests, the CI matrix, the release workflow, the CHANGELOG extractor.
+    None of that arrived in the sdist, so unpacking it and running pytest gave
+    2 collection errors, 4 failures and 14 errors: the suite could not even be
+    collected, and nothing said so, because nobody unpacks their own sdist.
+
+    Reading the paths back out of the test files rather than listing them here
+    keeps this honest — a test that starts reading a new repository file is
+    caught by this one instead of by whoever runs the sdist next.
+    """
+
+    #: Shipped by the build backend rather than by MANIFEST.in.
+    ALREADY_SHIPPED = {"src", "tests", "pyproject.toml", "MANIFEST.in"}
+
+    def _repo_paths_the_tests_read(self):
+        paths = set()
+        for test_file in sorted((ROOT / "tests").glob("test_*.py")):
+            text = test_file.read_text(encoding="utf-8")
+            for match in re.finditer(r'ROOT\s*/\s*"([^"]+)"', text):
+                paths.add(match.group(1))
+        return paths - self.ALREADY_SHIPPED
+
+    def test_every_repository_path_the_tests_read_is_in_the_manifest(self):
+        missing = [p for p in sorted(self._repo_paths_the_tests_read())
+                   if p not in MANIFEST]
+        assert not missing, (
+            "the tests read these repository paths and MANIFEST.in does not ship them, "
+            "so `pytest` inside an unpacked sdist fails on files that are simply absent: "
+            "%s" % ", ".join(missing)
+        )
+
+    def test_the_documentation_link_is_shipped_too(self):
+        """The PyPI sidebar promises this file; the package it describes should
+        carry it. The rest of docs/ is design notes the package has no use for."""
+        target = re.search(r"/blob/main/(docs/[^\"]+)", _urls()["Documentation"]).group(1)
+        assert target in MANIFEST, "%s is advertised on PyPI but not shipped" % target
+
+    def test_the_guard_can_tell_a_shipped_path_from_a_missing_one(self):
+        """An extractor that quietly finds nothing would make the check above
+        pass against an empty MANIFEST.in."""
+        found = self._repo_paths_the_tests_read()
+        assert found, "no repository paths were extracted — the pattern stopped matching"
+        assert ".github" in found, "the CI-matrix test reads .github and should be picked up"
+        assert "no-such-directory" not in MANIFEST, "the membership test does not discriminate"

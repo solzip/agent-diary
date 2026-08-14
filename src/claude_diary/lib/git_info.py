@@ -155,7 +155,11 @@ def get_branch_for_commit(cwd: str, commit_hash: str) -> str:
     """
     if not cwd or not commit_hash:
         return get_head_branch(cwd)
-    try:
+    # Guarded rather than bare, because this runs only when a Notion push has
+    # commits to label — rarely, and never in the paths the tests exercise most.
+    # A `NameError` here would be absorbed into the HEAD-branch fallback and
+    # look exactly like a commit that belongs to no branch.
+    with non_fatal("branch lookup for a commit"):
         result = subprocess.run(
             ["git", "branch", "--contains", commit_hash, "--format=%(refname:short)"],
             cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
@@ -164,8 +168,6 @@ def get_branch_for_commit(cwd: str, commit_hash: str) -> str:
             line = line.strip().lstrip("* ").strip()
             if line and not line.startswith("("):
                 return line
-    except Exception:
-        pass
     return get_head_branch(cwd)
 
 
@@ -217,7 +219,11 @@ def get_diff_stat_for_commits(cwd: str, commit_hashes: List[str]) -> DiffStat:
         return total
     import re
     for h in commit_hashes:
-        try:
+        # This function existed for a while before anything called it. A broad
+        # handler around code in that state hides the defect that a first run
+        # would otherwise reveal: every commit fails, the totals come out zero,
+        # and zero is what a session with no changes looks like.
+        with non_fatal("diff stat for commit %s" % h[:7]):
             result = subprocess.run(
                 ["git", "show", "--stat", "--format=", h],
                 cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
@@ -235,8 +241,6 @@ def get_diff_stat_for_commits(cwd: str, commit_hashes: List[str]) -> DiffStat:
                 total["added"] += int(a.group(1))
             if d:
                 total["deleted"] += int(d.group(1))
-        except Exception:
-            continue
     return total
 
 

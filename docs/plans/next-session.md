@@ -2,18 +2,19 @@
 
 > Written 2026-08-13, at v4.10.0. Kept in the repository rather than in
 > assistant memory because that memory is per-machine and this work is
-> continuing somewhere else.
+> continuing somewhere else. Updated 2026-08-14 after a full-project audit.
 
 ## Where things stand
 
 ```
 main        clean, nothing unpushed
 released    v4.10.0 (PyPI 4.10.0 confirmed)
-CHANGELOG   [Unreleased] empty
-tests       1,109 passing, CI green on 30 combinations
+CHANGELOG   [Unreleased] has 2026-08-14's work in it, not yet released
+tests       1,153 passing locally and from an unpacked sdist
+CI          green on 30 combinations
 ```
 
-Nothing is half-finished. Every branch opened today is merged and deleted.
+Nothing is half-finished. Every branch is merged and deleted.
 
 ## Waiting on Sol, not on code
 
@@ -35,6 +36,53 @@ Nothing is half-finished. Every branch opened today is merged and deleted.
    left is the one that was always there — **write the CHANGELOG section
    before tagging**, and a test on `pyproject.toml`'s version now enforces it
    at PR time rather than at tag time.
+
+## The 2026-08-14 audit, and what it left open
+
+Everything the project can check was run against the whole of it: the suite
+with the coverage gate, ruff, mypy, a package build with `twine check`, the
+version string in all five files, CHANGELOG against tags against GitHub
+releases, `claude plugin validate --strict`, every relative link in the 28
+tracked Markdown files, every subcommand's `--help` (22 plus 5 nested), the
+project's own secret scanner over all 158 tracked files, and a replay of the
+release workflow's shell steps. All clean. Coverage 89.91%; the floor is
+`notion_views.py` at 75%, still the module yesterday named as code whose paths
+had never run.
+
+Three things were found and fixed — the home-directory leak, the sdist that
+could not run its own tests, and four handlers whose failure value was
+indistinguishable from an empty success. They are in the CHANGELOG.
+
+**What the audit found and did not fix**, all of it one shape — a constant
+that exists in one place and is written out by hand somewhere else:
+
+- **`RICH_TEXT_LIMIT = 2000` is defined and never used.** Eight literal
+  `[:2000]` do the actual truncating across three modules, and
+  `formatter.py`'s docstring claims truncation happens "to RICH_TEXT_LIMIT"
+  while that module neither imports it nor could. The values agree today.
+- **`ACTIVE_STATUSES` in `notion_ops.py` is defined and never used**, sitting
+  directly above `DONE_STATUSES`, which is. This is one of the six scattered
+  status definitions the records/work-items design is blocked on — worth
+  fixing *there* rather than here.
+- **`DEFAULT_VERIFICATION_LIMIT = 3` in `formatter.py` is defined and never
+  used.**
+- **`"~/working-diary"` is written out at seven call sites** as a fallback to
+  `config.get("diary_dir", ...)`, while the real default lives in
+  `DEFAULT_CONFIG` — built with `os.path.join`, not as a POSIX literal. The
+  fallbacks cannot fire (`load_config` deep-copies the defaults), so they are
+  seven copies of a value nothing would update.
+- **The transcript root is spelled three ways**: `DEFAULT_TRANSCRIPT_ROOT` in
+  `backfill.py` (used), a bare `"~/.claude/projects"` twice in `write.py`, and
+  `os.path.join("~", ".claude", "projects")` in `try_run.py`.
+
+None of it is a live defect; all of it is the "one place was fixed and the
+others were not" shape that has produced most of this project's real bugs.
+
+**Clean, and worth not re-checking:** no absolute machine paths, no `/tmp` or
+`/var`, no Notion IDs, no e-mail addresses, no credential-shaped values (the
+only match is the scanner's own pattern list), the version literal appears in
+`__init__.py` alone, and every environment variable read is either namespaced
+`CLAUDE_DIARY_*` or an OS standard.
 
 ## The one large piece of work left
 
@@ -81,6 +129,17 @@ row decides whether steps 4-7 are worth starting.
   wrong wrote five entries into the real diary.
 - **Concurrency regressions must be tested with separate processes.** Threads
   share a file object and pass tests that the real thing fails.
+- **Count broad handlers with an AST, and read the `except` type properly.**
+  A scan that treats `except json.JSONDecodeError` as a bare `except` — the
+  type is an `ast.Attribute`, not an `ast.Name` — reported 85 handlers and 42
+  silent ones where there were 82 and 39. Two separate measurements that day
+  disagreed for this reason before the classifier was fixed.
+- **A handler with no `logger` or `print` in it is not necessarily silent.**
+  Of the 39 untraced handlers, most hand the failure back as a return value or
+  append it to a `failures` list the command prints later. The ones worth
+  fixing are narrower: where the failure value is *indistinguishable from a
+  real, empty, successful answer*. `tests/test_silent_failures.py` holds the
+  reviewed list, so the next scan starts from a decision rather than a count.
 - **`non_fatal` is not for every `except Exception`.** It reports `NameError`,
   which in a short body that runs on every entry dies in CI on the first run.
   The 4.9.0 defect survived a day because its *call site* was untested, not its
