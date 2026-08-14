@@ -1,4 +1,4 @@
-name: Release to PyPI
+name: Release
 
 on:
   push:
@@ -9,7 +9,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      id-token: write   # PyPI trusted publishing
+      contents: write   # creating the GitHub release
     steps:
       - uses: actions/checkout@v4
 
@@ -17,6 +18,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # Before the build, deliberately. A tag whose version the CHANGELOG never
+      # mentions should stop here, while it is still fixable: a PyPI version
+      # cannot be unpublished, but a release that has not been created yet
+      # costs nothing to delay.
+      - name: Read the release notes out of the CHANGELOG
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python scripts/changelog_section.py "$version" --output release-notes.md
+          echo "RELEASE_TITLE=$(python scripts/changelog_section.py "$version" --title)" >> "$GITHUB_ENV"
 
       - name: Install build tools
         run: pip install build
@@ -26,3 +37,18 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+      # After PyPI, so the release never announces a version nobody can install.
+      # Re-running a failed workflow on the same tag has to be safe, hence the
+      # edit branch rather than a create that fails on the second attempt.
+      - name: Publish the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "$RELEASE_TITLE" --notes-file release-notes.md --latest
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag \
+              --title "$RELEASE_TITLE" --notes-file release-notes.md --latest
+          fi
