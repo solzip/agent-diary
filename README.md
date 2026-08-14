@@ -680,7 +680,7 @@ This README focuses on currently usable functionality. Detailed design and plann
 | Area | Status |
 |------|--------|
 | Available | Claude Code Stop Hook, Codex skills, Markdown diaries, Notion task row push, schema v8 / view ensure, `ops` operations report, `review` queue, push run artifacts |
-| In progress | Notion schema reduction ([#12](https://github.com/solzip/agent-diary/issues/12)), dry-run ordinals ([#10](https://github.com/solzip/agent-diary/issues/10)), `Schema Version` string fix ([#11](https://github.com/solzip/agent-diary/issues/11)) |
+| In progress | Notion schema reduction ([#12](https://github.com/solzip/agent-diary/issues/12)) |
 | Next | Windows install/output experience, Notion sub-item guidance |
 | Under review | SQLite search index, Cursor/Windsurf/VS Code integration |
 
@@ -693,6 +693,7 @@ If you are deciding whether the code is worth reading, start with these two.
 
 Detailed design notes:
 
+- [Decision records (ADR)](docs/decisions/README.md) — the options that were compared, and why the rejected ones were rejected
 - [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
 - [Notion views design](docs/02-design/features/diary-notion-views.design.md)
 - [Distribution plan](docs/plans/phase-d-distribution.md)
