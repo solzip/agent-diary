@@ -27,10 +27,14 @@ Nothing is half-finished. Every branch opened today is merged and deleted.
    identical). Titles carry the CHANGELOG date (`v4.10.0 — 2026-08-13`) because
    GitHub stamps all eighteen with today's creation date and the real release
    dates would otherwise be lost. v4.10.0 is marked latest.
-   **Keep it current:** a new release does not appear on its own — the `v*` tag
-   publishes to PyPI via `release.yml`, it does not write release notes. Add
-   `gh release create vX.Y.Z --verify-tag --title "vX.Y.Z — <date>"
-   --notes-file <section>` to the release steps, or the count drifts back.
+   **It stays current on its own now.** `release.yml` reads the version's
+   CHANGELOG section, publishes to PyPI, then creates the release from that
+   section verbatim. The extraction runs *before* the build on purpose: a tag
+   whose version the CHANGELOG never mentioned fails while it is still
+   fixable, because a PyPI version cannot be unpublished. So the only rule
+   left is the one that was always there — **write the CHANGELOG section
+   before tagging**, and a test on `pyproject.toml`'s version now enforces it
+   at PR time rather than at tag time.
 
 ## The one large piece of work left
 
