@@ -7,10 +7,10 @@ from typing import Any, Dict, List, Optional
 
 from claude_diary.i18n import get_label
 from claude_diary.lib.conventional import commit_type
+from claude_diary.lib.notion_api import RICH_TEXT_LIMIT
 from claude_diary.types import EntryData, GitInfo
 
 
-DEFAULT_VERIFICATION_LIMIT = 3
 PROMPT_OUTPUT_LIMIT = 15
 APPENDIX_ITEM_LIMIT = 10
 
@@ -753,7 +753,7 @@ def _toggle(text, children):
 
 
 def _rich_text(text):
-    return [{"type": "text", "text": {"content": _truncate(text, 2000)}}]
+    return [{"type": "text", "text": {"content": _truncate(text, RICH_TEXT_LIMIT)}}]
 
 
 def _truncate(text, n):

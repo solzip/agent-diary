@@ -29,7 +29,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from claude_diary.config import load_config
+from claude_diary.config import load_config, resolve_diary_dir
 from claude_diary.log import configure_from_config, get_logger
 
 logger = get_logger("claude_diary.cli.report")
@@ -49,7 +49,7 @@ def cmd_report(args) -> None:
     config = load_config()
     configure_from_config(config)
     lang = config.get("lang", "ko")
-    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
+    diary_dir = resolve_diary_dir(config)
 
     try:
         start, end = _resolve_period(args)

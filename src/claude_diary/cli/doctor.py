@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, NamedTuple
 
-from claude_diary.config import get_config_path, load_config
+from claude_diary.config import get_config_path, load_config, resolve_diary_dir
 from claude_diary.log import configure_from_config, get_logger
 
 logger = get_logger("claude_diary.cli.doctor")
@@ -132,7 +132,7 @@ def _check_hook_registered() -> Check:
 
 
 def _check_diary_dir(config) -> Check:
-    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
+    diary_dir = resolve_diary_dir(config)
     if not os.path.isdir(diary_dir):
         return Check(WARN, "diary directory", "does not exist yet: %s" % diary_dir,
                      "it is created on the first entry")
@@ -149,7 +149,7 @@ def _check_recent_activity(config) -> Check:
     Everything else can pass while the diary quietly stops filling in. The
     only way to notice that is to look at how long it has been.
     """
-    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
+    diary_dir = resolve_diary_dir(config)
     latest = _latest_entry_date(diary_dir)
     if latest is None:
         return Check(WARN, "recent activity", "no entries yet",

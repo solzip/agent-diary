@@ -23,15 +23,15 @@ Error handling policy:
 import time
 
 from claude_diary.log import get_logger
-from claude_diary.lib import notion_cache
+from claude_diary.lib import notion_api, notion_cache
 
 logger = get_logger("claude_diary.exporters.notion_hierarchical")
 
 
-NOTION_API_VERSION = "2022-06-28"
-NOTION_API_BASE = "https://api.notion.com/v1"
+NOTION_API_VERSION = notion_api.API_VERSION
+NOTION_API_BASE = notion_api.API_BASE
 MAX_RETRIES = 3
-RICH_TEXT_LIMIT = 2000
+RICH_TEXT_LIMIT = notion_api.RICH_TEXT_LIMIT
 SCHEMA_VERSION = "v8"
 DATABASE_TITLE = "Entries"
 

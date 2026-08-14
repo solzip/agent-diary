@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **한 번만 적혀야 할 값들을 한 곳으로**: 전수 검사에서 **정의만 되고 아무 데서도 안 읽히는 상수 3개**가 나왔다. 죽은 줄 자체가 문제가 아니라 **그 옆에 자란 것**이 문제였다 — 이름이 붙은 자리 하나와, 손으로 다시 쓴 자리 여럿이 서로를 모른다
+  - `RICH_TEXT_LIMIT`이 아무 데서도 안 쓰이는 동안 **`[:2000]` 리터럴 8개가 3개 모듈에서** 실제로 자르고 있었다. `formatter.py`는 docstring에 "RICH_TEXT_LIMIT으로 자른다"고 적어놓고 **그 이름을 임포트할 수조차 없었다** — `notion_hierarchical`이 `formatter`를 임포트하므로 화살표가 한 방향뿐이다. 그래서 아무것도 임포트하지 않는 잎 모듈 `lib/notion_api.py`를 만들었다. API 버전(`2022-06-28`, 두 곳)과 베이스 URL도 같은 길을 가고 있어 함께 옮겼다
+  - `ACTIVE_STATUSES`가 안 쓰이는 동안 **바로 아래 파일에서 같은 상태 문자열이 인라인으로 여섯 번** 비교되고 있었고, `properties.py`엔 별도로 `VALID_STATUSES`가 또 있었다. `lib/statuses.py`로 통합했다. **의미는 하나도 바꾸지 않았다** — `Deployed`가 "배포"인지 "완료"인지는 records/work-items 설계가 아직 들고 있는 질문이고, 여기서는 현재 의미를 그대로 옮기기만 했다. 어제 적어둔 **착수 순서 1번("상태 정의 통합")이 이것**이다
+  - `DEFAULT_VERIFICATION_LIMIT`은 대응하는 인라인 값도 없는 순수한 죽은 줄이라 지웠다
+  - `config.get("diary_dir", "~/working-diary")`가 **7개 호출부에 각자 기본값 사본**을 들고 있었다. **그 사본들은 발화될 수 없다** — `load_config`가 `DEFAULT_CONFIG`를 deepcopy하므로 키는 항상 있다. 즉 아무도 갱신하지 않을 기본값 7개가, 실제로 유효한 형태(`os.path.join`)와 **다른 형태**(POSIX 리터럴)로 적혀 있었다. `resolve_diary_dir(config)` 하나로 모았다
+  - **transcript 루트는 세 철자였고, 그게 Windows에서 동등하지 않았다.** `expanduser("~/.claude/projects")`는 `C:\Users\me/.claude/projects`(구분자 혼용), `os.path.join` 형태는 `C:\Users\me\.claude\projects`를 준다. 같은 디렉터리를 열지만 **다른 문자열과만 같다.** 둘을 합치는 순간 기존 테스트가 이 차이를 잡았다. 그래서 상수 하나가 아니라 **사람이 읽는 기본값 문자열(`CLAUDE_TRANSCRIPT_ROOT`)과 코드가 쓰는 `resolve_transcript_root()`로 나눴다**
+  - 회귀 테스트: **정의만 되고 안 읽히는 상수가 생기면 실패한다.** 참조는 텍스트가 아니라 **구문 트리에서** 센다 — docstring에 이름이 적혀 있는 것이 `RICH_TEXT_LIMIT`이 오랫동안 쓰이는 것처럼 보였던 이유다. 통합한 값 넷이 다시 흩어져도 잡는다. 이때도 **리터럴만 보고 산문은 보지 않는다** — 디렉터리 구조를 설명하는 docstring을 상수 보간으로 바꾸는 건 개악이다
+  - 가드 4개를 변형으로 검증했다 — **4/4**. 그 과정에서 가드가 **자기가 옮겨놓은 죽은 상수(`ACTIVE`)를 즉시 잡았다.** 죽은 상수를 지운 게 아니라 자리만 옮긴 셈이어서, 호출부에 맞는 이름(`EARLY`)으로 바꾸고 인라인 튜플 하나를 마저 없앴다
+
 ### Fixed
 
 - **sdist가 자기가 실은 테스트를 돌릴 수 없던 문제**: sdist는 `tests/`를 같이 싣는데, 그중 여럿이 패키지가 아니라 **저장소**를 읽는다(플러그인 매니페스트, CI 매트릭스, 릴리스 워크플로, CHANGELOG 추출기). 그 파일들이 sdist에 없었다

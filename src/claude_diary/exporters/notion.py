@@ -4,6 +4,7 @@ Requires: pip install requests (optional dependency)
 """
 
 from claude_diary.exporters.base import BaseExporter
+from claude_diary.lib.notion_api import API_VERSION, RICH_TEXT_LIMIT
 
 
 class NotionExporter(BaseExporter):
@@ -35,13 +36,16 @@ class NotionExporter(BaseExporter):
         git_info = entry_data.get("git_info") or {}
         code_stats = entry_data.get("code_stats") or {}
 
+        def rich_text(lines):
+            return {"rich_text": [{"text": {"content": "\n".join(lines)[:RICH_TEXT_LIMIT]}}]}
+
         properties = {
             "Date": {"date": {"start": entry_data.get("date", "")}},
             "Project": {"select": {"name": entry_data.get("project", "unknown")}},
             "Categories": {"multi_select": [{"name": c} for c in categories[:5]]},
-            "Task Requests": {"rich_text": [{"text": {"content": "\n".join(prompts[:3])[:2000]}}]},
-            "Files Modified": {"rich_text": [{"text": {"content": "\n".join(files_mod + files_new)[:2000]}}]},
-            "Work Summary": {"rich_text": [{"text": {"content": "\n".join(hints[:5])[:2000]}}]},
+            "Task Requests": rich_text(prompts[:3]),
+            "Files Modified": rich_text(files_mod + files_new),
+            "Work Summary": rich_text(hints[:5]),
         }
 
         # Team mode: add Author column
@@ -55,7 +59,7 @@ class NotionExporter(BaseExporter):
                 git_info.get("branch", ""),
                 "\n".join("%s %s" % (c["hash"], c["message"]) for c in commits[:5])
             )
-            properties["Git Commits"] = {"rich_text": [{"text": {"content": git_text[:2000]}}]}
+            properties["Git Commits"] = {"rich_text": [{"text": {"content": git_text[:RICH_TEXT_LIMIT]}}]}
 
         # Code stats
         added = code_stats.get("added", 0)
@@ -68,7 +72,7 @@ class NotionExporter(BaseExporter):
             headers={
                 "Authorization": "Bearer %s" % token,
                 "Content-Type": "application/json",
-                "Notion-Version": "2022-06-28",
+                "Notion-Version": API_VERSION,
             },
             json={"parent": {"database_id": db_id}, "properties": properties},
             timeout=10,

@@ -28,13 +28,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Set
 
-from claude_diary.config import load_config
+from claude_diary.config import CLAUDE_TRANSCRIPT_ROOT, load_config, resolve_diary_dir
 from claude_diary.core import process_session
 from claude_diary.log import configure_from_config, get_logger
 
 logger = get_logger("claude_diary.cli.backfill")
 
-DEFAULT_TRANSCRIPT_ROOT = "~/.claude/projects"
+DEFAULT_TRANSCRIPT_ROOT = CLAUDE_TRANSCRIPT_ROOT
 
 # The writer emits the full session id on its own line inside a <details>
 # block. That line is what makes an import repeatable.
@@ -58,7 +58,7 @@ def cmd_backfill(args) -> None:
     config = load_config()
     configure_from_config(config)
 
-    diary_dir = os.path.expanduser(config.get("diary_dir", "~/working-diary"))
+    diary_dir = resolve_diary_dir(config)
     tz_offset = config.get("timezone_offset", 9)
     local_tz = timezone(timedelta(hours=tz_offset))
 
