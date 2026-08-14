@@ -95,7 +95,6 @@ CURRENT_EXTENSION_COLUMNS = [
     "Status",
     "Task Group",
     "Depends On",
-    "Parent Task",
     "Work Period",
     "Priority",
     "Next Action",
@@ -117,10 +116,13 @@ def _assert_current_extension_schema(patch_body, db_id):
     assert relation["database_id"] == db_id
     assert relation["type"] == "single_property"
 
-    parent_relation = props["Parent Task"]["relation"]
-    assert parent_relation["database_id"] == db_id
-    assert parent_relation["type"] == "dual_property"
-    assert parent_relation["dual_property"]["synced_property_name"] == "Sub-items"
+    # `Parent Task`/`Sub-items` were a custom dual-property pair standing in for
+    # a hierarchy nothing ever wrote to it: `update_row_parent` had no callers,
+    # and `_wire_parent_tasks` reports a failure and asks the user to enable
+    # Notion's native sub-items rather than falling back to this pair. Creating
+    # the columns only added two that stayed empty.
+    assert "Parent Task" not in props
+    assert "Sub-items" not in props
 
     assert props["Priority"] == {"select": {}}
     assert props["Next Action"] == {"rich_text": {}}
@@ -654,62 +656,6 @@ class TestUpdateRelations:
             {"id": "row_a"},
             {"id": "row_c"},
         ]
-
-    def test_update_row_parent_sets_parent_task(self):
-        exp = _make_exporter()
-        mock_req = MagicMock()
-        mock_req.request.return_value = _make_response(200, {"id": "row_child"})
-
-        with _patch_requests(mock_req):
-            exp.update_row_parent("row_child", "row_parent")
-
-        body = mock_req.request.call_args.kwargs["json"]
-        assert body["properties"]["Parent Task"]["relation"] == [
-            {"id": "row_parent"},
-        ]
-
-    def test_update_row_subitems_sets_subitems(self):
-        exp = _make_exporter()
-        mock_req = MagicMock()
-        mock_req.request.return_value = _make_response(200, {"id": "row_parent"})
-
-        with _patch_requests(mock_req):
-            exp.update_row_subitems("row_parent", ["row_child_1", "row_child_2"])
-
-        body = mock_req.request.call_args.kwargs["json"]
-        assert body["properties"]["Sub-items"]["relation"] == [
-            {"id": "row_child_1"},
-            {"id": "row_child_2"},
-        ]
-
-    def test_update_row_subitems_preserves_existing_subitems(self):
-        exp = _make_exporter()
-        mock_req = MagicMock()
-        mock_req.request.side_effect = [
-            _make_response(200, {
-                "id": "row_parent",
-                "properties": {
-                    "Sub-items": {
-                        "relation": [
-                            {"id": "row_existing"},
-                            {"id": "row_child_1"},
-                        ]
-                    }
-                },
-            }),
-            _make_response(200, {"id": "row_parent"}),
-        ]
-
-        with _patch_requests(mock_req):
-            exp.update_row_subitems("row_parent", ["row_child_1", "row_child_2"])
-
-        body = mock_req.request.call_args_list[1].kwargs["json"]
-        assert body["properties"]["Sub-items"]["relation"] == [
-            {"id": "row_existing"},
-            {"id": "row_child_1"},
-            {"id": "row_child_2"},
-        ]
-
 
 class TestRequestsMissing:
     def test_friendly_error_when_requests_not_installed(self):

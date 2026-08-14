@@ -605,3 +605,50 @@ class TestEnsureMigratesSubitems:
         result = CoreViewsEnsurer(client).ensure("db1", "2026-06-02")
         assert result.ok()  # migration failure must not fail the ensure run
         assert any("sub-item migration skipped" in w for w in result.warnings)
+
+
+class TestTheLegacyRelationPairIsGone:
+    """`Parent Task`/`Sub-items` were a custom dual-property pair that nothing
+    filled. `update_row_parent` had no callers, and `_wire_parent_tasks` reports
+    a failure asking the user to enable Notion's native sub-items rather than
+    writing to this pair — so on a database without native sub-items the columns
+    existed and stayed empty either way.
+
+    Measured before removal: 13 legacy links in the live database, all 13 also
+    present in the native pair, so nothing was carried only here.
+
+    Pinned because removing the two names from both lists broke no test at all —
+    the lists had never been asserted on.
+    """
+
+    LEGACY = ("Parent Task", "Sub-items")
+
+    def test_ensure_does_not_recreate_them(self):
+        from claude_diary.exporters.notion_views import (
+            REQUIRED_PROPERTIES, SCHEMA_EXTENSION_PROPERTIES,
+        )
+        for name in self.LEGACY:
+            assert name not in REQUIRED_PROPERTIES, (
+                "%s is back in REQUIRED_PROPERTIES; `ensure` will recreate the "
+                "column on every database" % name)
+            assert name not in SCHEMA_EXTENSION_PROPERTIES, name
+
+    def test_a_new_database_is_not_given_them(self):
+        from claude_diary.exporters.notion_hierarchical import _current_schema_extensions
+        props = _current_schema_extensions("db-1")
+        for name in self.LEGACY:
+            assert name not in props
+
+    def test_reading_old_links_still_works(self):
+        """Databases in the wild still have the columns and the links in them.
+        The migration that folds them into the native pair has to keep reading."""
+        import claude_diary.exporters.notion_views as nv
+        rows = [
+            {"id": "child", "properties": {
+                "Parent Task": {"type": "relation", "relation": [{"id": "parent"}]},
+                "상위 항목": {"type": "relation", "relation": []},
+            }},
+            {"id": "parent", "properties": {}},
+        ]
+        migrations = nv._compute_native_migration(rows, "상위 항목")
+        assert migrations == [("child", ["parent"], 1)]

@@ -479,16 +479,6 @@ class NotionHierarchicalExporter:
             }
         })
 
-    def update_row_parent(self, row_id, parent_row_id):
-        """PATCH a row to set its `Parent Task` containment relation."""
-        self._request("PATCH", "/pages/%s" % row_id, {
-            "properties": {
-                "Parent Task": {
-                    "relation": [{"id": parent_row_id}]
-                }
-            }
-        })
-
     def update_row_review(self, row_id, status, reviewed_date):
         """PATCH a row's review state.
 
@@ -531,19 +521,6 @@ class NotionHierarchicalExporter:
             "properties": {
                 parent_property_name: {
                     "relation": [{"id": parent_row_id}]
-                }
-            }
-        })
-
-    def update_row_subitems(self, row_id, child_row_ids):
-        """PATCH a parent row to include native Notion `Sub-items` relations."""
-        merged_ids = _unique_ids(
-            self.get_row_relation_ids(row_id, "Sub-items") + list(child_row_ids)
-        )
-        self._request("PATCH", "/pages/%s" % row_id, {
-            "properties": {
-                "Sub-items": {
-                    "relation": [{"id": rid} for rid in merged_ids]
                 }
             }
         })
@@ -605,7 +582,6 @@ def _current_schema_extensions(db_id):
         "Status": {"select": {}},
         "Task Group": {"select": {}},
         "Depends On": _self_relation(db_id),
-        "Parent Task": _subitem_parent_relation(db_id),
         "Work Period": {"date": {}},
         "Priority": {"select": {}},
         "Next Action": {"rich_text": {}},
