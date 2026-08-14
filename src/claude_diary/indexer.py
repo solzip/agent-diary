@@ -4,6 +4,7 @@ import json
 import os
 
 from claude_diary.lib.filelock import FileLock
+from claude_diary.lib.stats import CATEGORY_LINE
 from claude_diary.log import get_logger
 
 logger = get_logger("claude_diary.indexer")
@@ -133,7 +134,11 @@ def reindex_all(diary_dir):
             proj_match = re.search(r'📁 `([^`]+)`', session)
             project = proj_match.group(1) if proj_match else ""
 
-            cats = re.findall(r'(?:카테고리|Categories).*?`([^`]+)`', session)
+            # One shared pattern with `lib/stats.py`: the two used to carry
+            # separate copies of the same broken regex, so the index and the
+            # stats agreed on a wrong answer.
+            cat_line = CATEGORY_LINE.search(session)
+            cats = re.findall(r'`([^`]+)`', cat_line.group(0)) if cat_line else []
             files = re.findall(r'  - `([^`]+)`', session)
 
             keywords = set()

@@ -11,7 +11,7 @@
       "displayName": "Agent Diary",
       "source": "./",
       "description": "Records what you asked for and what changed, automatically, when a Claude Code session ends. The plugin installs the Stop Hook; the agent-diary CLI comes from the Python package (pip install agent-diary).",
-      "version": "4.11.2",
+      "version": "4.11.3",
       "author": {
         "name": "solzip",
         "url": "https://github.com/solzip"
