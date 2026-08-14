@@ -2,21 +2,28 @@
 
 > Written 2026-08-13, at v4.10.0. Kept in the repository rather than in
 > assistant memory because that memory is per-machine and this work is
-> continuing somewhere else. Updated 2026-08-14 after a full-project audit.
+> continuing somewhere else. Updated 2026-08-14 after a full-project audit and
+> the four releases that followed it, two of them fixing things the audit had
+> passed.
 
 ## Where things stand
 
 ```
 main        clean, nothing unpushed
-released    v4.11.0 (PyPI 4.11.0 confirmed, GitHub release created by the tag)
+released    v4.11.3 (PyPI confirmed; 22 tags = 22 releases = 22 CHANGELOG sections)
 CHANGELOG   [Unreleased] empty
-tests       1,160 passing locally and from an unpacked sdist
+tests       1,197 passing
 CI          green on 30 combinations
 ```
 
-v4.11.0 was the first tag to publish its own release notes. The workflow ran
-all eight steps green, and the published release body is byte-identical to the
-CHANGELOG section it came from — checked, not assumed.
+v4.11.0 was the first tag to publish its own release notes, and four releases
+have gone out that way since. The workflow runs all eight steps green and the
+published body is byte-identical to the CHANGELOG section it came from —
+checked, not assumed.
+
+**Anyone upgrading past 4.11.2 should run `agent-diary reindex` once.** The
+category defect below wrote a thin index; the diary files were never wrong, so
+a rebuild recovers all of it.
 
 Nothing is half-finished. Every branch is merged and deleted.
 
@@ -57,6 +64,10 @@ Three things were found and fixed — the home-directory leak, the sdist that
 could not run its own tests, and four handlers whose failure value was
 indistinguishable from an empty success. They are in the CHANGELOG.
 
+**"All clean" was premature.** Two more defects turned up within hours, both
+in paths this audit had signed off on. See the next section for what it was
+not looking at.
+
 **What the audit found in the constants, and what was done about it.** Three
 were defined and read by nothing — `RICH_TEXT_LIMIT`, `ACTIVE_STATUSES`,
 `DEFAULT_VERIFICATION_LIMIT` — and in each case the value they named was typed
@@ -86,6 +97,52 @@ Two things came out of doing it that are worth keeping:
 only match is the scanner's own pattern list), the version literal appears in
 `__init__.py` alone, and every environment variable read is either namespaced
 `CLAUDE_DIARY_*` or an OS standard.
+
+## What the audit missed, and how it was found
+
+Two defects arrived after the audit had declared everything clean, and both
+were found the same way: by **running a command and looking at the output**,
+which the audit never did. It ran `--help` on all 27 paths and captured every
+one through a UTF-8 pipe.
+
+- **A Korean console could not print this tool's output at all** (4.11.1).
+  cp949 has no em dash and no emoji, so `stats` died on `╔` — its first
+  character — along with `weekly`, `report` and `doctor`. Four of the eleven
+  commands that run without credentials. Reported by a user of another
+  project, not by any check here. `hook.py` had guarded its own streams since
+  it was written; the CLI never got it.
+- **Every category after the first was dropped** (4.11.3). `indexer.py` and
+  `lib/stats.py` each held a copy of a regex that looks like it collects all
+  of them and collects one. On a real 73-file diary: **20,424 categories in
+  the files, 7,048 reaching `stats`**, and 96.1% of entries affected. It also
+  invented categories out of prose — `reindex`, `search`, `([^` were being
+  counted as categories.
+
+Three things worth keeping from how those went:
+
+- **Test data written by hand is not evidence.** A first pass with an invented
+  diary format "found" that Korean search was broken and that session ids were
+  not indexed. Both were artifacts of the fixture. Regenerating the diary with
+  the tool's own hook made one disappear and the real one appear.
+- **A fixture can carry the bug and still pass.** `test_reindex_fidelity`'s
+  entry has had two categories since the day it was written, and nothing
+  asserted on them — so reverting the broken regex left all 28 tests green.
+  The suite existed specifically to catch thin indexes.
+- **Check a fix against more than the case that produced it.** The console fix
+  looked right on cp949 and turned `주간 작업 리포트` into `** ** ***` on an
+  ASCII locale, and a `·` that cp949 happens to have became 31 asterisks. Five
+  encodings now, not one.
+
+## Not verified
+
+- The category fix was measured at the parser (20,431 against 7,057 on the
+  real diary). **`search docs` was not re-run after a reindex**, so the change
+  in what the command answers is inferred, not observed.
+- 4.11.2 and 4.11.3 were confirmed published and green; **neither was
+  installed from PyPI into a clean environment and run**, the way 4.11.1 was.
+- `mypy` still covers 15% of the code (6 of 62 files, 1,932 of 12,882 lines),
+  and `notion_views.py` is still the coverage floor at 75%. Both are
+  deliberate, neither has changed.
 
 ## The one large piece of work left
 
@@ -136,6 +193,17 @@ unverified, and that single row decides whether steps 4-7 are worth starting.
   wrong wrote five entries into the real diary.
 - **Concurrency regressions must be tested with separate processes.** Threads
   share a file object and pass tests that the real thing fails.
+- **New `print` calls need no wrapping.** `make_output_unbreakable()` runs at
+  the CLI entry point and installs an encoding error handler on stdout and
+  stderr, so a console that cannot draw `█` gets `#` and one that cannot draw
+  a word gets `?`. Write the real character. What must *not* pass through it
+  is file content — `weekly` writes its report and then prints it, and the
+  diary headers this repo's own parser matches on (`### ⏰ … 📁`) are parsed,
+  not decorated.
+- **The category line has one parser**, `CATEGORY_LINE` in `lib/stats.py`,
+  used by both the indexer and the stats. It is anchored to the bold label
+  line on purpose: a loose match also finds the word in ordinary prose, which
+  is how `reindex` and `search` ended up counted as categories.
 - **Count broad handlers with an AST, and read the `except` type properly.**
   A scan that treats `except json.JSONDecodeError` as a bare `except` — the
   type is an `ast.Attribute`, not an `ast.Name` — reported 85 handlers and 42
