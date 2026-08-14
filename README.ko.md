@@ -684,7 +684,7 @@ CI에서는 Python 3.12 작업에서만 돕니다. 현재 mypy가 이 프로젝�
 | 구분 | 내용 |
 |------|------|
 | 사용 가능 | Claude Code Stop Hook, Codex skill, Markdown 일지, Notion task row push, schema v8 / view ensure, 운영 진단 `ops`, 검토 큐 `review`, push 실행 기록 |
-| 진행 중 | Notion 스키마 축소 ([#12](https://github.com/solzip/agent-diary/issues/12)), dry-run 차수 반영 ([#10](https://github.com/solzip/agent-diary/issues/10)), `Schema Version` 표기 정정 ([#11](https://github.com/solzip/agent-diary/issues/11)) |
+| 진행 중 | Notion 스키마 축소 ([#12](https://github.com/solzip/agent-diary/issues/12)) |
 | 다음 개선 | Windows 설치/출력 경험 정리, Notion sub-item 안내 개선 |
 | 검토 중 | SQLite 기반 검색 인덱스, Cursor/Windsurf/VS Code 같은 다른 AI IDE 연동 |
 
@@ -697,6 +697,7 @@ CI에서는 Python 3.12 작업에서만 돕니다. 현재 mypy가 이 프로젝�
 
 세부 설계 문서:
 
+- [결정 문서 (ADR)](docs/decisions/README.md) — 비교한 선택지와 탈락한 쪽을 버린 이유
 - [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
 - [Notion views design](docs/02-design/features/diary-notion-views.design.md)
 - [Distribution plan](docs/plans/phase-d-distribution.md)
