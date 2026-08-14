@@ -53,6 +53,23 @@
 어떤 지표를 읽으면 안 되는지). 코드를 건드리기 전에 그 문서의
 「Things that are true and are not written in the code」를 먼저 읽는다.
 
+## 즉석 스크립트는 `PYTHONPATH=src`로 돌린다
+
+`src/` 레이아웃이다. 저장소 루트에서 그냥 `python -c "import claude_diary"`를
+하면 **작업 트리가 아니라 site-packages의 설치본을 읽는다.** 고친 코드를 확인한
+줄 알았는데 실제로는 배포된 옛 버전을 잰 것이 된다.
+
+```bash
+PYTHONPATH=src python -c "import claude_diary.indexer as i; print(i.__file__)"
+```
+
+`pytest`는 `pyproject.toml`의 `pythonpath = ["src"]`가 처리하므로 그냥 돌리면
+된다. 문제가 되는 건 **손으로 돌리는 한 줄짜리 확인**이다. 그리고 그런 확인은
+틀려도 조용히 그럴듯한 답을 낸다 — 이 저장소가 반복해서 걸린 모양 그대로다.
+
+실제로 2026-08-14에 `count_branch_sessions` 수정을 검증하면서 이걸로 "수정 전후
+값이 같다"는 결과를 받았다. 설치본을 재고 있었다.
+
 ## 실험이 실제 일지를 건드리지 않게
 
 `CLAUDE_DIARY_DIR`만 바꾸는 걸로는 부족하다. `config.json`이 환경변수보다
