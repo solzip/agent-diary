@@ -4,17 +4,25 @@
 > assistant memory because that memory is per-machine and this work is
 > continuing somewhere else. Updated 2026-08-14 after a full-project audit and
 > the four releases that followed it, two of them fixing things the audit had
-> passed.
+> passed — and again later that day, after the README was brought back in line
+> with the code and 4.12.0 went out.
 
 ## Where things stand
 
 ```
 main        clean, nothing unpushed
-released    v4.11.3 (PyPI confirmed; 22 tags = 22 releases = 22 CHANGELOG sections)
+released    v4.12.0 (PyPI confirmed; 23 tags = 23 releases = 23 CHANGELOG sections)
 CHANGELOG   [Unreleased] empty
-tests       1,197 passing
+tests       1,199 passing
 CI          green on 30 combinations
 ```
+
+**The working rules now live in [`CLAUDE.md`](../../CLAUDE.md), not in one
+machine's assistant memory.** Read it first. It holds the rule that a
+user-visible change updates both READMEs in the same PR, the table of which
+document is authoritative for what, and the two ways a check here silently
+measures the wrong thing (`PYTHONPATH=src`, and the three variables an
+isolated run needs).
 
 v4.11.0 was the first tag to publish its own release notes, and four releases
 have gone out that way since. The workflow runs all eight steps green and the
@@ -22,15 +30,58 @@ published body is byte-identical to the CHANGELOG section it came from —
 checked, not assumed.
 
 **Anyone whose index has ever been rebuilt should run `agent-diary reindex`
-once on 4.11.3.** The category defect made `reindex` write a thin index; the
-diary files were never wrong, so a rebuild on the fixed code recovers all of
-it. Measured below: `search feature` went from 2,287 hits to 4,949.
+once on 4.11.3 or later.** The category defect made `reindex` write a thin
+index; the diary files were never wrong, so a rebuild on the fixed code
+recovers all of it. Measured below: `search feature` went from 2,287 hits to
+4,949. This is in the README now, which it was not when this paragraph was
+written — a user had no way to know the command was worth running.
 
 The published 4.11.3 was installed from PyPI into a clean virtualenv and run:
 `stats`, `weekly`, `doctor` and `search` all complete on a cp949 console with
-zero `?` in the output.
+zero `?` in the output. 4.12.0 was installed the same way and `doctor` reports
+8 ok, 0 warnings, 0 failures; its release body is byte-identical to the
+CHANGELOG section (2,274 characters, compared rather than assumed).
 
 Nothing is half-finished. Every branch is merged and deleted.
+
+## The README had drifted 65 commits behind the code
+
+Worth recording because nothing failed while it happened. Between 4.9.0 and
+4.11.3 the README was not touched once, and its opening description of how the
+tool works became false: it said one finished session appends one entry, and
+its sample entry showed a `📝 Work Summary` block the hook stopped writing
+while omitting the `💬 Response` block it started writing. Four PRs (#81–#83,
+#85) brought it back.
+
+Two things came out of that worth keeping:
+
+- **The rule is now in the repository** (`CLAUDE.md`), because the failure mode
+  was a rule that lived nowhere. Documentation drift here looks exactly like
+  the code defects this project keeps finding — nothing raises, and a plausible
+  wrong answer is served.
+- **Documenting a number is a way of checking it.** Writing down what the
+  branch line's `(#N)` meant is what found that it did not mean that.
+
+## What 4.12.0 changed
+
+- **`(#N)` on the branch line counted rows, not sessions.** Correct until
+  4.9.0 made an entry a turn. Measured on the real index: one branch held
+  1,292 rows from 24 sessions, and a branch worked on in a single sitting held
+  15 — the next entry would have called itself the sixteenth session on it.
+  Now counts distinct `session_id`, which `reindex_all` recovers from the
+  entry text, so it survives a rebuild.
+  **Entries already written keep the number they were stamped with.** Anything
+  written between 4.9.0 and 4.12.0 has a turn count in it; it is not
+  retroactively corrected and should be read as one.
+- **`Parent Task` / `Sub-items` are out of the Notion schema.** `ensure` no
+  longer creates them. Existing databases keep their columns and values; the
+  migration that folds them into native sub-items stays.
+
+The test that should have caught the ordinal gave its three entries three
+different session ids, so rows and sessions were the same number in the
+fixture. That is the third time this pattern has appeared here — see the
+4.11.3 note below on `test_reindex_fidelity`. **When a fixture could
+distinguish two readings of a value, make it distinguish them.**
 
 ## Waiting on Sol, not on code
 
