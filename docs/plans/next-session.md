@@ -261,6 +261,24 @@ simply no longer read.
   wrong wrote five entries into the real diary.
 - **Concurrency regressions must be tested with separate processes.** Threads
   share a file object and pass tests that the real thing fails.
+- **A second `diary-notion push` in the same session writes nothing.** The row
+  key is `session_id:task_index` (`notion_cache._row_key`) and `task_index` is
+  the position in the `tasks` array, so pushing 6 new tasks after an 11-task
+  push collides on indices 0-5 and every one comes back `already exists`.
+  Measured 2026-08-14: `Pushed 0, skipped 6`.
+
+  `--force` is not the fix — `archive_rows_for_session` archives **every** row
+  of that session, so it would have destroyed the 11 already there to write 6.
+
+  The workaround is to re-send the whole array: previous tasks first (they skip)
+  and the new ones after, which lands them on fresh indices. The previous input
+  is preserved at `.codefleet/runs/<timestamp>-<session>/input.json`, and
+  `parent_index` / `depends_on_indices` in the appended tasks have to be shifted
+  by the offset. Doing that gave `Pushed 6, skipped 11` with nothing archived.
+
+  It is the shape this project keeps finding: nothing fails, and the command
+  reports success while doing nothing.
+
 - **New `print` calls need no wrapping.** `make_output_unbreakable()` runs at
   the CLI entry point and installs an encoding error handler on stdout and
   stderr, so a console that cannot draw `█` gets `#` and one that cannot draw
