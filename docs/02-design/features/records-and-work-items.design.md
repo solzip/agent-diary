@@ -108,6 +108,15 @@ So `parent_progress` runs, but it has never once run on the case this design
 exists for. "The reporting half already exists" would be an overstatement — the
 code exists and its input never has.
 
+> **2026-08-14: it has now.** Two real rows from different sessions were linked
+> by hand with `update_row_native_parent` and read back. Notion accepted the
+> link, the `상위 항목` / `하위 항목` pair synced both ways, and `ops` reported
+> `children: 1, active: 1, done: 0` on the parent. The link was undone
+> afterwards. What blocks this is not the platform but `_wire_parent_tasks`,
+> which only pairs indices inside the rows the current push created — there is
+> no lookup for a parent from an earlier session. See
+> [ADR-0002](../../decisions/0002-two-layer-records-and-work-items.md).
+
 ### Two hierarchy relations, not one
 
 The database carries two dual-property relation pairs:
@@ -275,5 +284,7 @@ starting. Steps 1 and 4 are useful even if the rest never happens.
 - **Year boundaries.** The database is per-year. A work item spanning New Year
   has no defined home, and today nothing does either.
 - **Which relation pair**, and what happens to the 13 links in the loser.
-- **Whether cross-session linking works at all.** Unknown, not assumed — see
-  step 3. Every one of the 90 links that exists today is intra-session.
+- ~~**Whether cross-session linking works at all.**~~ **Answered 2026-08-14: it
+  works.** Notion accepts the link, the native pair syncs both ways, and `ops`
+  counts it. The gap is a lookup for a parent from an earlier session, not the
+  platform. [ADR-0002](../../decisions/0002-two-layer-records-and-work-items.md)
