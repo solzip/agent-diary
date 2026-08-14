@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **브랜치 차수 `(#N)`이 세션이 아니라 항목을 세고 있던 문제**: `count_branch_sessions`가 인덱스 **행 수**를 셌습니다. 쓰일 당시엔 그게 세션 수와 같았지만, **4.9.0에서 항목이 턴 단위가 되면서 달라졌습니다** — 그 뒤로 이 숫자는 턴 수입니다
+  - 구현이 **자기 문서와 어긋나 있었습니다.** docstring은 "How many sessions this project has already recorded on this branch", `formatter.py`의 주석도 "this is the twelfth session on this piece of work"라고 말합니다
+  - **실측**(실제 `.diary_index.json`, 항목 7,269개): `erp_chatbot_solzip`의 한 브랜치가 **항목 1,292개 / 세션 24개**. 4.9.0 이후 항목만 봐도 `itwill_1st_movie`의 브랜치가 **항목 15개 / 세션 1개** — 다음 항목이 `(#16)`으로 찍히지만 실제로는 첫 세션입니다
+  - `session_id`로 distinct를 셉니다. 값은 인덱스에 이미 있고 `reindex_all`이 항목 본문의 `<code>` 블록에서 복구하므로 **rebuild 후에도 유지됩니다**
+  - id가 없는 행(그 인덱스에서 7,269개 중 **4개**)은 빈 문자열을 공유해 **넷이 합쳐 하나**로 셉니다. 정체를 알 수 없는 행이 숫자를 부풀리는 게 지금 고치는 결함이라, 그쪽으로 되돌아가지 않게 했습니다
+  - **기존 테스트가 결함을 통과시키고 있었습니다.** `test_sessions_on_one_branch_are_counted`는 항목 3개에 **서로 다른** id를 줘서, 행을 세든 세션을 세든 답이 같았습니다. 같은 세션이 여러 턴을 쓴 경우를 단정하는 테스트를 새로 넣었습니다
+  - 되돌리기 검증: 옛 계산으로 되돌리면 새 테스트 **2개가 전부 실패**합니다 (`5 == 2` 등)
+
 ### Removed
 
 - **`Parent Task` / `Sub-items` — 아무것도 채우지 않던 관계쌍**: Notion DB 스키마에서 뺐습니다. 이 둘은 네이티브 하위항목이 없는 DB를 위한 대체 경로처럼 보였지만, **대체 경로가 아니었습니다**

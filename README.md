@@ -63,6 +63,8 @@ Categories are inferred from the work. Branch, commits and diff stats are read f
 
 `📝 Work Summary` is not in the entry above because the hook does not write one. It appears when an agent authors the entry itself — `/diary`, `$diary`, or `agent-diary write --input` — and supplies `summary_hints`.
 
+**The branch line carries a thread number.** ``🌿 Branch: `feat/jwt-auth` (#3)`` means this is the third session this project has recorded on that branch, so an entry says where it sits in a piece of work rather than leaving you to count. It counts sessions, not entries — a long sitting is many entries and one number. The first session on a branch is not numbered, because there is no thread behind it to point at.
+
 ### What makes it different
 
 - **It is automatic.** In Claude Code a Stop Hook fires each time Claude finishes replying. You never have to decide to record something.

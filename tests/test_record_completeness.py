@@ -157,6 +157,34 @@ class TestItKeepsTheThread:
 
         assert count_branch_sessions(str(diary), "proj", "feature/x") == 3
 
+    def test_one_session_counts_once_however_many_turns_it_wrote(self, tmp_path):
+        """The count was `sum(1 for ...)` over index rows, which was the same
+        number as sessions until 4.9.0 made an entry a turn. The test above
+        gave its three entries three different ids, so it kept passing while
+        the count was really counting turns."""
+        from claude_diary.indexer import count_branch_sessions, update_index
+
+        diary = tmp_path / "d"
+        diary.mkdir()
+        for _ in range(15):
+            update_index(str(diary), self._entry("proj", "feature/x", "one-session"))
+
+        assert count_branch_sessions(str(diary), "proj", "feature/x") == 1
+
+    def test_rows_with_no_session_id_cannot_inflate_the_count(self, tmp_path):
+        """4 of 7,269 rows in a real index have no id. They are one unknown,
+        not one each — an unattributable row inflating the number is the
+        defect, not the fix for it."""
+        from claude_diary.indexer import count_branch_sessions, update_index
+
+        diary = tmp_path / "d"
+        diary.mkdir()
+        for _ in range(4):
+            update_index(str(diary), self._entry("proj", "feature/x", ""))
+        update_index(str(diary), self._entry("proj", "feature/x", "s1"))
+
+        assert count_branch_sessions(str(diary), "proj", "feature/x") == 2
+
     def test_a_missing_branch_counts_as_no_thread(self, tmp_path):
         from claude_diary.indexer import count_branch_sessions
 
