@@ -26,7 +26,7 @@ import sys
 
 import pytest
 
-from claude_diary.lib.console import make_output_unbreakable
+from claude_diary.lib.console import ERROR_HANDLER, make_output_unbreakable
 
 #: Characters this project prints that cp949 cannot represent. It carries
 #: U+2015 HORIZONTAL BAR but not U+2014 EM DASH, and no emoji at all.
@@ -89,6 +89,69 @@ class TestTheCommandsSurviveAKoreanConsole:
             "a UTF-8 console should still get the box drawing and emoji")
 
 
+class TestTheChartsStayCharts:
+    """Not crashing was the first fix; being readable is this one.
+
+    `errors="replace"` stopped the exception and printed `?`. `stats` draws its
+    bars out of block elements, so every chart came out as a row of question
+    marks — which reads as a broken program, not as a chart.
+    """
+
+    def _cp949(self, text):
+        return text.encode("cp949", errors=ERROR_HANDLER).decode("cp949")
+
+    @pytest.mark.parametrize("original,drawn", [
+        ("████████", "########"),      # a full bar
+        ("███░░░░░", "###-----"),      # a partial one
+        ("▓▓", "++"),
+        ("╔══╗", "+==+"),
+        ("║ x ║", "| x |"),
+        ("a — b", "a - b"),
+        ("✓ done", "v done"),
+        ("✗ failed", "x failed"),
+    ])
+    def test_it_draws_the_nearest_ascii(self, original, drawn):
+        assert self._cp949(original) == drawn
+
+    def test_substitutions_keep_the_length(self):
+        """`stats` sizes its boxes by counting characters. A replacement of a
+        different length moves the right border."""
+        for original in ("█▓░", "╔═╗║╚╝╠╣", "—✓✗"):
+            assert len(self._cp949(original)) == len(original)
+
+    def test_an_unmapped_character_is_decoration_not_an_error(self):
+        """`*` rather than `?`: a question mark reads as something having gone
+        wrong, and an emoji this table has never heard of has not."""
+        assert self._cp949("\U0001f984") == "*"
+
+    def test_what_the_console_can_encode_is_left_alone(self):
+        assert self._cp949("한글과 → 화살표") == "한글과 → 화살표"
+
+    def test_no_command_prints_a_question_mark_on_cp949(self, tmp_path):
+        """The symptom this fix is named for."""
+        for command in ("stats", "weekly", "report --days 7"):
+            result = _run(command, _isolated(tmp_path, "cp949"))
+            assert "?" not in result.stdout, "%s still prints `?`" % command
+
+    def test_the_saved_report_keeps_the_real_characters(self, tmp_path):
+        """The substitution is the terminal's problem, not the file's. `weekly`
+        writes its report and then prints it; only the printed copy is
+        degraded."""
+        env = _isolated(tmp_path, "cp949")
+        assert _run("weekly", env).returncode == 0
+        saved = sorted((tmp_path / "diary" / "weekly").glob("*.md"))
+        assert saved, "weekly wrote no file"
+        text = saved[0].read_text(encoding="utf-8")
+        assert "\U0001f4ca" in text and "—" in text
+
+    def test_the_diary_file_is_untouched(self, tmp_path):
+        """Entry headers are parsed on `### ⏰` elsewhere in this codebase."""
+        env = _isolated(tmp_path, "cp949")
+        _run("stats", env)
+        diary = (tmp_path / "diary" / "2026-08-14.md").read_text(encoding="utf-8")
+        assert "⏰" in diary and "\U0001f4c1" in diary
+
+
 class TestTheHelperItself:
     def test_it_leaves_a_utf8_stream_alone(self, monkeypatch):
         class Stream:
@@ -117,7 +180,7 @@ class TestTheHelperItself:
         monkeypatch.setattr(sys, "stdout", Stream())
         monkeypatch.setattr(sys, "stderr", Stream())
         make_output_unbreakable()
-        assert seen == {"errors": "replace"}
+        assert seen == {"errors": ERROR_HANDLER}
 
     def test_a_captured_stream_without_reconfigure_is_not_touched(self, monkeypatch):
         """pytest and friends swap stdout for objects that have no such method;
