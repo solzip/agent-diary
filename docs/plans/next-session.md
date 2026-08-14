@@ -86,9 +86,28 @@ distinguish two readings of a value, make it distinguish them.**
 ## Waiting on Sol, not on code
 
 1. **PyPI: yank `claude-diary` 4.2.0.** The retired package name still serves
-   April's code. Measured: 91% of its 324 downloads had no Python version or
-   platform in the user agent, so there is no evidence of real users — but the
-   yank is one click and leaves a warning either way. Needs PyPI credentials.
+   April's code — checked 2026-08-14: one version, 4.2.0, uploaded 2026-04-29,
+   not yanked, while `agent-diary` is at 4.12.0. So `pip install claude-diary`
+   today installs code from before turn-scoped entries, before the console
+   encoding fixes, and before the category fix, and it installs *quietly*.
+
+   **"Leaves a warning either way" was wrong**, which is why this now says what
+   it does. Read out of pip 24.0
+   (`_internal/resolution/resolvelib/factory.py:302-334`): a yanked candidate
+   is skipped unless `all_yanked and pinned`, where pinned means `==` without a
+   wildcard, or `===`. Since 4.2.0 is the only version:
+
+   - `pip install claude-diary` → **fails.** No candidate survives the filter.
+   - `pip install claude-diary==4.2.0` → still installs, with the yank reason
+     shown.
+
+   That is the shape worth having: someone who pinned it keeps working, and
+   someone typing the old name by mistake is stopped rather than quietly given
+   April. Yank is reversible and deletes nothing.
+
+   Measured earlier: 91% of its 324 downloads had no Python version or platform
+   in the user agent, so there is no evidence of real users either way. Needs
+   PyPI credentials, so it is a click Sol has to make.
 2. ~~**GitHub Releases: 18 tags, 0 release notes.**~~ **Done 2026-08-14.** All
    18 tags now have a release; each body is its CHANGELOG section verbatim,
    verified by round-tripping every published body against the source (18/18
