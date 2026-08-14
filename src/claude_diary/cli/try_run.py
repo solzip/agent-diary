@@ -129,10 +129,11 @@ def _latest_transcript_for_cwd():
 
     Not by directory name. Claude Code encodes the project path into the folder
     name by replacing separators, and every character outside ASCII collapses
-    to a dash as well — `C:\\Users\\윤솔\\Desktop\\개인\\sol\\working-diary`
-    becomes `C--Users----Desktop----sol-working-diary`, which cannot be matched
-    back to the path it came from. The transcript records its `cwd` in the
-    first few lines, so that is what gets compared.
+    to a dash as well — `C:\\Users\\홍길동\\Desktop\\문서\\sol\\working-diary`
+    becomes `C--Users-----Desktop----sol-working-diary`, which cannot be matched
+    back to the path it came from: the run of dashes says how many characters
+    were dropped, not which ones. The transcript records its `cwd` in the first
+    few lines, so that is what gets compared.
     """
     root = os.path.expanduser(os.path.join("~", ".claude", "projects"))
     if not os.path.isdir(root):
