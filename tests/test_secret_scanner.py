@@ -1,6 +1,15 @@
 """Tests for secret scanner."""
 
-from claude_diary.lib.secret_scanner import scan_and_mask, scan_entry_data
+import re
+from pathlib import Path
+
+from claude_diary.lib.secret_scanner import (
+    BASIC_PATTERNS,
+    scan_and_mask,
+    scan_entry_data,
+)
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 class TestScanAndMask:
@@ -83,3 +92,39 @@ class TestScanEntryData:
         }
         scan_entry_data(entry)
         assert entry["secrets_masked"] > 0
+
+
+class TestTheDocumentedPatternCountMatchesTheCode:
+    """Both READMEs print how many patterns ship built in, and that number has
+    already been wrong twice.
+
+    The CHANGELOG's 2.0.0 entry said "11+ patterns" while `BASIC_PATTERNS`
+    held 9. By 4.12.0 the list had grown to 12 and both READMEs still said
+    "11+". Nothing in the suite read either number, so neither could fail —
+    the count was prose, and prose does not drift loudly.
+
+    These assertions build the expected text from `BASIC_PATTERNS`, so adding
+    a pattern fails here until both READMEs move in the same commit, which is
+    what CLAUDE.md asks for anyway.
+    """
+
+    def test_the_english_readme_states_the_current_count(self):
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        assert "%d built-in patterns for API keys" % len(BASIC_PATTERNS) in text
+
+    def test_the_korean_readme_states_the_current_count(self):
+        text = (ROOT / "README.ko.md").read_text(encoding="utf-8")
+        assert "기본 패턴 %d종" % len(BASIC_PATTERNS) in text
+
+    def test_the_english_readme_carries_the_count_exactly_once(self):
+        """A second mention drifts on its own. The pattern also matches the
+        older `11+ patterns` wording, so a leftover copy fails rather than
+        hiding behind different phrasing."""
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        found = re.findall(r"(\d+)\+?\s+(?:built-in\s+)?patterns", text)
+        assert found == [str(len(BASIC_PATTERNS))], found
+
+    def test_the_korean_readme_carries_the_count_exactly_once(self):
+        text = (ROOT / "README.ko.md").read_text(encoding="utf-8")
+        found = re.findall(r"(\d+)종", text)
+        assert found == [str(len(BASIC_PATTERNS))], found
