@@ -595,7 +595,7 @@ CLAUDE_DIARY_SKIP=1 claude
 
 The path form exists because a name alone cannot tell `~/work/acme` from `~/personal/acme`, and because listing every client repository by hand is the sort of chore that gets skipped until the session you most wanted excluded.
 
-**Redact more than the built-in patterns.** Secrets are masked before anything is written — 11+ patterns for API keys, tokens and private keys. Add your own regexes for names that are not secrets but are still yours:
+**Redact more than the built-in patterns.** Secrets are masked before anything is written — 12 built-in patterns for API keys, tokens and private keys. Add your own regexes for names that are not secrets but are still yours:
 
 ```json
 {
