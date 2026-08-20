@@ -48,7 +48,7 @@ decisions this week, all inflated:
 |---|---|
 | 132 "sessions" in a day | turns, not sessions |
 | project line churn of -1,547,143 | one working tree counted once per turn |
-| `_verification` 3.3% done | one task duplicated 20–400 times, all open |
+| `project-d` 3.3% done | one task duplicated 20–400 times, all open |
 | `docs` 6,916 commits | the same commits recounted every turn |
 | 441 of 476 Notion rows stale | many are copies of one piece of work |
 
@@ -185,11 +185,11 @@ exist and are git repositories. Of those:
 last segment == repository root      22  (25%)
 last segment is a subdirectory       67  (75%)
 
-  936x  'harness'          -> _verification
-  827x  'dev'              -> erp_chatbot_solzip
-  411x  'chatbot'          -> erp_chatbot_solzip
-  180x  'docs'             -> LottoMap_back
-  142x  '담당팀_답변'        -> _verification
+  936x  'harness'          -> project-d
+  827x  'dev'              -> project-a
+  411x  'chatbot'          -> project-a
+  180x  'docs'             -> project-b
+  142x  '업무_문서'        -> project-d
 ```
 
 Only 253 of 6,977 entries (4%) currently carry one of those wrong names,

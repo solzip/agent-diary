@@ -5,10 +5,10 @@ record more than one working directory and one records twenty-six — every `cd`
 into a subdirectory is another. The project name came from the last path
 segment, so work was filed under whatever folder it was standing in:
 
-    936x  harness  -> _verification
-    827x  dev      -> erp_chatbot_solzip
-    411x  chatbot  -> erp_chatbot_solzip
-    180x  docs     -> LottoMap_back
+    936x  harness  -> project-d
+    827x  dev      -> project-a
+    411x  chatbot  -> project-a
+    180x  docs     -> project-b
 
 Of the 89 recorded directories that still exist and are repositories, 75% have
 a last segment that is not the repository. Only 4% of existing entries are
@@ -75,12 +75,12 @@ class TestNamingTheProject:
         assert _extract_project_name(value) == "unknown"
 
     def test_a_path_that_no_longer_exists_falls_back(self):
-        """Projects move. `E:\\dev\\erp\\erp_chatbot_solzip` did."""
+        """Projects move. `E:\\dev\\project-a` did."""
         assert _extract_project_name("/gone/my-project") == "my-project"
 
 
 class TestNotionAgrees:
-    """A session filed as `erp_chatbot_solzip` locally must not arrive in
+    """A session filed as `project-a` locally must not arrive in
     Notion as `dev`; both sides resolve the same way."""
 
     def test_the_notion_side_resolves_to_the_repository_too(self, repo):

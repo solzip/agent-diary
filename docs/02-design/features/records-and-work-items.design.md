@@ -43,15 +43,15 @@ into a field.
 532 rows, 92 (17%) carry an identifier in the title
 19 identifiers are shared by more than one row
 
-  라운드 2   17 rows    Testing 13, Design 3, Deployed 1
-  R27       10 rows    Testing 9, Implementation 1
-  P3         8 rows    Testing 6, Deployed 1, Design 1
-  IF-76      4 rows    Testing 3, Design 1
+  group-a   17 rows    Testing 13, Design 3, Deployed 1
+  group-b       10 rows    Testing 9, Implementation 1
+  group-c    8 rows    Testing 6, Deployed 1, Design 1
+  group-d      4 rows    Testing 3, Design 1
 ```
 
-`R27` is a work item and those ten rows are its records. Today each of the ten
-carries its own status, so "where is R27 now" has to be reconstructed by eye —
-and nine of them say `Testing` not because R27 is being tested but because nine
+`group-b` is a work item and those ten rows are its records. Today each of the ten
+carries its own status, so "where is group-b now" has to be reconstructed by eye —
+and nine of them say `Testing` not because group-b is being tested but because nine
 sessions happened to be testing when they wrote.
 
 `Task Group` is the field meant for this. It is filled on 8% of rows while 17%
@@ -61,7 +61,7 @@ out of laziness so much as bypassed: the title is what Notion shows first.
 ## The model
 
 ```
-work item     R27, IF-76, 라운드 2        few, long-lived, HAS STATE
+work item     group-b, group-d, group-a        few, long-lived, HAS STATE
   └─ record   one per session per task    many, immutable, NO STATE
   └─ record
 ```
@@ -148,8 +148,8 @@ and is how continuation ordinals are numbered.
 So the join is:
 
 ```
-push writes a record with Task Group = "R27"
-  -> look up the work-item row for "R27" in this year's database
+push writes a record with Task Group = "group-b"
+  -> look up the work-item row for "group-b" in this year's database
   -> not found: create it
   -> wire the record as its sub-item
 ```
@@ -164,7 +164,7 @@ label, which is what it was already trying to be.
 1. **Already shipped**: `push` warns when a task has no `task_group` and prints
    the names already in use for that project.
 2. **Propose from the title.** 17% of rows carry an identifier the agent
-   already wrote — `R27`, `IF-76`, `라운드 2`. Offer those as candidates rather
+   already wrote — `group-b`, `group-d`, `group-a`. Offer those as candidates rather
    than requiring a new naming discipline. The schemes differ per project and
    forcing one would mean changing how Sol works to suit the tool.
 3. **Not** rejecting a push without one. An unlinked record still beats no
@@ -278,7 +278,7 @@ starting. Steps 1 and 4 are useful even if the rest never happens.
 - **The 배포 distinction.** Fourth status value, separate checkbox, or out of
   scope.
 - **Unlinked records.** Implicit one-record work item, or hanging loose.
-- **Identifier scheme.** Whether the tool proposes from titles (`R27`, `IF-76`)
+- **Identifier scheme.** Whether the tool proposes from titles (`group-b`, `group-d`)
   or expects `Task Group` to be authored directly. Proposing is friendlier and
   guesses; expecting is precise and has been 8% effective so far.
 - **Year boundaries.** The database is per-year. A work item spanning New Year

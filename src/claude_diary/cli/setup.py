@@ -139,7 +139,7 @@ allowed-tools:
      - `Planning` / `Research` / `Review` / `Release` / `Support` / `Maintenance` / `General`
      - 불확실하면 `General`
    - `parent_index`: 이 task가 다른 task의 하위 작업이면 부모 task의 **같은 push 내 인덱스**. 최상위 task면 `null`
-     - 포함 관계와 Notion 하위항목에만 사용. 예: "상품 목록 포커싱"의 parent는 "로컬 테스트 진행"
+     - 포함 관계와 Notion 하위항목에만 사용. 예: "목록 화면 포커싱"의 parent는 "로컬 테스트 진행"
    - `depends_on_indices`: 이 task가 선행을 의존하는 다른 task의 **같은 push 내 인덱스 배열** (예: `[0, 1]`)
      - 같은 JSON 안의 tasks 배열 순서 (0-base) 기준
      - 하위 작업이 아니라 큰 메인 작업끼리의 선행 연결성에만 사용. 없으면 빈 배열 `[]`
