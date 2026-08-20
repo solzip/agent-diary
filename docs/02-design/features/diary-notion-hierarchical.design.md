@@ -126,7 +126,7 @@
 
 **Review Status / Last Reviewed**: 상사 제출 전 검토, 구현 리뷰, 사후 확인이 필요한 작업을 분리하기 위한 컬럼. 검토 필요는 `Needs Review`, 검토 완료는 `Reviewed`, 뒤로 미루는 경우는 `Deferred`를 사용한다.
 
-**Parent Task / Sub-items (dual self-relation)**: 포함 관계. 예: `상품 목록 포커싱`의 Parent Task는 `로컬 테스트 진행`이고, 부모 row의 `Sub-items`에는 하위 작업들이 자동으로 연결된다. 같은 push 안에서는 JSON의 `parent_index`를 row ID로 변환해 `Parent Task`를 연결한다. Notion native 하위항목/sub-item toggle은 `Sub-items` relation을 기준으로 동작한다. 너무 작은 확인 항목은 별도 row가 아니라 본문 checklist로 남긴다.
+**Parent Task / Sub-items (dual self-relation)**: 포함 관계. 예: `목록 화면 포커싱`의 Parent Task는 `로컬 테스트 진행`이고, 부모 row의 `Sub-items`에는 하위 작업들이 자동으로 연결된다. 같은 push 안에서는 JSON의 `parent_index`를 row ID로 변환해 `Parent Task`를 연결한다. Notion native 하위항목/sub-item toggle은 `Sub-items` relation을 기준으로 동작한다. 너무 작은 확인 항목은 별도 row가 아니라 본문 checklist로 남긴다.
 
 **Depends On (self-relation, 단방향)**: 같은 DB 안의 최상위 메인 작업 간 선행 연결 참조. JSON 스키마의 `depends_on_indices`가 같은 push의 top-level task index를 가리킨다. CLI가 push 순서대로 row_id 누적 → 인덱스를 실제 row ID로 변환해서 relation 채움. 하위 작업 row는 `Depends On` 연결 대상에서 제외해 sub-item 구조와 선행 관계가 섞이지 않게 한다.
 

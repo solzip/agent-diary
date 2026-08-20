@@ -72,8 +72,8 @@ def get_repo_root(cwd):
     on one machine, seventeen record more than one working directory and one
     records twenty-six — every `cd` into a subdirectory is another one. Naming
     the project after the last path segment therefore files work under whatever
-    folder it happened to be in: `harness` instead of `_verification` 936
-    times, `dev` instead of `erp_chatbot_solzip` 827 times. Measured across the
+    folder it happened to be in: `harness` instead of `project-d` 936
+    times, `dev` instead of `project-a` 827 times. Measured across the
     89 recorded directories that still exist and are repositories, 75% have a
     last segment that is not the repository.
 

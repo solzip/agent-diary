@@ -304,7 +304,7 @@ only to *the unit that shipped together*, which the hierarchy already expresses.
 
 - **The shape of the deployment marker** — checkbox, date, or release
   identifier (`v4.11.3`). This repository deploys by tag so an identifier
-  answers all three questions, but how projects like `erp_chatbot_solzip`
+  answers all three questions, but how projects like `project-a`
   deploy has not been checked.
 - **The lookup key for a parent in an earlier session.** Cross-session linking
   works; what is missing is how a push finds the parent row. This is the same

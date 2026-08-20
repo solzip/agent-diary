@@ -100,7 +100,7 @@ working-diary diary-notion weekly-brief
 
 ```text
 Parent Task = 포함 관계
-예: "상품 목록 포커싱"은 "로컬 테스트 진행"의 하위 작업
+예: "목록 화면 포커싱"은 "로컬 테스트 진행"의 하위 작업
 
 Depends On = 큰 메인 작업끼리의 선행 관계
 예: "2차 view 자동화 구현"은 "schema v7 보장"이 끝나야 가능
@@ -409,11 +409,11 @@ working-diary diary-notion weekly-brief
 ```text
 오늘 작업 우선순위
 
-1. 결제 진행 중 키패드 차단
-   이유: 전날 next_steps에 남았고 배리어프리 로컬 테스트 완료를 막고 있음
+1. 폼 제출 중 입력 차단 버그 수정
+   이유: 전날 next_steps에 남았고 로컬 테스트 완료를 막고 있음
 
 2. 테스트 DB 복구 상태 확인
-   이유: 상품 목록/결제 플로우 테스트의 선행 조건
+   이유: 목록/제출 플로우 테스트의 선행 조건
 
 3. Terraform 04-modules-basic 진행
    이유: 01~03이 완료됐고 다음 학습 순서

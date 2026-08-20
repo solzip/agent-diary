@@ -146,7 +146,7 @@ def _project_name_from_cwd(cwd):
     """Extract a stable project name from the command working directory.
 
     The repository root, not the folder the command happened to run in — the
-    same rule the diary uses, so a session filed under `erp_chatbot_solzip`
+    same rule the diary uses, so a session filed under `project-a`
     locally does not arrive in Notion as `dev`.
     """
     if not cwd:
