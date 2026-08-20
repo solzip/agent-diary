@@ -638,7 +638,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Core**: Modular pip package structure (`src/claude_diary/`)
 - **Core**: Auto-categorization (7 categories, KO/EN keywords)
 - **Core**: Git integration (branch, commits, diff stats)
-- **Core**: Secret scanner (11+ patterns auto-masked)
+- **Core**: Secret scanner (9 patterns auto-masked)
 - **Core**: Search index (`.diary_index.json`) for fast CLI queries
 - **CLI**: 11 subcommands (search, filter, trace, stats, weekly, config, init, migrate, reindex, audit, dashboard)
 - **Exporters**: Plugin architecture with 5 official exporters (Notion, Slack, Discord, Obsidian, GitHub)
