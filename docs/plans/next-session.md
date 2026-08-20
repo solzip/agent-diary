@@ -5,17 +5,48 @@
 > continuing somewhere else. Updated 2026-08-14 after a full-project audit and
 > the four releases that followed it, two of them fixing things the audit had
 > passed — and again later that day, after the README was brought back in line
-> with the code and 4.12.0 went out.
+> with the code and 4.12.0 went out. Updated 2026-08-20 after a sentence-level
+> README-vs-code audit found two more code defects and 4.13.0 shipped the
+> fixes — the day's full record is in
+> [`docs/tasks/2026-08-20.md`](../tasks/2026-08-20.md).
 
 ## Where things stand
 
 ```
 main        clean, nothing unpushed
-released    v4.12.0 (PyPI confirmed; 23 tags = 23 releases = 23 CHANGELOG sections)
+released    v4.13.0 (PyPI confirmed; 24 tags = 24 releases = 24 CHANGELOG sections)
 CHANGELOG   [Unreleased] empty
-tests       1,199 passing
+tests       1,210 passing
 CI          green on 30 combinations
 ```
+
+## What 4.13.0 changed (2026-08-20)
+
+The README was checked claim-by-claim against the code, every sentence to a
+file:line. Most of it held. What did not is in the CHANGELOG; the two worth
+remembering here:
+
+- **The 4.12.0 ordinal fix was incomplete.** The counting function was right
+  and its tests passed — but `core.py` added 1 to a count that still included
+  the session being written, so the first session on a branch stamped `(#2)`
+  from its second turn. The off-by-one lived at the *call site*, the same
+  boundary-shape 4.12.0's own release note warned about. Fixed with
+  `count_branch_sessions(..., exclude_session_id=)`. As before, numbers
+  already stamped are not corrected retroactively.
+- **The README is also the PyPI long description, and PyPI does not rewrite
+  relative URLs.** Twelve links — including the Architecture/postmortem links
+  the introduction points code readers at — and the demo image were dead on
+  pypi.org, silently, since the beginning. All absolute now; verified with
+  `readme_renderer[md]` (the renderer PyPI uses) before merging, and against
+  the live PyPI JSON after 4.13.0 published: zero relative links remain.
+
+Also: `team monthly --month` accepted the flag and returned the current
+*week* — no monthly report existed. One does now (`monthly/team-YYYY-MM.md`).
+Two follow-up questions were deliberately left as discussion, not code:
+whether `/diary` should gain a summary-input path, and whether
+`diary-notion push` should run the secret scanner over agent-authored JSON
+(today it does not — the README now says so precisely). Both are argued in
+PR #93's body.
 
 **The working rules now live in [`CLAUDE.md`](../../CLAUDE.md), not in one
 machine's assistant memory.** Read it first. It holds the rule that a
