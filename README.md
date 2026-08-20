@@ -61,7 +61,7 @@ Categories are inferred from the work. Branch, commits and diff stats are read f
 
 **An entry covers one turn, not one session.** The Stop Hook fires each time Claude Code finishes replying, and an entry holds only what happened since the previous one, so a long session leaves a series of entries in the day's file. Diaries written before 4.9.0 look different: every entry there re-recorded the session's opening prompts, so the same requests repeat down the file.
 
-`📝 Work Summary` is not in the entry above because the hook does not write one. It appears when an agent authors the entry itself — `/diary`, `$diary`, or `agent-diary write --input` — and supplies `summary_hints`.
+`📝 Work Summary` is not in the entry above because the hook does not write one. It appears when an agent authors the entry itself — `$diary`, or `agent-diary write --input` — and supplies `summary_hints`. `/diary` reads the transcript rather than authoring an entry, so it never produces one either.
 
 **The branch line carries a thread number.** ``🌿 Branch: `feat/jwt-auth` (#3)`` means this is the third session this project has recorded on that branch, so an entry says where it sits in a piece of work rather than leaving you to count. It counts sessions, not entries — a long sitting is many entries and one number. The first session on a branch is not numbered, because there is no thread behind it to point at.
 
@@ -292,7 +292,7 @@ Every push writes a record of the run under the current working directory, **by 
   input.json        the original task JSON
   git-diff.patch    the working tree diff at push time
   preview.md        the rendered Notion body
-  manifest.json     the files above with sha256, plus a push result summary
+  manifest.json     the files above with sha256; a real push adds its result summary
 ```
 
 Notion is the destination, not the record. If a push half-fails, or a row is later edited by hand, this local copy is the only way back to what was actually submitted.
@@ -330,7 +330,7 @@ Expandable task hierarchy uses Notion native Sub-items. Enable it once in the No
 2. Open the top-right `...` menu and enable `Sub-items`.
 3. Run `agent-diary diary-notion ensure` again.
 
-Rows are still recorded if Sub-items are not enabled. Only visual nesting is missing, and push prints a hint.
+Rows are still created if Sub-items are not enabled, but a task that names a parent is reported as a failure: push prints the hint above, preserves the input JSON, and exits with code `1` so the run can be repeated after enabling Sub-items.
 
 ## 3. Logic
 
@@ -363,7 +363,7 @@ Key modules:
 | Automatic diary core | `src/claude_diary/core.py` | Claude Code Stop Hook diary pipeline |
 | Manual diary core | `src/claude_diary/cli/write.py` | Handles `/diary`, `$diary`, and `agent-diary write` |
 | Notion push | `src/claude_diary/cli/notion_push/` | Pushes task JSON as Notion rows (split into validate/properties/relations/artifacts) |
-| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | Ensures schema v8, 5 core views and 5 operating views |
+| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | Ensures schema v8, 3 core views and 2 operating views |
 | Notion review queue | `src/claude_diary/cli/notion_review.py` | Lists `Needs Review` rows; `--apply` records `Reviewed` |
 | Formatter | `src/claude_diary/formatter.py` | Creates Markdown entries and Notion page bodies |
 
@@ -516,11 +516,12 @@ agent-diary team init --repo <url> --name <name>
 agent-diary team add-member --name <name> --role member
 ```
 
-The legacy CLI remains supported.
+The legacy command names remain supported: the `working-diary` and `claude-diary` binaries are the same CLI, and `notion` still works as an alias for `diary-notion`.
 
 ```bash
-agent-diary write
-agent-diary diary-notion ensure
+working-diary write
+claude-diary diary-notion ensure
+agent-diary notion push --input .diary-notion-<id>.json
 ```
 
 ## 5. Configuration
@@ -609,7 +610,7 @@ The path form exists because a name alone cannot tell `~/work/acme` from `~/pers
 }
 ```
 
-Matches become `****` in the diary, in Notion, and in every exporter, because masking happens before the entry is formatted.
+Matches become `****` in the diary and in every exporter fed from it — including the Notion exporter — because masking happens before the entry is formatted. One path is not covered: task JSON an agent authors for `diary-notion push` is pushed as the agent wrote it; the push command itself does not scan.
 
 `agent-diary doctor` reports how many of each rule are active, so "what is this recording" has an answer you can check rather than remember.
 

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **설치되는 `/diary-notion` slash command 문구 2건 정정**: `ensure`가 보장하는 뷰 수를 "5 core + 5 operating"으로 안내했지만 실제는 3 core + 2 operating입니다(`notion_views.py`가 정의하는 그대로). `--preview-file`을 일반 push 옵션처럼 안내했지만 실제로는 `--dry-run` 경로에서만 읽히고 실제 push에서는 무시됩니다. 코드 동작은 그대로이고 안내 문구만 실동작에 맞췄습니다 — 반영하려면 `agent-diary install --force`
 
 ## [4.12.0] - 2026-08-14
 
