@@ -7,13 +7,13 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Core Dependencies: 0](https://img.shields.io/badge/core%20dependencies-0-brightgreen)](https://github.com/solzip/agent-diary)
 
-> [English](README.md) | 한국어
+> [English](https://github.com/solzip/agent-diary/blob/main/README.md) | 한국어
 >
 > 커뮤니티 프로젝트입니다. Anthropic 또는 OpenAI의 공식 프로젝트가 아닙니다.
 
-![Agent Diary 데모](docs/demo.svg)
+![Agent Diary 데모](https://raw.githubusercontent.com/solzip/agent-diary/main/docs/demo.svg)
 
-> **코드를 보러 오셨다면** — [Architecture](docs/ARCHITECTURE.md)에 멱등성 키와 캐시 무효화, 원인별로 갈리는 재시도 정책, 스키마 버전 관리, 부분 실패의 의미를 정리해뒀습니다. [Postmortem](docs/postmortem/2026-08-07-ensure-wipe.md)은 스키마 PATCH 하나가 497 row에서 6개 속성을 지운 사고의 전말입니다.
+> **코드를 보러 오셨다면** — [Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md)에 멱등성 키와 캐시 무효화, 원인별로 갈리는 재시도 정책, 스키마 버전 관리, 부분 실패의 의미를 정리해뒀습니다. [Postmortem](https://github.com/solzip/agent-diary/blob/main/docs/postmortem/2026-08-07-ensure-wipe.md)은 스키마 PATCH 하나가 497 row에서 6개 속성을 지운 사고의 전말입니다.
 
 ## 1. 왜 필요한가
 
@@ -336,7 +336,7 @@ Sub-items가 아직 없어도 row 기록은 정상 동작합니다. 다만 계�
 
 ## 3. 로직
 
-이 절은 **무엇이 어떤 순서로 흐르는가**를 다룹니다. 왜 그렇게 설계했는지 — 멱등성 키, 재시도 정책, 스키마 버전 관리, 부분 실패 처리 — 는 [Architecture](docs/ARCHITECTURE.md)에 있습니다.
+이 절은 **무엇이 어떤 순서로 흐르는가**를 다룹니다. 왜 그렇게 설계했는지 — 멱등성 키, 재시도 정책, 스키마 버전 관리, 부분 실패 처리 — 는 [Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md)에 있습니다.
 
 ### 3-1. Core 로직
 
@@ -501,7 +501,7 @@ agent-diary reindex
 agent-diary delete --last
 ```
 
-<a id="reindex-once-on-4-11-3"></a>
+<a id="reindex-once-on-4-11-3"></a><a id="user-content-reindex-once-on-4-11-3"></a>
 **4.11.3으로 올린 뒤 `agent-diary reindex`를 한 번 돌리세요.** 그 이전 버전의 `reindex`는 일지 본문에서 인덱스를 다시 만들면서 항목마다 **첫 번째 카테고리만** 담았습니다. 그래서 카테고리로 하는 검색이 매치의 일부만 답했습니다 — 실제 일지 73개 파일 기준 `refactor`가 1,183건 중 35건만 돌려줬습니다. 일지 파일 자체는 처음부터 정확했고, 얇았던 건 거기서 만들어진 인덱스뿐이며, 그것도 **한 번이라도 rebuild한 경우에만** 그렇습니다. 훅이 쓰는 증분 경로는 영향을 받은 적이 없습니다. 그래서 4.11.3 이상에서 다시 만들면 전부 복구됩니다.
 
 확장 기능 명령:
@@ -713,17 +713,17 @@ CI에서는 Python 3.12 작업에서만 돕니다. 현재 mypy가 이 프로젝�
 
 코드를 읽을지 판단하려는 분이라면 이 둘을 먼저 보세요.
 
-- **[Architecture](docs/ARCHITECTURE.md)** — 멱등성 모델, 재시도·에러 분류 정책, 캐시 무효화, 스키마 버전 관리, 부분 실패의 의미, 의존성 0개를 택한 이유
-- **[Postmortem: `ensure`가 497 row의 6개 속성을 지운 사고](docs/postmortem/2026-08-07-ensure-wipe.md)** — 증상, 프로덕션 대조 측정, 근본 원인, 수정, 회귀 테스트, 그리고 두 달간 못 본 이유
+- **[Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md)** — 멱등성 모델, 재시도·에러 분류 정책, 캐시 무효화, 스키마 버전 관리, 부분 실패의 의미, 의존성 0개를 택한 이유
+- **[Postmortem: `ensure`가 497 row의 6개 속성을 지운 사고](https://github.com/solzip/agent-diary/blob/main/docs/postmortem/2026-08-07-ensure-wipe.md)** — 증상, 프로덕션 대조 측정, 근본 원인, 수정, 회귀 테스트, 그리고 두 달간 못 본 이유
 
 세부 설계 문서:
 
-- [결정 문서 (ADR)](docs/decisions/README.md) — 비교한 선택지와 탈락한 쪽을 버린 이유
-- [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
-- [Notion views design](docs/02-design/features/diary-notion-views.design.md)
-- [Distribution plan](docs/plans/phase-d-distribution.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
+- [결정 문서 (ADR)](https://github.com/solzip/agent-diary/blob/main/docs/decisions/README.md) — 비교한 선택지와 탈락한 쪽을 버린 이유
+- [Notion hierarchical design](https://github.com/solzip/agent-diary/blob/main/docs/02-design/features/diary-notion-hierarchical.design.md)
+- [Notion views design](https://github.com/solzip/agent-diary/blob/main/docs/02-design/features/diary-notion-views.design.md)
+- [Distribution plan](https://github.com/solzip/agent-diary/blob/main/docs/plans/phase-d-distribution.md)
+- [Contributing](https://github.com/solzip/agent-diary/blob/main/CONTRIBUTING.md)
+- [Security](https://github.com/solzip/agent-diary/blob/main/SECURITY.md)
 
 ## 11. 라이선스
 

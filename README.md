@@ -7,13 +7,13 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Core Dependencies: 0](https://img.shields.io/badge/core%20dependencies-0-brightgreen)](https://github.com/solzip/agent-diary)
 
-> English | [한국어](README.ko.md)
+> English | [한국어](https://github.com/solzip/agent-diary/blob/main/README.ko.md)
 >
 > This is a community project. It is not an official Anthropic or OpenAI project.
 
-![Agent Diary demo](docs/demo.svg)
+![Agent Diary demo](https://raw.githubusercontent.com/solzip/agent-diary/main/docs/demo.svg)
 
-> **Here to read the code?** [Architecture](docs/ARCHITECTURE.md) covers the idempotency key and its cache invalidation, a retry policy that branches on cause, schema versioning, and what partial failure means. The [postmortem](docs/postmortem/2026-08-07-ensure-wipe.md) is how one schema PATCH emptied six properties across 497 rows.
+> **Here to read the code?** [Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md) covers the idempotency key and its cache invalidation, a retry policy that branches on cause, schema versioning, and what partial failure means. The [postmortem](https://github.com/solzip/agent-diary/blob/main/docs/postmortem/2026-08-07-ensure-wipe.md) is how one schema PATCH emptied six properties across 497 rows.
 
 ## 1. Why
 
@@ -334,7 +334,7 @@ Rows are still recorded if Sub-items are not enabled. Only visual nesting is mis
 
 ## 3. Logic
 
-This section covers **what flows where, in what order**. Why it is built that way — the idempotency key, the retry policy, schema versioning, partial-failure handling — is in [Architecture](docs/ARCHITECTURE.md).
+This section covers **what flows where, in what order**. Why it is built that way — the idempotency key, the retry policy, schema versioning, partial-failure handling — is in [Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md).
 
 ### 3-1. Core Logic
 
@@ -497,7 +497,7 @@ agent-diary reindex
 agent-diary delete --last
 ```
 
-<a id="reindex-once-on-4-11-3"></a>
+<a id="reindex-once-on-4-11-3"></a><a id="user-content-reindex-once-on-4-11-3"></a>
 **Run `agent-diary reindex` once after upgrading to 4.11.3.** Before that release `reindex` rebuilt the index from the text of the diary and kept only the *first* category on each entry, so a search by category answered with part of its matches — on a real 73-file diary, `refactor` returned 35 of 1,183. The diary files themselves were always correct; only the index built from them was thin, and only if it was ever rebuilt. The incremental path the hook writes through was never affected. A rebuild on 4.11.3 or later therefore recovers all of it.
 
 Extension commands:
@@ -709,17 +709,17 @@ This README focuses on currently usable functionality. Detailed design and plann
 
 If you are deciding whether the code is worth reading, start with these two.
 
-- **[Architecture](docs/ARCHITECTURE.md)** — the idempotency model, the retry and error-taxonomy policy, cache invalidation, schema versioning, what partial failure means, and why the core has no dependencies
-- **[Postmortem: `ensure` emptied six properties across 497 rows](docs/postmortem/2026-08-07-ensure-wipe.md)** — symptom, measurement against production, root cause, fix, regression tests, and why it went unseen for two months
+- **[Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md)** — the idempotency model, the retry and error-taxonomy policy, cache invalidation, schema versioning, what partial failure means, and why the core has no dependencies
+- **[Postmortem: `ensure` emptied six properties across 497 rows](https://github.com/solzip/agent-diary/blob/main/docs/postmortem/2026-08-07-ensure-wipe.md)** — symptom, measurement against production, root cause, fix, regression tests, and why it went unseen for two months
 
 Detailed design notes:
 
-- [Decision records (ADR)](docs/decisions/README.md) — the options that were compared, and why the rejected ones were rejected
-- [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
-- [Notion views design](docs/02-design/features/diary-notion-views.design.md)
-- [Distribution plan](docs/plans/phase-d-distribution.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
+- [Decision records (ADR)](https://github.com/solzip/agent-diary/blob/main/docs/decisions/README.md) — the options that were compared, and why the rejected ones were rejected
+- [Notion hierarchical design](https://github.com/solzip/agent-diary/blob/main/docs/02-design/features/diary-notion-hierarchical.design.md)
+- [Notion views design](https://github.com/solzip/agent-diary/blob/main/docs/02-design/features/diary-notion-views.design.md)
+- [Distribution plan](https://github.com/solzip/agent-diary/blob/main/docs/plans/phase-d-distribution.md)
+- [Contributing](https://github.com/solzip/agent-diary/blob/main/CONTRIBUTING.md)
+- [Security](https://github.com/solzip/agent-diary/blob/main/SECURITY.md)
 
 ## 11. License
 
