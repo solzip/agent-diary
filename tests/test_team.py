@@ -629,3 +629,81 @@ class TestValidateMemberName:
     def test_rejects_spaces(self):
         with pytest.raises(ValueError):
             validate_member_name("my name")
+
+
+class TestTeamMonthlyReport:
+    """`team monthly --month 2026-06` accepted the flag and then routed to the
+    weekly report, which never received it — a month-scoped command that
+    silently reported the current week instead."""
+
+    def _make_daily_file(self, member_path, date_str, sessions=1, project="proj"):
+        filepath = os.path.join(member_path, "%s.md" % date_str)
+        content_parts = []
+        for _ in range(sessions):
+            content_parts.append(
+                "### ⏰ 10:00:00\n"
+                "\U0001f4c1 `%s`\n"
+                "Categories: `feature`\n"
+                "Work Summary:\n"
+                "  - Implemented feature X\n" % project
+            )
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("\n---\n\n".join(content_parts))
+
+    @patch("claude_diary.team.load_config")
+    def test_reports_the_requested_month_and_only_it(self, mock_config, tmp_path):
+        from claude_diary.team import team_monthly_report
+
+        mock_config.return_value = {"timezone_offset": 9}
+        alice_dir = tmp_path / "members" / "alice"
+        alice_dir.mkdir(parents=True)
+        self._make_daily_file(str(alice_dir), "2026-06-10", sessions=2)
+        self._make_daily_file(str(alice_dir), "2026-07-10", sessions=5)
+
+        result = team_monthly_report(str(tmp_path), month="2026-06")
+        assert result is not None
+        report, filepath = result
+        assert "Team Monthly Report — 2026-06" in report
+        assert "alice (2 sessions)" in report
+
+    @patch("claude_diary.team.load_config")
+    def test_saves_under_monthly(self, mock_config, tmp_path):
+        from claude_diary.team import team_monthly_report
+
+        mock_config.return_value = {"timezone_offset": 9}
+        alice_dir = tmp_path / "members" / "alice"
+        alice_dir.mkdir(parents=True)
+        self._make_daily_file(str(alice_dir), "2026-06-10")
+
+        _, filepath = team_monthly_report(str(tmp_path), month="2026-06")
+        assert filepath == os.path.join(str(tmp_path), "monthly", "team-2026-06.md")
+        assert os.path.exists(filepath)
+
+    @patch("claude_diary.team.load_config")
+    def test_returns_none_when_no_members_dir(self, mock_config, tmp_path):
+        from claude_diary.team import team_monthly_report
+
+        mock_config.return_value = {"timezone_offset": 9}
+        assert team_monthly_report(str(tmp_path), month="2026-06") is None
+
+    @patch("claude_diary.cli.load_config")
+    @patch("claude_diary.team.load_config")
+    def test_the_cli_hands_the_month_over(self, mock_team_config, mock_cli_config, tmp_path, capsys):
+        """The routing was the defect: `monthly` called the weekly report with
+        no month argument, so the flag the CLI accepted changed nothing."""
+        from types import SimpleNamespace
+        from claude_diary.cli.team import cmd_team
+
+        mock_cli_config.return_value = {
+            "lang": "ko", "team": {"repo_path": str(tmp_path)}
+        }
+        mock_team_config.return_value = {"timezone_offset": 9}
+        alice_dir = tmp_path / "members" / "alice"
+        alice_dir.mkdir(parents=True)
+        self._make_daily_file(str(alice_dir), "2026-06-10", sessions=3)
+
+        cmd_team(SimpleNamespace(action="monthly", month="2026-06",
+                                 repo=None, name=None, role="member"))
+        out = capsys.readouterr().out
+        assert "Team Monthly Report — 2026-06" in out
+        assert "alice (3 sessions)" in out

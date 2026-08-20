@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`team monthly --month`가 플래그를 받고 무시하던 문제**: `monthly`가 주간 리포트 함수를 month 인자 없이 호출하고 있어서, 월을 지정해도 **현재 주의 주간 리포트**가 나왔습니다 — 실패 없이, 그럴듯한 다른 답으로. 이제 진짜 월간 리포트를 만듭니다: 지정한 달(기본은 이번 달)의 날짜 전체를 집계하고 팀 저장소의 `monthly/team-YYYY-MM.md`로 저장합니다. 렌더링 형식은 주간 리포트와 같습니다
 
 ## [4.12.0] - 2026-08-14
 

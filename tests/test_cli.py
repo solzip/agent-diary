@@ -1180,12 +1180,15 @@ class TestCmdTeam:
         os.makedirs(repo_path)
 
         with patch("claude_diary.team.get_team_repo_path", return_value=repo_path), \
-             patch("claude_diary.team.team_weekly_report", return_value=("# Monthly", "/path/m.md")):
+             patch("claude_diary.team.team_monthly_report",
+                   return_value=("# Monthly", "/path/m.md")) as mock_monthly:
             args = Namespace(action="monthly", project=None, member=None,
-                             month=None, repo=None, name=None, role="member")
+                             month="2026-06", repo=None, name=None, role="member")
             cmd_team(args)
         captured = capsys.readouterr()
         assert "# Monthly" in captured.out
+        # This used to patch team_weekly_report — the routing defect, pinned.
+        assert mock_monthly.call_args.kwargs.get("month") == "2026-06"
 
 
 # ── cmd_audit verify mismatch ──
