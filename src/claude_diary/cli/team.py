@@ -10,7 +10,7 @@ import claude_diary.cli as _cli
 def cmd_team(args):
     from claude_diary.team import (
         init_team, get_team_repo_path, team_stats,
-        print_team_stats, team_weekly_report
+        print_team_stats, team_weekly_report, team_monthly_report
     )
 
     if args.action == "init":
@@ -37,7 +37,10 @@ def cmd_team(args):
 
     elif args.action in ("weekly", "monthly"):
         lang = config.get("lang", "ko")
-        result = team_weekly_report(repo_path, lang=lang)
+        if args.action == "monthly":
+            result = team_monthly_report(repo_path, month=args.month, lang=lang)
+        else:
+            result = team_weekly_report(repo_path, lang=lang)
         if result:
             report, filepath = result
             print(report)

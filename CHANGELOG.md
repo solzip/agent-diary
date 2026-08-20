@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`team monthly --month`가 플래그를 받고 무시하던 문제**: `monthly`가 주간 리포트 함수를 month 인자 없이 호출하고 있어서, 월을 지정해도 **현재 주의 주간 리포트**가 나왔습니다 — 실패 없이, 그럴듯한 다른 답으로. 이제 진짜 월간 리포트를 만듭니다: 지정한 달(기본은 이번 달)의 날짜 전체를 집계하고 팀 저장소의 `monthly/team-YYYY-MM.md`로 저장합니다. 렌더링 형식은 주간 리포트와 같습니다
 - **브랜치 차수 `(#N)`이 세션의 2번째 턴부터 1 크게 찍히던 문제**: 4.12.0이 카운트를 턴이 아니라 세션으로 고쳤지만, core는 **지금 쓰고 있는 세션을 포함한** 카운트에 +1을 하고 있었습니다. 턴 1이 세션을 인덱스에 넣으므로, 브랜치의 첫 세션이 두 번째 항목부터 `(#2)`를 달았습니다 — 뒤에 아무 흐름도 없는데. 이제 카운트가 기록 중인 세션을 제외합니다(`count_branch_sessions(..., exclude_session_id=)`). 4.12.0과 마찬가지로 **이미 쓰인 항목의 숫자는 소급해 고치지 않습니다** — 4.12.0~이 수정 사이에 쓰인 항목의 차수는 각 세션의 첫 항목에서만 정확합니다
 - **설치되는 `/diary-notion` slash command 문구 2건 정정**: `ensure`가 보장하는 뷰 수를 "5 core + 5 operating"으로 안내했지만 실제는 3 core + 2 operating입니다(`notion_views.py`가 정의하는 그대로). `--preview-file`을 일반 push 옵션처럼 안내했지만 실제로는 `--dry-run` 경로에서만 읽히고 실제 push에서는 무시됩니다. 코드 동작은 그대로이고 안내 문구만 실동작에 맞췄습니다 — 반영하려면 `agent-diary install --force`
 

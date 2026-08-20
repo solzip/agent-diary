@@ -255,6 +255,78 @@ def print_team_stats(stats_data):
     print("+" + "=" * width + "+")
 
 
+def _member_summaries(members_dir, date_strs):
+    """Read every member's daily files for the given dates.
+
+    Shared by the weekly and monthly reports — the two differ only in which
+    dates they cover and where they save.
+    """
+    total_sessions = 0
+    member_summaries = {}
+
+    for member_name in sorted(os.listdir(members_dir)):
+        member_path = os.path.join(members_dir, member_name)
+        if not os.path.isdir(member_path):
+            continue
+
+        m_sessions = 0
+        m_tasks = []
+        m_projects = set()
+        m_categories = Counter()
+
+        for date_str in date_strs:
+            filepath = os.path.join(member_path, "%s.md" % date_str)
+            stats = parse_daily_file(filepath)
+            m_sessions += stats["sessions"]
+            m_tasks.extend(stats["tasks"][:3])
+            m_projects |= stats["projects"]
+            for c in stats.get("categories", []):
+                m_categories[c] += 1
+
+        if m_sessions > 0:
+            total_sessions += m_sessions
+            member_summaries[member_name] = {
+                "sessions": m_sessions,
+                "tasks": m_tasks,
+                "projects": m_projects,
+                "categories": m_categories,
+            }
+
+    return total_sessions, member_summaries
+
+
+def _render_team_report(title, subtitle, total_sessions, member_summaries):
+    lines = [title, subtitle, ""]
+
+    lines.append("| Item | Count |")
+    lines.append("|------|-------|")
+    lines.append("| Total Sessions | **%d** |" % total_sessions)
+    lines.append("| Active Members | **%d** |" % len(member_summaries))
+    lines.append("")
+
+    for name, summary in member_summaries.items():
+        cats = " ".join("%s(%d)" % (c, n) for c, n in summary["categories"].most_common(3))
+        lines.append("### %s (%d sessions)" % (name, summary["sessions"]))
+        lines.append("- Projects: %s" % ", ".join("`%s`" % p for p in summary["projects"]))
+        if cats:
+            lines.append("- Categories: %s" % cats)
+        if summary["tasks"]:
+            for t in summary["tasks"][:3]:
+                lines.append("  - %s" % t)
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _save_team_report(team_repo_path, subdir, filename, report):
+    report_dir = os.path.join(team_repo_path, subdir)
+    Path(report_dir).mkdir(parents=True, exist_ok=True)
+    filepath = os.path.join(report_dir, filename)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(report)
+    return filepath
+
+
 def team_weekly_report(team_repo_path, target_date=None, lang="ko"):
     """Generate team weekly report."""
     config = load_config()
@@ -274,71 +346,57 @@ def team_weekly_report(team_repo_path, target_date=None, lang="ko"):
     if not os.path.isdir(members_dir):
         return None
 
-    lines = []
-    if lang == "ko":
-        lines.append("# Team Weekly Report — W%d" % week_num)
-    else:
-        lines.append("# Team Weekly Report — W%d" % week_num)
-    lines.append("### %s ~ %s" % (monday.strftime("%Y-%m-%d"), dates[-1].strftime("%Y-%m-%d")))
-    lines.append("")
+    total_sessions, member_summaries = _member_summaries(
+        members_dir, [d.strftime("%Y-%m-%d") for d in dates]
+    )
+    report = _render_team_report(
+        "# Team Weekly Report — W%d" % week_num,
+        "### %s ~ %s" % (monday.strftime("%Y-%m-%d"), dates[-1].strftime("%Y-%m-%d")),
+        total_sessions, member_summaries,
+    )
 
-    total_sessions = 0
-    member_summaries = {}
-
-    for member_name in sorted(os.listdir(members_dir)):
-        member_path = os.path.join(members_dir, member_name)
-        if not os.path.isdir(member_path):
-            continue
-
-        m_sessions = 0
-        m_tasks = []
-        m_projects = set()
-        m_categories = Counter()
-
-        for date in dates:
-            date_str = date.strftime("%Y-%m-%d")
-            filepath = os.path.join(member_path, "%s.md" % date_str)
-            stats = parse_daily_file(filepath)
-            m_sessions += stats["sessions"]
-            m_tasks.extend(stats["tasks"][:3])
-            m_projects |= stats["projects"]
-            for c in stats.get("categories", []):
-                m_categories[c] += 1
-
-        if m_sessions > 0:
-            total_sessions += m_sessions
-            member_summaries[member_name] = {
-                "sessions": m_sessions,
-                "tasks": m_tasks,
-                "projects": m_projects,
-                "categories": m_categories,
-            }
-
-    lines.append("| Item | Count |")
-    lines.append("|------|-------|")
-    lines.append("| Total Sessions | **%d** |" % total_sessions)
-    lines.append("| Active Members | **%d** |" % len(member_summaries))
-    lines.append("")
-
-    for name, summary in member_summaries.items():
-        cats = " ".join("%s(%d)" % (c, n) for c, n in summary["categories"].most_common(3))
-        lines.append("### %s (%d sessions)" % (name, summary["sessions"]))
-        lines.append("- Projects: %s" % ", ".join("`%s`" % p for p in summary["projects"]))
-        if cats:
-            lines.append("- Categories: %s" % cats)
-        if summary["tasks"]:
-            for t in summary["tasks"][:3]:
-                lines.append("  - %s" % t)
-        lines.append("")
-
-    report = "\n".join(lines)
-
-    # Save
-    weekly_dir = os.path.join(team_repo_path, "weekly")
-    Path(weekly_dir).mkdir(parents=True, exist_ok=True)
     filename = "team-W%02d_%s.md" % (week_num, monday.strftime("%Y-%m-%d"))
-    filepath = os.path.join(weekly_dir, filename)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(report)
+    filepath = _save_team_report(team_repo_path, "weekly", filename, report)
+
+    return report, filepath
+
+
+def team_monthly_report(team_repo_path, month=None, lang="ko"):
+    """Generate team monthly report.
+
+    `team monthly` used to route to the weekly report with no month argument,
+    so `--month` was accepted and ignored — a month-scoped command silently
+    reporting the current week instead.
+    """
+    config = load_config()
+    tz_offset = config.get("timezone_offset", 9)
+    local_tz = timezone(timedelta(hours=tz_offset))
+    now = datetime.now(local_tz)
+
+    if month:
+        year, mon = month.split("-")
+        year, mon = int(year), int(mon)
+    else:
+        year, mon = now.year, now.month
+
+    members_dir = os.path.join(team_repo_path, "members")
+    if not os.path.isdir(members_dir):
+        return None
+
+    import calendar
+    _, days_in_month = calendar.monthrange(year, mon)
+    date_strs = ["%04d-%02d-%02d" % (year, mon, d) for d in range(1, days_in_month + 1)]
+    month_str = "%04d-%02d" % (year, mon)
+
+    total_sessions, member_summaries = _member_summaries(members_dir, date_strs)
+    report = _render_team_report(
+        "# Team Monthly Report — %s" % month_str,
+        "### %s ~ %s" % (date_strs[0], date_strs[-1]),
+        total_sessions, member_summaries,
+    )
+
+    filepath = _save_team_report(
+        team_repo_path, "monthly", "team-%s.md" % month_str, report
+    )
 
     return report, filepath
