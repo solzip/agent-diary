@@ -43,8 +43,8 @@
 
   <!-- Phase 2: Session ends, diary generated -->
   <g class="phase2">
-    <text class="dim" x="20" y="168">── Claude Code session ends ──</text>
-    <text class="highlight" x="20" y="190">[diary] Session #3 for 2026-03-24 | project: my-app | categories: feature,test</text>
+    <text class="dim" x="20" y="168">── Claude Code finishes replying ──</text>
+    <text class="highlight" x="20" y="190">── an entry is appended to ~/working-diary/2026-03-24.md ──</text>
 
     <text class="prompt" x="20" y="218">$</text>
     <text class="cmd" x="36" y="218">cat ~/working-diary/2026-03-24.md</text>

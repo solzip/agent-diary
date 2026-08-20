@@ -220,3 +220,74 @@ class TestItKeepsTheThread:
         )
         assert reindex_all(str(diary)) == 1
         assert load_index(str(diary))["entries"][0]["branch"] == "feature/x"
+
+
+class TestTheOrdinalCountsOtherSessionsNotThisOne:
+    """4.12.0 made the count sessions instead of turns, but core still adds 1
+    to a count that includes the session being written: turn 1 puts the
+    session in the index, so turn 2 of the very first session on a branch
+    computed ordinal 2 and stamped `(#2)` on a thread with nothing behind it.
+    """
+
+    def _turn(self, text, ts):
+        return json.dumps({"type": "user", "timestamp": ts,
+                           "message": {"content": [{"type": "text", "text": text}]}}) + "\n"
+
+    def _run_two_turns(self, tmp_path, monkeypatch, session_id, transcript_name):
+        import os
+        from unittest.mock import patch
+
+        from claude_diary.core import process_session
+
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        monkeypatch.setenv("CLAUDE_DIARY_DIR", str(tmp_path / "diary"))
+
+        transcript = tmp_path / transcript_name
+        with patch("claude_diary.core.collect_git_info") as mock_git:
+            mock_git.return_value = {"branch": "feature/x", "commits": [],
+                                     "diff_stat": None}
+            transcript.write_text(self._turn("first request", "2026-07-01T10:00:00Z"),
+                                  encoding="utf-8")
+            assert process_session(session_id, str(transcript), str(tmp_path)) is True
+            with open(transcript, "a", encoding="utf-8") as f:
+                f.write(self._turn("second request", "2026-07-01T10:05:00Z"))
+            assert process_session(session_id, str(transcript), str(tmp_path)) is True
+
+        diary_dir = tmp_path / "diary"
+        return "\n".join(
+            (diary_dir / name).read_text(encoding="utf-8")
+            for name in os.listdir(diary_dir) if name.endswith(".md")
+        )
+
+    def test_every_turn_of_the_first_session_is_unnumbered(self, tmp_path, monkeypatch):
+        """Turn 2 arrives with the session already indexed by turn 1. That is
+        still the first session on the branch, so still no number."""
+        text = self._run_two_turns(tmp_path, monkeypatch, "session-one", "t1.jsonl")
+        assert "(#" not in text
+
+    def test_the_second_session_is_numbered_2_on_every_turn(self, tmp_path, monkeypatch):
+        text1 = self._run_two_turns(tmp_path, monkeypatch, "session-one", "t1.jsonl")
+        assert "(#" not in text1
+        text2 = self._run_two_turns(tmp_path, monkeypatch, "session-two", "t2.jsonl")
+        assert text2.count("(#2)") == 2
+        assert "(#3)" not in text2
+
+    def test_the_count_can_leave_out_the_session_being_written(self, tmp_path):
+        from claude_diary.indexer import count_branch_sessions, update_index
+
+        diary = tmp_path / "d"
+        diary.mkdir()
+        entry = {
+            "date": "2026-07-01", "time": "10:00:00", "project": "proj",
+            "session_id": "current", "user_prompts": ["x"],
+            "files_created": [], "files_modified": [], "categories": [],
+            "git_info": {"branch": "feature/x", "commits": []}, "code_stats": None,
+        }
+        update_index(str(diary), entry)
+        update_index(str(diary), dict(entry, session_id="earlier"))
+
+        assert count_branch_sessions(str(diary), "proj", "feature/x") == 2
+        assert count_branch_sessions(
+            str(diary), "proj", "feature/x", exclude_session_id="current"
+        ) == 1

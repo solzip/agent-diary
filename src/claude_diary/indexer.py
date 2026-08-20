@@ -82,7 +82,7 @@ def load_index(diary_dir):
     return _load_index(index_path)
 
 
-def count_branch_sessions(diary_dir, project, branch):
+def count_branch_sessions(diary_dir, project, branch, exclude_session_id=None):
     """How many sessions this project has already recorded on this branch.
 
     Used to stamp the sequence number into the entry being written, so the
@@ -103,16 +103,26 @@ def count_branch_sessions(diary_dir, project, branch):
     between them rather than once each; an unattributable row should not be
     able to inflate the number, which is the defect being fixed.
 
+    **`exclude_session_id` exists because the caller is usually mid-session.**
+    Turn 1 of a session puts its id in the index, so from turn 2 onward a
+    count that includes it says "one more session than there really was
+    before this one" — the very first session on a branch was stamping
+    `(#2)` on its second entry. The session being written is not a prior
+    session; the caller passes its own id to keep it out of the count.
+
     Zero when either is missing, which reads as "no thread to place this in".
     """
     if not project or not branch:
         return 0
     index = load_index(diary_dir)
-    return len({
+    sessions = {
         entry.get("session_id") or ""
         for entry in index.get("entries", [])
         if entry.get("project") == project and entry.get("branch") == branch
-    })
+    }
+    if exclude_session_id:
+        sessions.discard(exclude_session_id)
+    return len(sessions)
 
 
 def reindex_all(diary_dir):

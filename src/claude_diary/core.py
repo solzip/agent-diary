@@ -123,8 +123,13 @@ def process_session(session_id: str, transcript_path: str, cwd: str,
         branch = (entry_data.get("git_info") or {}).get("branch", "")
         if branch:
             from claude_diary.indexer import count_branch_sessions
+            # The count must leave this session out: from turn 2 onward it is
+            # already in the index, and a prior-session count that includes
+            # the session being written is off by one.
             entry_data["branch_session_ordinal"] = (
-                count_branch_sessions(diary_dir, project, branch) + 1
+                count_branch_sessions(
+                    diary_dir, project, branch, exclude_session_id=session_id
+                ) + 1
             )
     except Exception as e:
         logger.warning("Branch thread lookup failed: %s", e)
