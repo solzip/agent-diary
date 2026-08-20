@@ -7,13 +7,13 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Core Dependencies: 0](https://img.shields.io/badge/core%20dependencies-0-brightgreen)](https://github.com/solzip/agent-diary)
 
-> English | [한국어](README.ko.md)
+> English | [한국어](https://github.com/solzip/agent-diary/blob/main/README.ko.md)
 >
 > This is a community project. It is not an official Anthropic or OpenAI project.
 
-![Agent Diary demo](docs/demo.svg)
+![Agent Diary demo](https://raw.githubusercontent.com/solzip/agent-diary/main/docs/demo.svg)
 
-> **Here to read the code?** [Architecture](docs/ARCHITECTURE.md) covers the idempotency key and its cache invalidation, a retry policy that branches on cause, schema versioning, and what partial failure means. The [postmortem](docs/postmortem/2026-08-07-ensure-wipe.md) is how one schema PATCH emptied six properties across 497 rows.
+> **Here to read the code?** [Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md) covers the idempotency key and its cache invalidation, a retry policy that branches on cause, schema versioning, and what partial failure means. The [postmortem](https://github.com/solzip/agent-diary/blob/main/docs/postmortem/2026-08-07-ensure-wipe.md) is how one schema PATCH emptied six properties across 497 rows.
 
 ## 1. Why
 
@@ -61,7 +61,7 @@ Categories are inferred from the work. Branch, commits and diff stats are read f
 
 **An entry covers one turn, not one session.** The Stop Hook fires each time Claude Code finishes replying, and an entry holds only what happened since the previous one, so a long session leaves a series of entries in the day's file. Diaries written before 4.9.0 look different: every entry there re-recorded the session's opening prompts, so the same requests repeat down the file.
 
-`📝 Work Summary` is not in the entry above because the hook does not write one. It appears when an agent authors the entry itself — `/diary`, `$diary`, or `agent-diary write --input` — and supplies `summary_hints`.
+`📝 Work Summary` is not in the entry above because the hook does not write one. It appears when an agent authors the entry itself — `$diary`, or `agent-diary write --input` — and supplies `summary_hints`. `/diary` reads the transcript rather than authoring an entry, so it never produces one either.
 
 **The branch line carries a thread number.** ``🌿 Branch: `feat/jwt-auth` (#3)`` means this is the third session this project has recorded on that branch, so an entry says where it sits in a piece of work rather than leaving you to count. It counts sessions, not entries — a long sitting is many entries and one number. The first session on a branch is not numbered, because there is no thread behind it to point at.
 
@@ -292,7 +292,7 @@ Every push writes a record of the run under the current working directory, **by 
   input.json        the original task JSON
   git-diff.patch    the working tree diff at push time
   preview.md        the rendered Notion body
-  manifest.json     the files above with sha256, plus a push result summary
+  manifest.json     the files above with sha256; a real push adds its result summary
 ```
 
 Notion is the destination, not the record. If a push half-fails, or a row is later edited by hand, this local copy is the only way back to what was actually submitted.
@@ -330,11 +330,11 @@ Expandable task hierarchy uses Notion native Sub-items. Enable it once in the No
 2. Open the top-right `...` menu and enable `Sub-items`.
 3. Run `agent-diary diary-notion ensure` again.
 
-Rows are still recorded if Sub-items are not enabled. Only visual nesting is missing, and push prints a hint.
+Rows are still created if Sub-items are not enabled, but a task that names a parent is reported as a failure: push prints the hint above, preserves the input JSON, and exits with code `1` so the run can be repeated after enabling Sub-items.
 
 ## 3. Logic
 
-This section covers **what flows where, in what order**. Why it is built that way — the idempotency key, the retry policy, schema versioning, partial-failure handling — is in [Architecture](docs/ARCHITECTURE.md).
+This section covers **what flows where, in what order**. Why it is built that way — the idempotency key, the retry policy, schema versioning, partial-failure handling — is in [Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md).
 
 ### 3-1. Core Logic
 
@@ -363,7 +363,7 @@ Key modules:
 | Automatic diary core | `src/claude_diary/core.py` | Claude Code Stop Hook diary pipeline |
 | Manual diary core | `src/claude_diary/cli/write.py` | Handles `/diary`, `$diary`, and `agent-diary write` |
 | Notion push | `src/claude_diary/cli/notion_push/` | Pushes task JSON as Notion rows (split into validate/properties/relations/artifacts) |
-| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | Ensures schema v8, 5 core views and 5 operating views |
+| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | Ensures schema v8, 3 core views and 2 operating views |
 | Notion review queue | `src/claude_diary/cli/notion_review.py` | Lists `Needs Review` rows; `--apply` records `Reviewed` |
 | Formatter | `src/claude_diary/formatter.py` | Creates Markdown entries and Notion page bodies |
 
@@ -497,7 +497,7 @@ agent-diary reindex
 agent-diary delete --last
 ```
 
-<a id="reindex-once-on-4-11-3"></a>
+<a id="reindex-once-on-4-11-3"></a><a id="user-content-reindex-once-on-4-11-3"></a>
 **Run `agent-diary reindex` once after upgrading to 4.11.3.** Before that release `reindex` rebuilt the index from the text of the diary and kept only the *first* category on each entry, so a search by category answered with part of its matches — on a real 73-file diary, `refactor` returned 35 of 1,183. The diary files themselves were always correct; only the index built from them was thin, and only if it was ever rebuilt. The incremental path the hook writes through was never affected. A rebuild on 4.11.3 or later therefore recovers all of it.
 
 Extension commands:
@@ -516,11 +516,12 @@ agent-diary team init --repo <url> --name <name>
 agent-diary team add-member --name <name> --role member
 ```
 
-The legacy CLI remains supported.
+The legacy command names remain supported: the `working-diary` and `claude-diary` binaries are the same CLI, and `notion` still works as an alias for `diary-notion`.
 
 ```bash
-agent-diary write
-agent-diary diary-notion ensure
+working-diary write
+claude-diary diary-notion ensure
+agent-diary notion push --input .diary-notion-<id>.json
 ```
 
 ## 5. Configuration
@@ -609,7 +610,7 @@ The path form exists because a name alone cannot tell `~/work/acme` from `~/pers
 }
 ```
 
-Matches become `****` in the diary, in Notion, and in every exporter, because masking happens before the entry is formatted.
+Matches become `****` in the diary and in every exporter fed from it — including the Notion exporter — because masking happens before the entry is formatted. One path is not covered: task JSON an agent authors for `diary-notion push` is pushed as the agent wrote it; the push command itself does not scan.
 
 `agent-diary doctor` reports how many of each rule are active, so "what is this recording" has an answer you can check rather than remember.
 
@@ -709,17 +710,17 @@ This README focuses on currently usable functionality. Detailed design and plann
 
 If you are deciding whether the code is worth reading, start with these two.
 
-- **[Architecture](docs/ARCHITECTURE.md)** — the idempotency model, the retry and error-taxonomy policy, cache invalidation, schema versioning, what partial failure means, and why the core has no dependencies
-- **[Postmortem: `ensure` emptied six properties across 497 rows](docs/postmortem/2026-08-07-ensure-wipe.md)** — symptom, measurement against production, root cause, fix, regression tests, and why it went unseen for two months
+- **[Architecture](https://github.com/solzip/agent-diary/blob/main/docs/ARCHITECTURE.md)** — the idempotency model, the retry and error-taxonomy policy, cache invalidation, schema versioning, what partial failure means, and why the core has no dependencies
+- **[Postmortem: `ensure` emptied six properties across 497 rows](https://github.com/solzip/agent-diary/blob/main/docs/postmortem/2026-08-07-ensure-wipe.md)** — symptom, measurement against production, root cause, fix, regression tests, and why it went unseen for two months
 
 Detailed design notes:
 
-- [Decision records (ADR)](docs/decisions/README.md) — the options that were compared, and why the rejected ones were rejected
-- [Notion hierarchical design](docs/02-design/features/diary-notion-hierarchical.design.md)
-- [Notion views design](docs/02-design/features/diary-notion-views.design.md)
-- [Distribution plan](docs/plans/phase-d-distribution.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
+- [Decision records (ADR)](https://github.com/solzip/agent-diary/blob/main/docs/decisions/README.md) — the options that were compared, and why the rejected ones were rejected
+- [Notion hierarchical design](https://github.com/solzip/agent-diary/blob/main/docs/02-design/features/diary-notion-hierarchical.design.md)
+- [Notion views design](https://github.com/solzip/agent-diary/blob/main/docs/02-design/features/diary-notion-views.design.md)
+- [Distribution plan](https://github.com/solzip/agent-diary/blob/main/docs/plans/phase-d-distribution.md)
+- [Contributing](https://github.com/solzip/agent-diary/blob/main/CONTRIBUTING.md)
+- [Security](https://github.com/solzip/agent-diary/blob/main/SECURITY.md)
 
 ## 11. License
 
