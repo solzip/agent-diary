@@ -62,7 +62,7 @@ allowed-tools:
 ## Local Artifact Store
 
 - `diary-notion push` stores local run artifacts under `.agent-diary/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`.
-- Use `--preview-file` for an extra Markdown preview path or `--no-artifacts` to disable local artifact writes.
+- Use `--preview-file` together with `--dry-run` to save the rendered preview as Markdown (on a real push the flag is ignored), or `--no-artifacts` to disable local artifact writes.
 
 ## 단계
 
@@ -261,14 +261,14 @@ Split the current Codex session into task-sized entries and push them to Notion.
 ## Current Implementation Contract
 
 - `$diary-notion` is a row push workflow only. Do not run schema/view ensure unless the user explicitly asks for it.
-- `agent-diary diary-notion ensure` is the separate maintenance command that guarantees schema v8, native sub-items, 5 core views, and 5 operating views.
+- `agent-diary diary-notion ensure` is the separate maintenance command that guarantees schema v8, native sub-items, 3 core views, and 2 operating views.
 - Use Notion native sub-items for containment by setting `parent_index`. If the native relation is not enabled in Notion, still push the rows and report that sub-item activation is needed.
 - Treat legacy `Parent Task` / `Sub-items` as compatibility data only. Do not target them directly in JSON.
 - Use `Depends On` only for prerequisite links between large top-level main tasks. Never use dependencies for child tasks.
 - Never write `"unknown"` as `project`; omit it or leave it blank so the CLI falls back to the command cwd folder name.
 - Page bodies render as compact work reports: summary, results, work table, decisions, issues/risks, next actions/support, and appendix toggles.
 - Notion is the report surface; raw logs, long diffs, and bulky evidence belong in local artifact files and should be referenced by path/hash instead of pasted.
-- `diary-notion push` writes local run artifacts under `.agent-diary/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`. Use `--preview-file` for an extra Markdown preview path or `--no-artifacts` to disable local artifact writes.
+- `diary-notion push` writes local run artifacts under `.agent-diary/runs` by default: `input.json`, `git-diff.patch`, `preview.md`, and `manifest.json`. Use `--preview-file` together with `--dry-run` to save the rendered preview as Markdown (on a real push the flag is ignored), or `--no-artifacts` to disable local artifact writes.
 - For testing, QA, review, validation, or verification sessions, create a row even without code changes; keep `verification` short and place the meaningful prompt-result document in `prompt_outputs` or `verification_artifacts` so it renders inside a toggle.
 
 ## Workflow

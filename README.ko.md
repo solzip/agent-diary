@@ -61,7 +61,7 @@ Agent Diary는 그 맥락을 작업이 진행되는 동안 자동으로 붙잡�
 
 **항목 하나는 턴 하나지 세션 하나가 아닙니다.** Stop Hook은 Claude Code가 답을 마칠 때마다 돌고, 항목에는 직전 항목 이후에 일어난 것만 들어갑니다. 그래서 긴 세션은 그날 파일에 항목 여러 개를 남깁니다. 4.9.0 이전에 쓰인 일지는 모양이 다릅니다 — 그때는 항목마다 세션 앞부분의 요청을 다시 적어서, 같은 요청이 파일 아래로 계속 반복됩니다.
 
-위 예시에 `📝 작업 요약`이 없는 건 훅이 그 항목을 쓰지 않기 때문입니다. 이건 에이전트가 항목을 직접 작성할 때 — `/diary`, `$diary`, `agent-diary write --input` — `summary_hints`를 넣어주면 나옵니다.
+위 예시에 `📝 작업 요약`이 없는 건 훅이 그 항목을 쓰지 않기 때문입니다. 이건 에이전트가 항목을 직접 작성할 때 — `$diary`, `agent-diary write --input` — `summary_hints`를 넣어주면 나옵니다. `/diary`는 항목을 직접 작성하지 않고 transcript를 읽어 기록하므로 이 블록을 만들지 않습니다.
 
 **브랜치 줄에는 차수가 붙습니다.** ``🌿 브랜치: `feat/jwt-auth` (#3)``은 이 프로젝트가 그 브랜치에서 기록한 **세 번째 세션**이라는 뜻입니다. 항목 자체가 "이 작업의 어디쯤인지"를 말해주니 세어볼 필요가 없습니다. **항목이 아니라 세션을 셉니다** — 오래 붙잡고 있던 날은 항목이 여러 개여도 숫자는 하나입니다. 브랜치의 첫 세션에는 번호를 붙이지 않습니다. 뒤에 가리킬 흐름이 없기 때문입니다.
 
@@ -294,7 +294,7 @@ push는 **기본적으로** 실행할 때마다 현재 작업 디렉터리 아�
   input.json        원본 task JSON
   git-diff.patch    push 시점의 작업 트리 diff
   preview.md        Notion 본문 렌더링 결과
-  manifest.json     위 파일들의 목록과 sha256, push 결과 요약
+  manifest.json     위 파일들의 목록과 sha256. 실제 push였다면 결과 요약까지
 ```
 
 Notion은 기록의 목적지이지 사본이 아닙니다. push가 중간에 실패하거나 row를 나중에 손으로 고치면, 실제로 무엇을 보냈는지 되짚을 방법은 이 로컬 기록뿐입니다.
@@ -332,7 +332,7 @@ agent-diary diary-notion review --year 2026
 2. 우상단 `...` 메뉴에서 `Sub-items`를 활성화합니다.
 3. 다시 `agent-diary diary-notion ensure`를 실행합니다.
 
-Sub-items가 아직 없어도 row 기록은 정상 동작합니다. 다만 계층 nesting만 표시되지 않고, push 명령이 안내를 출력합니다.
+Sub-items가 아직 없어도 row 자체는 만들어집니다. 다만 부모를 지정한 task는 실패로 집계됩니다 — push가 위 안내를 출력하고, 입력 JSON을 보존한 채 종료 코드 `1`로 끝나므로, Sub-items를 켠 뒤 같은 push를 다시 실행하면 됩니다.
 
 ## 3. 로직
 
@@ -365,7 +365,7 @@ core 처리
 | 자동 기록 core | `src/claude_diary/core.py` | Claude Code Stop Hook 자동 일지 pipeline |
 | 수동 기록 core | `src/claude_diary/cli/write.py` | `/diary`, `$diary`, `agent-diary write` 처리 |
 | Notion push | `src/claude_diary/cli/notion_push/` | task JSON을 Notion row로 push (validate/properties/relations/artifacts로 분리) |
-| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | schema v8, core view 5개와 operating view 5개 보장 |
+| Notion schema/view | `src/claude_diary/cli/notion_ensure.py` | schema v8, core view 3개와 operating view 2개 보장 |
 | Notion 검토 큐 | `src/claude_diary/cli/notion_review.py` | `Needs Review` row 나열, `--apply` 시 `Reviewed` 기록 |
 | Formatter | `src/claude_diary/formatter.py` | Markdown entry와 Notion page body 생성 |
 
@@ -520,11 +520,12 @@ agent-diary team init --repo <url> --name <name>
 agent-diary team add-member --name <name> --role member
 ```
 
-기존 CLI도 계속 지원합니다.
+기존 명령 이름도 계속 지원합니다. `working-diary`·`claude-diary` 바이너리는 같은 CLI이고, `notion`은 `diary-notion`의 별칭으로 남아 있습니다.
 
 ```bash
-agent-diary write
-agent-diary diary-notion ensure
+working-diary write
+claude-diary diary-notion ensure
+agent-diary notion push --input .diary-notion-<id>.json
 ```
 
 ## 5. 설정
@@ -613,7 +614,7 @@ CLAUDE_DIARY_SKIP=1 claude
 }
 ```
 
-마스킹은 항목을 포맷하기 전에 일어나므로, 일지·Notion·모든 exporter에서 똑같이 `****`가 됩니다.
+마스킹은 항목을 포맷하기 전에 일어나므로, 일지와 거기서 이어지는 모든 exporter — Notion exporter 포함 — 에서 똑같이 `****`가 됩니다. 덮이지 않는 경로가 하나 있습니다: 에이전트가 `diary-notion push`용으로 직접 작성한 task JSON은 작성된 그대로 push되고, push 명령 자체는 스캔하지 않습니다.
 
 `agent-diary doctor`가 각 규칙이 몇 개 걸려 있는지 알려줍니다. "지금 뭘 기록하고 있더라"를 기억이 아니라 확인으로 답할 수 있게요.
 
